@@ -1,0 +1,95 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import {
+  BarChart3,
+  ChefHat,
+  ClipboardList,
+  FileCheck2,
+  LockKeyhole,
+  Menu,
+  Settings2,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { classNames } from "@/lib/utils";
+import type { AppRole } from "@/lib/types";
+
+const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
+  { href: "/dashboard", label: "Group overview", icon: BarChart3 },
+  { href: "/reports", label: "Weekly reports", icon: ClipboardList },
+  { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
+  { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
+  { href: "/costs", label: "Cost control", icon: LockKeyhole, roles: ["admin", "group_manager", "finance"] },
+  { href: "/settings/sites", label: "Sites & access", icon: Settings2, roles: ["admin"] },
+];
+
+export function AppShell({ children, isDemo, user }: { children: React.ReactNode; isDemo: boolean; user: { fullName: string; role: AppRole } }) {
+  const pathname = usePathname();
+  const [navOpen, setNavOpen] = useState(false);
+
+  return (
+    <div className="app-shell">
+      <aside className={classNames("app-shell__sidebar", navOpen && "app-shell__sidebar--open")}>
+        <div className="app-shell__brand">
+          <div className="app-shell__brand-mark">
+            <ChefHat aria-hidden="true" size={25} />
+          </div>
+          <div className="app-shell__brand-copy">
+            <strong>HOS Kitchen Reports</strong>
+            <span>Weekly operations</span>
+          </div>
+        </div>
+        <nav aria-label="Main navigation" className="app-shell__nav">
+          {navItems.filter((item) => !item.roles || item.roles.includes(user.role)).map(({ href, icon: Icon, label }) => {
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return (
+              <Link
+                className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")}
+                href={href}
+                key={href}
+                onClick={() => setNavOpen(false)}
+              >
+                <Icon aria-hidden="true" size={18} />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="app-shell__profile">
+          <div className="app-shell__profile-name">{user.fullName}</div>
+          <div className="app-shell__profile-role">{user.role.replaceAll("_", " ")} · Scoped access</div>
+        </div>
+      </aside>
+      <div className="app-shell__main">
+        <header className="app-shell__topbar">
+          <button
+            aria-label={navOpen ? "Close navigation" : "Open navigation"}
+            className="app-shell__mobile-button"
+            onClick={() => setNavOpen((value) => !value)}
+            type="button"
+          >
+            {navOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <div className="app-shell__context">Group reporting · Europe/London</div>
+          {isDemo ? (
+            <div className="demo-banner">
+              <CircleDashedIcon />
+              <strong>Demo workspace</strong>
+              <span>Connect Supabase to go live</span>
+            </div>
+          ) : (
+            <div className="status-badge status-badge--approved">Live workspace</div>
+          )}
+        </header>
+        <main className="app-shell__content">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function CircleDashedIcon() {
+  return <span aria-hidden="true">●</span>;
+}

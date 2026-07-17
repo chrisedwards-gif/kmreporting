@@ -1,0 +1,170 @@
+import { calculateCosts } from "@/lib/reporting/calculations";
+import { buildReviewFlags } from "@/lib/reporting/review";
+import type { SitePerformance, WeeklyReport } from "@/lib/types";
+
+const siteDefinitions = [
+  {
+    id: "dough-religion",
+    code: "DR-MCR",
+    name: "Dough Religion",
+    manager: "Warren",
+    targets: { foodCostTarget: 30, labourTarget: 32, wasteTarget: 1.2 },
+    input: {
+      netSales: 48_620,
+      openingStock: 5_800,
+      purchases: 14_750,
+      credits: 420,
+      transfersIn: 250,
+      transfersOut: 160,
+      closingStock: 5_420,
+      adjustments: 0,
+      paidHours: 850,
+      averageLoadedRate: 16.1,
+      agencyCost: 850,
+      overtimePremium: 210,
+      wasteCost: 430,
+    },
+    status: "approved" as const,
+    complianceIssues: "",
+    supportNeeded: "",
+  },
+  {
+    id: "choi-wan",
+    code: "CW-MCR",
+    name: "Choi Wan",
+    manager: "Ricky",
+    targets: { foodCostTarget: 31, labourTarget: 32, wasteTarget: 1.2 },
+    input: {
+      netSales: 42_180,
+      openingStock: 4_900,
+      purchases: 14_520,
+      credits: 180,
+      transfersIn: 130,
+      transfersOut: 220,
+      closingStock: 4_610,
+      adjustments: 90,
+      paidHours: 805,
+      averageLoadedRate: 16.2,
+      agencyCost: 1_480,
+      overtimePremium: 320,
+      wasteCost: 620,
+    },
+    status: "review_required" as const,
+    complianceIssues: "One chilled delivery was logged late; corrective action recorded.",
+    supportNeeded: "Short-term CDP cover for next Saturday.",
+  },
+  {
+    id: "kardia",
+    code: "KAR-MCR",
+    name: "Kardia",
+    manager: "Manager TBC",
+    targets: { foodCostTarget: 30.5, labourTarget: 33, wasteTarget: 1.2 },
+    input: {
+      netSales: 36_940,
+      openingStock: 4_200,
+      purchases: 10_840,
+      credits: 300,
+      transfersIn: 90,
+      transfersOut: 140,
+      closingStock: 4_010,
+      adjustments: 0,
+      paidHours: 720,
+      averageLoadedRate: 15.9,
+      agencyCost: 420,
+      overtimePremium: 180,
+      wasteCost: 295,
+    },
+    status: "submitted" as const,
+    complianceIssues: "",
+    supportNeeded: "",
+  },
+];
+
+export const demoSites: SitePerformance[] = siteDefinitions.map((site) => {
+  const costs = calculateCosts(site.input);
+  const flags = buildReviewFlags(costs, site.targets, {
+    complianceIssues: site.complianceIssues,
+    supportNeeded: site.supportNeeded,
+  });
+
+  return {
+    reportId: site.id,
+    id: site.id,
+    code: site.code,
+    name: site.name,
+    manager: site.manager,
+    netSales: site.input.netSales,
+    ...costs,
+    ...site.targets,
+    status: site.status,
+    flags,
+  };
+});
+
+const copyBySite: Record<string, Omit<WeeklyReport, "costs">> = {
+  "dough-religion": {
+    id: "10000000-0000-4000-8000-000000000001",
+    siteId: "dough-religion",
+    siteName: "Dough Religion",
+    manager: "Warren",
+    weekStart: "2026-07-06",
+    weekEnd: "2026-07-12",
+    status: "approved",
+    updatedAt: "2026-07-14T09:18:00Z",
+    submittedAt: "2026-07-13T10:22:00Z",
+    wins: "Friday service hit a new covers record with ticket times below 14 minutes.",
+    operationalIssues: "Dough mixer belt showed wear and has been booked for replacement.",
+    staffingIssues: "No material issues.",
+    complianceIssues: "",
+    equipmentIssues: "Mixer belt replacement booked for Wednesday morning.",
+    actionsUnderway: "Rebalanced Friday prep plan and retained the new pass positions.",
+    supportNeeded: "",
+  },
+  "choi-wan": {
+    id: "10000000-0000-4000-8000-000000000002",
+    siteId: "choi-wan",
+    siteName: "Choi Wan",
+    manager: "Ricky",
+    weekStart: "2026-07-06",
+    weekEnd: "2026-07-12",
+    status: "review_required",
+    updatedAt: "2026-07-14T11:42:00Z",
+    submittedAt: "2026-07-14T11:42:00Z",
+    wins: "New lunch bundle improved weekday conversion and guest feedback remained strong.",
+    operationalIssues: "Agency cover and late ordering drove avoidable cost in the weekend window.",
+    staffingIssues: "One CDP absence required agency cover on Friday and Saturday.",
+    complianceIssues: "One chilled delivery was logged late; corrective action recorded.",
+    equipmentIssues: "Dishwasher rinse pressure is being monitored after an engineer visit.",
+    actionsUnderway: "Rota rebuilt around confirmed availability; ordering cut-off moved earlier.",
+    supportNeeded: "Short-term CDP cover for next Saturday.",
+  },
+  kardia: {
+    id: "10000000-0000-4000-8000-000000000003",
+    siteId: "kardia",
+    siteName: "Kardia",
+    manager: "Manager TBC",
+    weekStart: "2026-07-06",
+    weekEnd: "2026-07-12",
+    status: "submitted",
+    updatedAt: "2026-07-14T08:06:00Z",
+    submittedAt: "2026-07-14T08:06:00Z",
+    wins: "Weekend prep pars reduced overproduction without affecting availability.",
+    operationalIssues: "Minor supplier substitution on two produce lines.",
+    staffingIssues: "Manager assignment still needs confirming in the system.",
+    complianceIssues: "",
+    equipmentIssues: "No material issues.",
+    actionsUnderway: "Continue daily waste checks and confirm new produce specification.",
+    supportNeeded: "",
+  },
+};
+
+export const demoReports: WeeklyReport[] = demoSites.map((costs) => ({
+  ...copyBySite[costs.id],
+  costs,
+}));
+
+export const demoWeek = {
+  start: "2026-07-06",
+  end: "2026-07-12",
+  dueAt: "2026-07-14T12:00:00+01:00",
+};
