@@ -15,4 +15,5 @@ export const environment = {
   cronSecret: process.env.CRON_SECRET,
   importSecret: process.env.IMPORT_SECRET,
   reminderWebhookUrl: process.env.REMINDER_WEBHOOK_URL,
+  reminderRecipientOverride: process.env.REMINDER_RECIPIENT_OVERRIDE?.trim().toLowerCase() || undefined,
 };
