@@ -20,10 +20,10 @@ export default async function CostsPage() {
         <RefreshDataButton />
       </header>
 
-      <section aria-label="Privacy model" className="metric-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-        <article className="metric-card" style={{ "--accent": "#1e2e35" } as React.CSSProperties}><LockKeyhole aria-hidden="true" color="#1e2e35" size={22} /><div className="metric-card__value" style={{ fontSize: "1.2rem" }}>Aggregate labour</div><div className="metric-card__note">Site total only; no personal rates</div></article>
-        <article className="metric-card" style={{ "--accent": "#2d7a62" } as React.CSSProperties}><DatabaseZap aria-hidden="true" color="#2d7a62" size={22} /><div className="metric-card__value" style={{ fontSize: "1.2rem" }}>Source-controlled</div><div className="metric-card__note">RotaCloud upload, manual or private API</div></article>
-        <article className="metric-card" style={{ "--accent": "#eb6b4f" } as React.CSSProperties}><EyeOff aria-hidden="true" color="#eb6b4f" size={22} /><div className="metric-card__value" style={{ fontSize: "1.2rem" }}>Safe snapshots</div><div className="metric-card__note">Site total and percentage only</div></article>
+      <section aria-label="Privacy model" className="metric-grid metric-grid--three">
+        <article className="metric-card" style={{ "--accent": "#1e2e35" } as React.CSSProperties}><LockKeyhole aria-hidden="true" color="#1e2e35" size={22} /><div className="metric-card__value metric-card__value--compact">Aggregate labour</div><div className="metric-card__note">Site total only; no personal rates</div></article>
+        <article className="metric-card" style={{ "--accent": "#2d7a62" } as React.CSSProperties}><DatabaseZap aria-hidden="true" color="#2d7a62" size={22} /><div className="metric-card__value metric-card__value--compact">Source-controlled</div><div className="metric-card__note">RotaCloud upload, manual or private API</div></article>
+        <article className="metric-card" style={{ "--accent": "#eb6b4f" } as React.CSSProperties}><EyeOff aria-hidden="true" color="#eb6b4f" size={22} /><div className="metric-card__value metric-card__value--compact">Safe snapshots</div><div className="metric-card__note">Site total and percentage only</div></article>
       </section>
 
       <section className="panel">
