@@ -13,6 +13,7 @@ type NotificationRow = {
   delivery_status: string;
   created_at: string;
   sent_at: string | null;
+  provider_reference: string | null;
   recipient_id: string;
   site_id: string | null;
 };
@@ -29,7 +30,7 @@ export default async function NotificationsPage() {
   if (supabase) {
     const { data, error } = await supabase
       .from("notification_log")
-      .select("id, notification_type, delivery_status, created_at, sent_at, recipient_id, site_id")
+      .select("id, notification_type, delivery_status, created_at, sent_at, provider_reference, recipient_id, site_id")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -65,6 +66,14 @@ export default async function NotificationsPage() {
     {} as Record<string, number>,
   );
 
+  const deliveryState = !environment.reminderWebhookUrl
+    ? <><TriangleAlert aria-hidden="true" size={15} /> Queue-only mode: no delivery webhook is configured yet.</>
+    : environment.reminderRecipientOverride
+      ? <><CheckCircle2 aria-hidden="true" size={15} /> UAT sandbox active: every delivery is redirected to {environment.reminderRecipientOverride}.</>
+      : environment.isPreview
+        ? <><TriangleAlert aria-hidden="true" size={15} /> Preview webhook is live without a recipient override. Scheduled reminders would use profile email addresses.</>
+        : <><CheckCircle2 aria-hidden="true" size={15} /> Delivery webhook configured.</>;
+
   return (
     <>
       <header className="page-header">
@@ -80,15 +89,11 @@ export default async function NotificationsPage() {
       <div className="dashboard-grid">
         <section className="panel">
           <div className="panel__header">
-            <div><h2 className="panel__title">Test delivery</h2><p className="panel__subtitle">Tests go only to your profile notification email</p></div>
+            <div><h2 className="panel__title">Test delivery</h2><p className="panel__subtitle">Tests go only to your profile email or the configured UAT override</p></div>
             <BellRing aria-hidden="true" size={19} />
           </div>
           <div className="panel__body">
-            <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
-              {environment.reminderWebhookUrl
-                ? <><CheckCircle2 aria-hidden="true" size={15} /> Delivery webhook configured.</>
-                : <><TriangleAlert aria-hidden="true" size={15} /> Queue-only mode: no delivery webhook is configured yet.</>}
-            </div>
+            <div className="privacy-callout" style={{ marginBottom: "1rem" }}>{deliveryState}</div>
             <TestNotificationForm />
           </div>
         </section>
@@ -123,7 +128,7 @@ export default async function NotificationsPage() {
                   </div>
                   <div><span className="report-row__metric-label">Kitchen</span>{siteName ?? "General test"}</div>
                   <div><span className="report-row__metric-label">Created</span>{formatDate(item.created_at)}</div>
-                  <div><span className="report-row__metric-label">Sent</span>{item.sent_at ? formatDate(item.sent_at) : "—"}</div>
+                  <div><span className="report-row__metric-label">Sent</span>{item.sent_at ? formatDate(item.sent_at) : "—"}{item.provider_reference ? <span className="basis-label">{item.provider_reference}</span> : null}</div>
                   <span className={`status-badge status-badge--${item.delivery_status === "sent" ? "approved" : item.delivery_status === "failed" ? "review_required" : "draft"}`}>
                     {item.delivery_status === "queued" ? <CircleDashed aria-hidden="true" size={13} /> : null}
                     {item.delivery_status}
