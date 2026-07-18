@@ -10,7 +10,7 @@ export type ApprovalActionState = { status: "idle" | "success" | "error"; messag
 
 const schema = z.object({
   reportId: z.uuid(),
-  intent: z.literal("approve"),
+  intent: z.enum(["approve", "changes_requested"]),
   notes: z.string().max(4_000).default(""),
 });
 
@@ -20,18 +20,34 @@ export async function processApproval(
 ): Promise<ApprovalActionState> {
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: "Check the decision details and try again." };
+  if (parsed.data.intent === "changes_requested" && !parsed.data.notes.trim()) {
+    return { status: "error", message: "Explain what the kitchen manager must change before returning the report." };
+  }
   await requireRole(["admin", "group_manager"]);
 
   if (environment.isDemo) {
-    return { status: "success", message: "Demo decision validated. In production this records your name, notes and timestamp." };
+    return {
+      status: "success",
+      message: parsed.data.intent === "approve"
+        ? "Demo approval validated. In production this records your name, notes and timestamp."
+        : "Demo change request validated. In production the report returns to draft with your notes in the audit trail.",
+    };
   }
 
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
-  const { error } = await supabase.rpc("resolve_and_approve_report", { target_report: parsed.data.reportId, resolution_notes: parsed.data.notes });
+  const { error } = parsed.data.intent === "approve"
+    ? await supabase.rpc("resolve_and_approve_report", { target_report: parsed.data.reportId, resolution_notes: parsed.data.notes })
+    : await supabase.rpc("decide_report", { target_report: parsed.data.reportId, target_decision: "changes_requested", decision_notes: parsed.data.notes });
+
   if (error) {
-    console.error("report approval failed", { code: error.code, message: error.message, reportId: parsed.data.reportId });
-    return { status: "error", message: "The report could not be approved. Confirm it is submitted and every actionable review flag has written resolution notes." };
+    console.error("report decision failed", { code: error.code, message: error.message, reportId: parsed.data.reportId, intent: parsed.data.intent });
+    return {
+      status: "error",
+      message: parsed.data.intent === "approve"
+        ? "The report could not be approved. Confirm it is submitted and every actionable review flag has written resolution notes."
+        : "The report could not be returned for changes. Confirm it is still awaiting a management decision.",
+    };
   }
 
   revalidatePath("/dashboard");
@@ -39,7 +55,10 @@ export async function processApproval(
   revalidatePath("/approvals");
   revalidatePath("/summary");
   revalidatePath(`/reports/${parsed.data.reportId}`);
-  return { status: "success", message: "Report approved." };
+  return {
+    status: "success",
+    message: parsed.data.intent === "approve" ? "Report approved." : "Changes requested. The report has returned to draft.",
+  };
 }
 
 const releaseSchema = z.object({ periodId: z.uuid(), intent: z.enum(["complete", "partial"]) });
