@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
+import { getCurrentReportingWeek } from "@/lib/reporting/periods";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -66,6 +67,8 @@ export async function createSite(
 
   revalidatePath("/settings/sites");
   revalidatePath("/reports/new");
+  revalidatePath("/approvals");
+  revalidatePath("/summary");
   return { status: "success", message: `${parsed.data.name} is ready for weekly reporting.` };
 }
 
@@ -79,25 +82,57 @@ export async function updateSite(
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
 
-  const { error } = await supabase.from("sites").update({
+  const { data: currentSite, error: currentError } = await supabase
+    .from("sites")
+    .select("id, active, reporting_start_date, reporting_end_date")
+    .eq("id", parsed.data.siteId)
+    .eq("organisation_id", profile.organisationId)
+    .maybeSingle();
+  if (currentError || !currentSite) return { status: "error", message: "That kitchen could not be found." };
+
+  const nextActive = parsed.data.active === "true";
+  const reactivating = nextActive && !currentSite.active;
+  const deactivating = !nextActive && currentSite.active;
+  const today = new Date().toISOString().slice(0, 10);
+  const reportingStartDate = reactivating ? getCurrentReportingWeek().start : currentSite.reporting_start_date;
+  const reportingEndDate = nextActive
+    ? null
+    : deactivating
+      ? today
+      : currentSite.reporting_end_date ?? today;
+
+  const { data: updatedSite, error } = await supabase.from("sites").update({
     name: parsed.data.name,
     code: parsed.data.code,
-    active: parsed.data.active === "true",
-    reporting_end_date: parsed.data.active === "true" ? null : new Date().toISOString().slice(0, 10),
+    active: nextActive,
+    reporting_start_date: reportingStartDate,
+    reporting_end_date: reportingEndDate,
     food_cost_target: parsed.data.foodCostTarget,
     labour_target: parsed.data.labourTarget,
     waste_target: parsed.data.wasteTarget,
     updated_at: new Date().toISOString(),
-  }).eq("id", parsed.data.siteId).eq("organisation_id", profile.organisationId);
+  }).eq("id", parsed.data.siteId).eq("organisation_id", profile.organisationId).select("id").maybeSingle();
 
   if (error?.code === "23505") return { status: "error", message: "That site code is already in use." };
-  if (error) return { status: "error", message: "The kitchen settings could not be saved." };
+  if (error || !updatedSite) return { status: "error", message: "The kitchen settings could not be saved." };
   try {
-    await createAdminClient().from("audit_log").insert({ organisation_id: profile.organisationId, actor_id: profile.id, action: "site.updated", entity_type: "site", entity_id: parsed.data.siteId, detail: { active: parsed.data.active === "true", code: parsed.data.code } });
+    await createAdminClient().from("audit_log").insert({
+      organisation_id: profile.organisationId,
+      actor_id: profile.id,
+      action: "site.updated",
+      entity_type: "site",
+      entity_id: parsed.data.siteId,
+      detail: { active: nextActive, code: parsed.data.code, reporting_start_date: reportingStartDate, reporting_end_date: reportingEndDate },
+    });
   } catch { /* The primary RLS-protected update has already succeeded. */ }
+
   revalidatePath("/settings/sites");
   revalidatePath("/dashboard");
-  return { status: "success", message: "Kitchen settings saved." };
+  revalidatePath("/reports");
+  revalidatePath("/reports/new");
+  revalidatePath("/approvals");
+  revalidatePath("/summary");
+  return { status: "success", message: reactivating ? "Kitchen reactivated from the current reporting week." : "Kitchen settings saved." };
 }
 
 export async function assignSiteManager(
