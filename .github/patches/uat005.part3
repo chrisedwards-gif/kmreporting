@@ -1,0 +1,135 @@
++.week-hint__reset {
++  background: none;
++  border: none;
++  color: var(--coral-dark);
++  cursor: pointer;
++  font: inherit;
++  font-size: 0.75rem;
++  font-weight: 700;
++  padding: 0;
++  text-decoration: underline;
++  text-underline-offset: 3px;
++}
++
++.approval-card__top {
++  align-items: center;
++  display: flex;
++  gap: 1rem;
++  justify-content: space-between;
++}
++
++.approval-card__meta {
++  margin-top: 0.6rem;
++}
++
++.approval-card__cta {
++  align-items: center;
++  display: flex;
++  font-size: 0.72rem;
++  font-weight: 750;
++  gap: 0.3rem;
++  margin-top: 0.65rem;
++}
++
++.data-table__no-report {
++  color: #b7b1a6;
++}
++
++.privacy-callout__icon {
++  display: inline;
++  margin-right: 0.4rem;
++  vertical-align: text-bottom;
++}
+diff --git a/src/app/login/page.tsx b/src/app/login/page.tsx
+index b189722..063bb8c 100644
+--- a/src/app/login/page.tsx
++++ b/src/app/login/page.tsx
+@@ -28,8 +28,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
+             <label className="field"><span className="field__label">Password</span><input autoComplete="current-password" className="field__input" minLength={8} name="password" required type="password" /></label>
+             <button className="button button--primary" type="submit">Sign in securely</button>
+           </form>
+-          <div style={{ display: "flex", justifyContent: "center", marginTop: "1.1rem" }}>
+-            <Link href="/auth/forgot-password" style={{ color: "var(--ink-600)", fontSize: ".82rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>Forgotten your password?</Link>
++          <div className="login__links">
++            <Link href="/auth/forgot-password">Forgotten your password?</Link>
+           </div>
+           {environment.isDemo && <div className="login__demo"><Link className="button button--secondary" href="/dashboard" style={{ width: "100%" }}>View the demo workspace</Link></div>}
+         </div>
+diff --git a/src/components/app-shell.tsx b/src/components/app-shell.tsx
+index db20b8e..a506ca0 100644
+--- a/src/components/app-shell.tsx
++++ b/src/components/app-shell.tsx
+@@ -37,6 +37,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
+ 
+   return (
+     <div className="app-shell">
++      <a className="skip-link" href="#main-content">Skip to main content</a>
+       <aside className={classNames("app-shell__sidebar", navOpen && "app-shell__sidebar--open")}>
+         <div className="app-shell__brand">
+           <div className="app-shell__brand-mark">
+@@ -80,7 +81,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
+             {navOpen ? <X size={22} /> : <Menu size={22} />}
+           </button>
+           <div className="app-shell__context">Group reporting · Europe/London</div>
+-          <div style={{ alignItems: "center", display: "flex", gap: ".6rem" }}>
++          <div className="app-shell__topbar-status">
+             <LiveReportingStatus isDemo={isDemo} />
+             {isPreview && !isDemo && (
+               <div className="demo-banner demo-banner--preview">
+@@ -98,7 +99,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
+             )}
+           </div>
+         </header>
+-        <main className="app-shell__content">{children}</main>
++        <main className="app-shell__content" id="main-content">{children}</main>
+       </div>
+     </div>
+   );
+diff --git a/src/components/dashboard/metric-card.tsx b/src/components/dashboard/metric-card.tsx
+index f81da64..8bbef17 100644
+--- a/src/components/dashboard/metric-card.tsx
++++ b/src/components/dashboard/metric-card.tsx
+@@ -6,11 +6,12 @@ type MetricCardProps = {
+   note: string;
+   trend?: "up" | "down" | "neutral";
+   accent?: string;
++  overTarget?: boolean;
+ };
+ 
+-export function MetricCard({ label, value, note, trend = "neutral", accent }: MetricCardProps) {
++export function MetricCard({ label, value, note, trend = "neutral", accent, overTarget = false }: MetricCardProps) {
+   return (
+-    <article className="metric-card" style={{ "--accent": accent } as React.CSSProperties}>
++    <article className={`metric-card${overTarget ? " metric-card--over-target" : ""}`} style={{ "--accent": accent } as React.CSSProperties}>
+       <div className="metric-card__label">{label}</div>
+       <div className="metric-card__value">{value}</div>
+       <div className="metric-card__note">
+diff --git a/src/components/dashboard/site-performance-table.tsx b/src/components/dashboard/site-performance-table.tsx
+index 2bbf94b..a10990c 100644
+--- a/src/components/dashboard/site-performance-table.tsx
++++ b/src/components/dashboard/site-performance-table.tsx
+@@ -43,9 +43,13 @@ export function SitePerformanceTable({ sites }: { sites: SitePerformance[] }) {
+               </td>
+               <td><StatusBadge status={site.status} /></td>
+               <td>
+-                <Link aria-label={`Open ${site.name} report`} href={`/reports/${site.reportId ?? site.id}`}>
+-                  <ChevronRight aria-hidden="true" size={18} />
+-                </Link>
++                {site.reportId ? (
++                  <Link aria-label={`Open ${site.name} report`} href={`/reports/${site.reportId}`}>
++                    <ChevronRight aria-hidden="true" size={18} />
++                  </Link>
++                ) : (
++                  <span aria-label={`No report yet for ${site.name}`} className="data-table__no-report">—</span>
++                )}
+               </td>
+             </tr>
+           ))}
+diff --git a/src/components/reports/approval-form.tsx b/src/components/reports/approval-form.tsx
+index 2b68b4e..284f9eb 100644
+--- a/src/components/reports/approval-form.tsx
++++ b/src/components/reports/approval-form.tsx
+@@ -16,7 +16,7 @@ export function ApprovalForm({ reportId, status, hasFlags }: { reportId: string;
+   if (isShared) {
+     return (
+       <div className="privacy-callout">
