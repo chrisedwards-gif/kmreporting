@@ -1,10 +1,12 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { environment } from "@/lib/env";
 import { getRequestOrigin } from "@/lib/http";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { safeInternalPath } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.email(),
@@ -44,6 +46,31 @@ export async function requestPasswordReset(formData: FormData) {
     });
   }
   redirect("/auth/forgot-password?sent=1");
+}
+
+const confirmTokenSchema = z.object({
+  tokenHash: z.string().min(20).max(2048),
+  type: z.enum(["email", "invite", "recovery"]),
+  next: z.string().max(200).optional(),
+});
+
+// Verification is intentionally a POST action. Microsoft Safe Links and other
+// email scanners may prefetch GET links; requiring a human button press keeps
+// them from consuming Supabase's one-time token before the recipient arrives.
+export async function confirmEmailToken(formData: FormData) {
+  const parsed = confirmTokenSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) redirect("/login?error=The+database+connection+is+unavailable.");
+
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: parsed.data.tokenHash,
+    type: parsed.data.type as EmailOtpType,
+  });
+  if (error) redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
+
+  redirect(safeInternalPath(parsed.data.next) ?? "/dashboard");
 }
 
 export type PasswordActionState = { status: "idle" | "error"; message: string };
