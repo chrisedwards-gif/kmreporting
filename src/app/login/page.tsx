@@ -28,6 +28,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <label className="field"><span className="field__label">Password</span><input autoComplete="current-password" className="field__input" minLength={8} name="password" required type="password" /></label>
             <button className="button button--primary" type="submit">Sign in securely</button>
           </form>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "1.1rem" }}>
+            <Link href="/auth/forgot-password" style={{ color: "var(--ink-600)", fontSize: ".82rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>Forgotten your password?</Link>
+          </div>
           {environment.isDemo && <div className="login__demo"><Link className="button button--secondary" href="/dashboard" style={{ width: "100%" }}>View the demo workspace</Link></div>}
         </div>
       </section>
