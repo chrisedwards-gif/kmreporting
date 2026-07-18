@@ -10,7 +10,7 @@ export type ApprovalActionState = { status: "idle" | "success" | "error"; messag
 
 const schema = z.object({
   reportId: z.uuid(),
-  intent: z.enum(["approve", "share"]),
+  intent: z.literal("approve"),
   notes: z.string().max(4_000).default(""),
 });
 
@@ -33,17 +33,15 @@ export async function processApproval(
 
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
-  const { error } = parsed.data.intent === "approve"
-    ? await supabase.rpc("resolve_and_approve_report", { target_report: parsed.data.reportId, resolution_notes: parsed.data.notes })
-    : await supabase.rpc("mark_report_shared", { target_report: parsed.data.reportId, channel: "management_summary" });
-  if (error) return { status: "error", message: parsed.data.intent === "approve" ? "The report could not be approved. Confirm it is submitted and every review flag has written resolution notes." : "Only an approved, unshared report can be released." };
+  const { error } = await supabase.rpc("resolve_and_approve_report", { target_report: parsed.data.reportId, resolution_notes: parsed.data.notes });
+  if (error) return { status: "error", message: "The report could not be approved. Confirm it is submitted and every review flag has written resolution notes." };
 
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/approvals");
   revalidatePath("/summary");
   revalidatePath(`/reports/${parsed.data.reportId}`);
-  return { status: "success", message: parsed.data.intent === "approve" ? "Report approved." : "Approved summary released." };
+  return { status: "success", message: "Report approved." };
 }
 
 const releaseSchema = z.object({ periodId: z.uuid() });
