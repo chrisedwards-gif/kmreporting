@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
 import { environment } from "@/lib/env";
+import { deliverReminderWebhook } from "@/lib/notifications/delivery";
 import { reminderContent, type ReminderKind } from "@/lib/notifications/reminders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -22,8 +23,15 @@ export async function sendTestNotification(
 
   try {
     const admin = createAdminClient();
-    const { data: recipient } = await admin.from("profiles").select("id, full_name, notification_email").eq("id", profile.id).single();
-    if (!recipient?.notification_email) return { status: "error", message: "Add a notification email to your profile before testing delivery." };
+    const { data: recipient, error: recipientError } = await admin
+      .from("profiles")
+      .select("id, full_name, notification_email")
+      .eq("id", profile.id)
+      .single();
+    if (recipientError || !recipient?.notification_email) {
+      return { status: "error", message: "Add a notification email to your profile before testing delivery." };
+    }
+
     const kind = parsed.data.kind as ReminderKind;
     const content = reminderContent(kind);
     const { data: logged, error: logError } = await admin.from("notification_log").insert({
@@ -40,20 +48,28 @@ export async function sendTestNotification(
       return { status: "success", message: `Test queued for ${recipient.notification_email}. Configure REMINDER_WEBHOOK_URL before expecting an email.` };
     }
 
-    const response = await fetch(environment.reminderWebhookUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ test: true, kind, recipient, subject: content.subject, message: content.message, actionPath: content.actionPath }),
+    const delivery = await deliverReminderWebhook(environment.reminderWebhookUrl, {
+      test: true,
+      kind,
+      recipient,
+      subject: content.subject,
+      message: content.message,
+      actionPath: content.actionPath,
     });
-    await admin.from("notification_log").update({
-      delivery_status: response.ok ? "sent" : "failed",
-      sent_at: response.ok ? new Date().toISOString() : null,
+
+    const { error: updateError } = await admin.from("notification_log").update({
+      delivery_status: delivery.ok ? "sent" : "failed",
+      provider_reference: delivery.providerReference || null,
+      sent_at: delivery.ok ? new Date().toISOString() : null,
     }).eq("id", logged.id);
+
     revalidatePath("/notifications");
-    return response.ok
-      ? { status: "success", message: `Test delivered to the configured webhook for ${recipient.notification_email}.` }
-      : { status: "error", message: `The webhook returned HTTP ${response.status}. The failed attempt is recorded.` };
-  } catch {
-    return { status: "error", message: "Notification testing requires the server-side Supabase key in Vercel." };
+    if (updateError) return { status: "error", message: "The webhook responded, but its delivery status could not be saved." };
+    return delivery.ok
+      ? { status: "success", message: `The delivery webhook accepted the test for ${recipient.notification_email}.` }
+      : { status: "error", message: `${delivery.error} The failed attempt is recorded.` };
+  } catch (error) {
+    console.error("notification test failed", error);
+    return { status: "error", message: "The notification test could not be completed. Check the Vercel server configuration and try again." };
   }
 }
