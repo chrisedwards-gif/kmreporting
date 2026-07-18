@@ -29,7 +29,7 @@ const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; rol
   { href: "/settings/sites", label: "Sites & access", icon: Settings2, roles: ["admin"] },
 ];
 
-export function AppShell({ children, isDemo, user }: { children: React.ReactNode; isDemo: boolean; user: { fullName: string; role: AppRole } }) {
+export function AppShell({ children, isDemo, isPreview, user }: { children: React.ReactNode; isDemo: boolean; isPreview: boolean; user: { fullName: string; role: AppRole } }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -80,6 +80,13 @@ export function AppShell({ children, isDemo, user }: { children: React.ReactNode
           <div className="app-shell__context">Group reporting · Europe/London</div>
           <div style={{ alignItems: "center", display: "flex", gap: ".6rem" }}>
             <LiveReportingStatus isDemo={isDemo} />
+            {isPreview && !isDemo && (
+              <div className="demo-banner demo-banner--preview">
+                <CircleDashedIcon />
+                <strong>UAT preview</strong>
+                <span>Staging data</span>
+              </div>
+            )}
             {isDemo && (
               <div className="demo-banner">
                 <CircleDashedIcon />

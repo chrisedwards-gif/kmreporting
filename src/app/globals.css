@@ -219,6 +219,12 @@ a {
   padding: 0.55rem 0.75rem;
 }
 
+.demo-banner--preview {
+  background: #fff0eb;
+  border-color: #f1b9a8;
+  color: #9f3f2e;
+}
+
 .live-status {
   align-items: center;
   background: #edf4f1;

@@ -7,6 +7,7 @@ const hasSupabaseEnvironment = Boolean(
 
 export const environment = {
   isDemo: process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !hasSupabaseEnvironment,
+  isPreview: process.env.VERCEL_ENV === "preview",
   hasSupabase: hasSupabaseEnvironment,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   supabasePublishableKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
