@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
+import { getRequestOrigin } from "@/lib/http";
 import { getCurrentReportingWeek } from "@/lib/reporting/periods";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -161,8 +162,10 @@ export async function assignSiteManager(
       return { status: "error", message: "That email already belongs to a different application role." };
     }
     if (!userId) {
+      const origin = await getRequestOrigin();
       const { data: invitation, error: invitationError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
         data: { full_name: parsed.data.fullName },
+        ...(origin ? { redirectTo: `${origin}/auth/callback?next=/auth/set-password` } : {}),
       });
       if (invitationError || !invitation.user) {
         return { status: "error", message: "The invitation could not be sent. Check whether this email already has an Auth account." };
