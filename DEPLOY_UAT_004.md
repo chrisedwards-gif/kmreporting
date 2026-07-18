@@ -12,7 +12,8 @@ This update fixes two defects found in review and closes the last workflow gap b
 2. **Password lifecycle**
    - `/auth/set-password` — invited managers and password-recovery users land here and choose a password before entering the app.
    - `/auth/forgot-password` — self-service reset from the sign-in screen. The response never reveals whether an email has an account.
-   - `/auth/callback` accepts a `next` parameter restricted to same-origin paths and supports both PKCE recovery codes and server-readable token hashes.
+   - `/auth/confirm` — displays a human confirmation button before a token is verified, preventing Microsoft Safe Links and similar email scanners from consuming one-time tokens.
+   - `/auth/callback` still handles PKCE recovery codes and safely forwards legacy token-hash links to `/auth/confirm`.
    - Auth emails derive an origin from request headers with Vercel deployment variables as a fallback, avoiding null redirect URLs in proxied Server Actions.
 
 ## Deploy in this order
@@ -27,18 +28,24 @@ This update fixes two defects found in review and closes the last workflow gap b
 
    to the redirect allow list.
 
-4. Use the configured **Site URL** directly in the email templates. This is more robust than rendering `.RedirectTo`, which can be null when a proxy/runtime omits request host information.
+4. Use the configured **Site URL** directly in the email templates. The email link must open `/auth/confirm`; it must not verify the token on the first GET request.
 
    **Invite user**
 
    ```html
-   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite&next=/auth/set-password">Accept invitation</a>
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/auth/set-password">Accept invitation</a>
    ```
 
    **Reset password**
 
    ```html
-   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/auth/set-password">Choose a new password</a>
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/set-password">Choose a new password</a>
+   ```
+
+   **Confirm signup**
+
+   ```html
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/auth/set-password">Confirm email address</a>
    ```
 
 5. Deploy the app build. `NEXT_PUBLIC_APP_URL` is an optional explicit fallback; Vercel Preview also supplies its deployment URL automatically.
@@ -48,6 +55,6 @@ This update fixes two defects found in review and closes the last workflow gap b
 - `POST /api/imports/operations` with a valid payload returns `200 { ok: true }`.
 - Save a weekly report with a manual purchase, then re-send the week's purchasing metrics through the operations endpoint: the safe snapshot's purchases figure still includes the manual amount.
 - Send sales and purchasing in separate imports using the same source system and business date: both domains remain present.
-- After configuring the Invite user template above, invite a test kitchen manager from **Settings → Sites**: the email lands on *Choose your password*, and the account can sign out and back in with that password.
-- *Forgotten your password?* on the sign-in screen delivers a reset email whose link opens the same set-password screen.
+- After configuring the Invite user template above, invite a test kitchen manager from **Settings → Sites**: the link opens a confirmation page, the manager presses **Confirm and continue**, chooses a password, then signs out and back in.
+- *Forgotten your password?* delivers a reset email whose link opens the same confirmation page without being consumed by Microsoft Safe Links.
 - `/auth/callback?next=//evil.example.com&code=x` never leaves the app's origin.
