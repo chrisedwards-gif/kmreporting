@@ -19,6 +19,8 @@ export function CostChart({ sites }: { sites: SitePerformance[] }) {
     Labour: Number(site.labourPct.toFixed(1)),
   }));
 
+  if (!sites.length) return <div className="empty-inline">The comparison chart will appear after the first kitchen report is saved.</div>;
+
   return (
     <div className="chart-wrap" aria-label="Food and labour cost percentages by site">
       <ResponsiveContainer height="100%" width="100%">

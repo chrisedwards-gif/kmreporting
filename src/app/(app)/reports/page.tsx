@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getReportingBundle } from "@/lib/data/reporting";
+import { PeriodSelector } from "@/components/reports/period-selector";
+import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Weekly reports" };
 
-export default async function ReportsPage() {
-  const { reports } = await getReportingBundle();
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period } = await searchParams;
+  const periods = await getReportingPeriods();
+  const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
+  const { reports } = await getReportingBundle(selectedPeriod);
   return (
     <>
       <header className="page-header">
@@ -16,7 +20,7 @@ export default async function ReportsPage() {
           <h1 className="page-header__title">Weekly reports.</h1>
           <p className="page-header__copy">One submission per kitchen, rolled into one controlled group view.</p>
         </div>
-        <Link className="button button--primary" href="/reports/new"><Plus aria-hidden="true" size={16} /> New report</Link>
+        <div className="page-header__actions"><PeriodSelector periods={periods} selected={selectedPeriod} /><Link className="button button--primary" href="/reports/new"><Plus aria-hidden="true" size={16} /> New report</Link></div>
       </header>
       <div className="report-list">
         {reports.map((report) => (
@@ -35,6 +39,7 @@ export default async function ReportsPage() {
             <ArrowRight aria-hidden="true" size={18} />
           </Link>
         ))}
+        {!reports.length ? <section className="panel empty-state"><h2>No reports for this week.</h2><p>Start the first kitchen report or select another reporting period.</p><Link className="button button--primary" href="/reports/new"><Plus aria-hidden="true" size={16} /> Start a report</Link></section> : null}
       </div>
     </>
   );

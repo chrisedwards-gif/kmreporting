@@ -9,6 +9,7 @@ import {
   ClipboardList,
   FileCheck2,
   LockKeyhole,
+  LogOut,
   Menu,
   Settings2,
   ShieldCheck,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import { classNames } from "@/lib/utils";
 import type { AppRole } from "@/lib/types";
+import { LiveReportingStatus } from "@/components/live-reporting-status";
+import { signOut } from "@/app/actions/auth";
 
 const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
   { href: "/dashboard", label: "Group overview", icon: BarChart3 },
@@ -59,8 +62,9 @@ export function AppShell({ children, isDemo, user }: { children: React.ReactNode
           })}
         </nav>
         <div className="app-shell__profile">
-          <div className="app-shell__profile-name">{user.fullName}</div>
-          <div className="app-shell__profile-role">{user.role.replaceAll("_", " ")} · Scoped access</div>
+          <div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.role.replaceAll("_", " ")} · Scoped access</div></div>
+            <form action={signOut}><button className="app-shell__signout" type="submit" aria-label="Sign out" title="Sign out"><LogOut aria-hidden="true" size={16} /></button></form>
+          </div>
         </div>
       </aside>
       <div className="app-shell__main">
@@ -74,15 +78,16 @@ export function AppShell({ children, isDemo, user }: { children: React.ReactNode
             {navOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="app-shell__context">Group reporting · Europe/London</div>
-          {isDemo ? (
-            <div className="demo-banner">
-              <CircleDashedIcon />
-              <strong>Demo workspace</strong>
-              <span>Connect Supabase to go live</span>
-            </div>
-          ) : (
-            <div className="status-badge status-badge--approved">Live workspace</div>
-          )}
+          <div style={{ alignItems: "center", display: "flex", gap: ".6rem" }}>
+            <LiveReportingStatus isDemo={isDemo} />
+            {isDemo && (
+              <div className="demo-banner">
+                <CircleDashedIcon />
+                <strong>Test workspace</strong>
+                <span>Safe sample data</span>
+              </div>
+            )}
+          </div>
         </header>
         <main className="app-shell__content">{children}</main>
       </div>

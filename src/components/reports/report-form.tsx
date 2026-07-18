@@ -8,7 +8,7 @@ import { formatCurrency, formatPercentage } from "@/lib/utils";
 
 const initialState: ReportActionState = { status: "idle", message: "" };
 
-export function ReportForm({ sites }: { sites: Array<{ id: string; name: string }> }) {
+export function ReportForm({ sites, week }: { sites: Array<{ id: string; name: string }>; week: { start: string; end: string } }) {
   const [state, formAction, pending] = useActionState(saveWeeklyReport, initialState);
   const [values, setValues] = useState({
     netSales: 0,
@@ -45,11 +45,11 @@ export function ReportForm({ sites }: { sites: Array<{ id: string; name: string 
           </label>
           <label className="field">
             <span className="field__label">Week starting</span>
-            <input className="field__input" defaultValue="2026-07-13" name="weekStart" required type="date" />
+            <input className="field__input" defaultValue={week.start} name="weekStart" required type="date" />
           </label>
           <label className="field">
             <span className="field__label">Week ending</span>
-            <input className="field__input" defaultValue="2026-07-19" name="weekEnd" required type="date" />
+            <input className="field__input" defaultValue={week.end} name="weekEnd" required type="date" />
           </label>
         </div>
       </section>
@@ -117,7 +117,7 @@ export function ReportForm({ sites }: { sites: Array<{ id: string; name: string 
       </section>
 
       {state.status !== "idle" && (
-        <div className={state.status === "error" ? "privacy-callout" : "privacy-callout"} role="status">
+        <div className={`form-message ${state.status === "error" ? "form-message--error" : "form-message--success"}`} role="status">
           {state.status === "success" && <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: "0.4rem", verticalAlign: "text-bottom" }} />}
           {state.message}
         </div>

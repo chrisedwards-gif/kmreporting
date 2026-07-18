@@ -75,5 +75,8 @@ export async function saveWeeklyReport(
 
   revalidatePath("/dashboard");
   revalidatePath("/reports");
+  revalidatePath("/approvals");
+  revalidatePath("/summary");
+  revalidatePath("/costs");
   return { status: "success", message: parsed.data.intent === "submit" ? "Report submitted for review." : "Draft saved." };
 }

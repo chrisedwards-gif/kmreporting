@@ -1,10 +1,13 @@
-import { DatabaseZap, EyeOff, LockKeyhole, RefreshCw } from "lucide-react";
+import { DatabaseZap, EyeOff, LockKeyhole } from "lucide-react";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
+import { RefreshDataButton } from "@/components/ui/refresh-data-button";
 import { getReportingBundle } from "@/lib/data/reporting";
+import { requireRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Cost control" };
 
 export default async function CostsPage() {
+  await requireRole(["admin", "group_manager", "finance"]);
   const { sites } = await getReportingBundle();
   return (
     <>
@@ -14,7 +17,7 @@ export default async function CostsPage() {
           <h1 className="page-header__title">Current costs. Private pay.</h1>
           <p className="page-header__copy">Payroll rates are joined to imported hours inside the database. The app receives only each kitchen’s aggregated staff cost.</p>
         </div>
-        <button className="button button--secondary" type="button"><RefreshCw aria-hidden="true" size={16} /> Refresh source data</button>
+        <RefreshDataButton />
       </header>
 
       <section aria-label="Privacy model" className="metric-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>

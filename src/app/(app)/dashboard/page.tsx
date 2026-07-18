@@ -9,7 +9,7 @@ import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 export const metadata = { title: "Group overview" };
 
 export default async function DashboardPage() {
-  const { sites, week } = await getReportingBundle();
+  const { sites, week, expectedSiteCount } = await getReportingBundle();
   const totals = sites.reduce(
     (sum, site) => ({
       netSales: sum.netSales + site.netSales,
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
           <p className="page-header__eyebrow">Weekly management summary</p>
           <h1 className="page-header__title">The group at a glance.</h1>
           <p className="page-header__copy">
-            Week ending {formatDate(week.end)} · {sites.length} active kitchen reports · {reviewFlags.length} checks need attention.
+            Week ending {formatDate(week.end)} · {sites.length} of {expectedSiteCount} active kitchens reported · {reviewFlags.length} checks need attention.
           </p>
         </div>
         <Link className="button button--primary" href="/reports/new">
@@ -94,6 +94,7 @@ export default async function DashboardPage() {
                   <div className="review-item__detail">{flag.detail}</div>
                 </Link>
               ))}
+              {!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No automated checks currently need management attention.</div> : null}
             </div>
           </div>
         </aside>

@@ -27,7 +27,7 @@ export function ApprovalForm({ reportId, status, hasFlags }: { reportId: string;
         {isApproved ? <Share2 aria-hidden="true" size={16} /> : <CheckCircle2 aria-hidden="true" size={16} />}
         {pending ? "Recording…" : isApproved ? "Release approved summary" : "Resolve & approve"}
       </button>
-      {state.status !== "idle" && <div className="privacy-callout" role="status">{state.message}</div>}
+      {state.status !== "idle" && <div className={`form-message ${state.status === "error" ? "form-message--error" : "form-message--success"}`} role="status">{state.message}</div>}
     </form>
   );
 }

@@ -17,6 +17,11 @@ The app runs immediately with deterministic demo data. Connect Supabase to enabl
 - A consistent group management summary that stays locked until every site is approved.
 - Tuesday reminders for missing reports and management review, with deduplication.
 - A server-only cost import API for payroll/time integrations.
+- Live dashboard refresh through Supabase Realtime when reports or imported metrics change.
+- A normalized operations API for EPOS sales/covers, purchasing/credits and waste feeds.
+- Admin site controls for kitchen targets, activation and audited manager invitations/assignments.
+- Reporting-period history across weekly reports, approvals and management summaries.
+- Audited group-summary release: printing is enabled only after every active kitchen is submitted, approved and released.
 
 ## Architecture
 
@@ -47,6 +52,8 @@ npm run dev
 
 Open `http://localhost:3000`. With no environment file, the app automatically uses the labelled demo workspace.
 
+For the full shared test plan, see [`STAGING.md`](./STAGING.md).
+
 Quality checks:
 
 ```bash
@@ -66,6 +73,8 @@ npm run build
    supabase db push
    supabase db seed
    ```
+
+   Existing installations should apply every later file in `supabase/migrations` in filename order. Migration `002_production_hardening.sql` prevents draft or already-shared reports from receiving an approval decision.
 
 4. Create users with Supabase Auth. Insert a matching `profiles` row for each user and add `site_memberships` for kitchen managers. Do not give kitchen users `admin`, `group_manager` or `finance` roles.
 5. Deploy to Vercel or another Node-compatible host and add the same environment variables there.
@@ -127,6 +136,14 @@ Example shape (use non-sensitive test data only in development):
 ```
 
 For an existing payroll/rota product, map its employee identifier to `employeeRef`; never use employee names in the reporting UI.
+
+## EPOS, purchasing and waste integrations
+
+Provider adapters send normalized daily figures to `POST /api/imports/operations` using the same `IMPORT_SECRET`. Supported domains are `sales`, `purchasing` and `waste`. A connector can own one or several domains without overwriting stocktake or payroll fields.
+
+The database keeps the most recent provider result for each site/date/domain, so webhook retries or a provider replacement do not double-count the week. Once a weekly report exists, imported daily data automatically updates its safe cost snapshot and the signed-in dashboard refreshes through Realtime.
+
+Use `scripts/push-test-operations.mjs` as the reference adapter. A specific EPOS or purchasing product only needs to map its response into that stable daily shape.
 
 ## Reminder delivery
 

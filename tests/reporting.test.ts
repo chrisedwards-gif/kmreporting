@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateCosts } from "@/lib/reporting/calculations";
-import { isMondayToSunday } from "@/lib/reporting/periods";
+import { getLatestCompletedReportingWeek, isMondayToSunday } from "@/lib/reporting/periods";
 import { buildReviewFlags } from "@/lib/reporting/review";
 
 describe("weekly reporting calculations", () => {
@@ -32,6 +32,17 @@ describe("weekly reporting calculations", () => {
     expect(isMondayToSunday("2026-07-06", "2026-07-12")).toBe(true);
     expect(isMondayToSunday("2026-07-07", "2026-07-13")).toBe(false);
     expect(isMondayToSunday("2026-07-06", "2026-07-13")).toBe(false);
+  });
+
+  it("defaults new reports to the latest completed Monday-to-Sunday week", () => {
+    expect(getLatestCompletedReportingWeek(new Date("2026-07-18T10:00:00Z"))).toMatchObject({
+      start: "2026-07-06",
+      end: "2026-07-12",
+    });
+    expect(getLatestCompletedReportingWeek(new Date("2026-07-20T10:00:00Z"))).toMatchObject({
+      start: "2026-07-13",
+      end: "2026-07-19",
+    });
   });
 
   it("raises cost and compliance review gates", () => {

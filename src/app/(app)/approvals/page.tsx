@@ -1,13 +1,20 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, Share2, ShieldAlert } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getReportingBundle } from "@/lib/data/reporting";
+import { PeriodSelector } from "@/components/reports/period-selector";
+import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatPercentage } from "@/lib/utils";
+import { requireRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Approvals" };
 
-export default async function ApprovalsPage() {
-  const { reports } = await getReportingBundle();
+export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  await requireRole(["admin", "group_manager"]);
+  const { period } = await searchParams;
+  const periods = await getReportingPeriods();
+  const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
+  const { reports, expectedSiteCount } = await getReportingBundle(selectedPeriod);
+  const missingReports = Math.max(expectedSiteCount - reports.length, 0);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
   const approved = reports.filter((report) => report.status === "approved");
   return (
@@ -18,11 +25,12 @@ export default async function ApprovalsPage() {
           <h1 className="page-header__title">Review before sharing.</h1>
           <p className="page-header__copy">Automated checks focus attention; a named manager still makes the approval decision.</p>
         </div>
+        <PeriodSelector basePath="/approvals" periods={periods} selected={selectedPeriod} />
       </header>
 
       <div className="dashboard-grid">
         <section className="panel">
-          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} kitchen reports waiting</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
+          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} reports waiting · {missingReports} kitchens not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
           <div className="panel__body">
             <div className="report-list">
               {pending.map((report) => (
@@ -37,6 +45,7 @@ export default async function ApprovalsPage() {
                   <div style={{ alignItems: "center", display: "flex", fontSize: ".72rem", fontWeight: 750, gap: ".3rem", marginTop: ".65rem" }}>Open decision <ArrowRight aria-hidden="true" size={14} /></div>
                 </Link>
               ))}
+              {!pending.length ? <div className="empty-inline empty-inline--compact">Nothing is waiting for approval.</div> : null}
             </div>
           </div>
         </section>
@@ -57,6 +66,7 @@ export default async function ApprovalsPage() {
             <div className="panel__header"><div><h2 className="panel__title">Approved this week</h2><p className="panel__subtitle">Ready for controlled sharing</p></div></div>
             <div className="panel__body">
               {approved.map((report) => <div className="cost-summary__row" key={report.id}><span className="cost-summary__label">{report.siteName}</span><StatusBadge status={report.status} /></div>)}
+              {!approved.length ? <div className="empty-inline empty-inline--compact">No reports have been approved for this week yet.</div> : null}
             </div>
           </section>
         </aside>

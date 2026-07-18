@@ -12,7 +12,7 @@ export const metadata = { title: "Report review" };
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await params;
-  const { reports } = await getReportingBundle();
+  const { reports } = await getReportingBundle(undefined, reportId);
   const report = reports.find((item) => item.siteId === reportId || item.id === reportId);
   if (!report) notFound();
   const profile = await getSessionProfile();
@@ -79,12 +79,13 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
               )}
             </div>
           </section>
-          {profile && roleCanApprove(profile.role) && (
+          {profile && roleCanApprove(profile.role) && ["submitted", "review_required", "approved", "shared"].includes(report.status) && (
             <section className="panel">
               <div className="panel__header"><div><h2 className="panel__title">Management decision</h2><p className="panel__subtitle">Named, timestamped and added to the audit trail</p></div></div>
               <div className="panel__body"><ApprovalForm hasFlags={report.costs.flags.length > 0} reportId={report.id} status={report.status} /></div>
             </section>
           )}
+          {profile && roleCanApprove(profile.role) && report.status === "draft" ? <div className="privacy-callout">This report is still a draft. It must be submitted by the kitchen before management can approve it.</div> : null}
         </aside>
       </div>
     </>

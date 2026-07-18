@@ -49,6 +49,7 @@ export function SitePerformanceTable({ sites }: { sites: SitePerformance[] }) {
               </td>
             </tr>
           ))}
+          {!sites.length ? <tr><td colSpan={7}><div className="empty-inline">No weekly cost snapshot is available for this reporting period.</div></td></tr> : null}
         </tbody>
       </table>
     </div>
