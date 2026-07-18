@@ -17,11 +17,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
   const approvedOrShared = reports.filter((report) => ["approved", "shared"].includes(report.status));
   const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
-  const outstanding = expectedSites.flatMap((site) => {
-    const report = reportBySite.get(site.id);
-    if (!report) return [{ site, report: undefined }];
-    return report.status === "draft" ? [{ site, report }] : [];
-  });
+  const outstanding = expectedSites
+    .map((site) => ({ site, report: reportBySite.get(site.id) }))
+    .filter((item) => !item.report || item.report.status === "draft");
   const draftCount = outstanding.filter((item) => item.report?.status === "draft").length;
   const notStartedCount = outstanding.length - draftCount;
 
