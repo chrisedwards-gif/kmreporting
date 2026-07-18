@@ -13,11 +13,17 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, expectedSiteCount, expectedSites } = await getReportingBundle(selectedPeriod);
-  const missingReports = Math.max(expectedSiteCount - reports.length, 0);
+  const { reports, expectedSites } = await getReportingBundle(selectedPeriod);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
   const approvedOrShared = reports.filter((report) => ["approved", "shared"].includes(report.status));
-  const missingSites = expectedSites.filter((site) => !reports.some((report) => report.siteId === site.id));
+  const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
+  const outstanding = expectedSites.flatMap((site) => {
+    const report = reportBySite.get(site.id);
+    if (!report) return [{ site, report: undefined }];
+    return report.status === "draft" ? [{ site, report }] : [];
+  });
+  const draftCount = outstanding.filter((item) => item.report?.status === "draft").length;
+  const notStartedCount = outstanding.length - draftCount;
 
   return (
     <>
@@ -32,7 +38,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
       <div className="dashboard-grid">
         <section className="panel">
-          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} reports waiting · {missingReports} kitchens not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
+          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} waiting for approval · {outstanding.length} not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
           <div className="panel__body">
             <div className="report-list">
               {pending.map((report) => (
@@ -65,8 +71,18 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             </div>
           </section>
           <section className="panel">
-            <div className="panel__header"><div><h2 className="panel__title">Still outstanding</h2><p className="panel__subtitle">Kitchen reports not yet started or submitted</p></div></div>
-            <div className="panel__body">{missingSites.map((site) => <div className="cost-summary__row" key={site.id}><span className="cost-summary__label">{site.name}</span><span className="status-badge status-badge--draft">Not submitted</span></div>)}{!missingSites.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}</div>
+            <div className="panel__header"><div><h2 className="panel__title">Still outstanding</h2><p className="panel__subtitle">{notStartedCount} not started · {draftCount} saved as draft</p></div></div>
+            <div className="panel__body">
+              {outstanding.map(({ site, report }) => (
+                <div className="cost-summary__row" key={site.id}>
+                  <span className="cost-summary__label">{site.name}</span>
+                  {report
+                    ? <Link aria-label={`Open ${site.name} draft`} href={`/reports/new?report=${report.id}`}><StatusBadge status="draft" /></Link>
+                    : <span className="status-badge status-badge--draft">Not started</span>}
+                </div>
+              ))}
+              {!outstanding.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}
+            </div>
           </section>
           <section className="panel">
             <div className="panel__header"><div><h2 className="panel__title">Approved or shared this week</h2><p className="panel__subtitle">Approved reports remain visible after a share is recorded</p></div></div>
