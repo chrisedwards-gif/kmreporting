@@ -1,0 +1,195 @@
+                   {report.costs.flags.map((flag) => <div className={`review-item review-item--${flag.severity}`} key={flag.code}><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></div>)}
+                 </div>
+               ) : (
+-                <div className="privacy-callout"><CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".35rem", verticalAlign: "text-bottom" }} />All automated checks have passed.</div>
++                <div className="privacy-callout"><CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />All automated checks have passed.</div>
+               )}
+             </div>
+           </section>
+diff --git a/src/app/auth/forgot-password/page.tsx b/src/app/auth/forgot-password/page.tsx
+index c288f55..7c3e38b 100644
+--- a/src/app/auth/forgot-password/page.tsx
++++ b/src/app/auth/forgot-password/page.tsx
+@@ -12,8 +12,8 @@ export default async function ForgotPasswordPage({
+   const { sent, error } = await searchParams;
+ 
+   return (
+-    <main className="login" style={{ gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
+-      <section className="login__form-wrap" style={{ background: "transparent", padding: "2rem 1.25rem", width: "min(100%, 480px)" }}>
++    <main className="login login--focused">
++      <section className="login__form-wrap">
+         <div className="login__card">
+           <div className="app-shell__brand" style={{ marginBottom: "1.25rem" }}>
+             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
+@@ -41,8 +41,8 @@ export default async function ForgotPasswordPage({
+                 </label>
+                 <button className="button button--primary" type="submit">Send reset link</button>
+               </form>
+-              <div style={{ display: "flex", justifyContent: "center", marginTop: "1.1rem" }}>
+-                <Link href="/login" style={{ color: "var(--ink-600)", fontSize: ".82rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>Back to sign in</Link>
++              <div className="login__links">
++                <Link href="/login">Back to sign in</Link>
+               </div>
+             </>
+           )}
+diff --git a/src/app/auth/set-password/page.tsx b/src/app/auth/set-password/page.tsx
+index 9b4476a..c32b222 100644
+--- a/src/app/auth/set-password/page.tsx
++++ b/src/app/auth/set-password/page.tsx
+@@ -15,8 +15,8 @@ export default async function SetPasswordPage() {
+   if (!data.user) redirect("/login?error=Your+link+has+expired.+Request+a+new+one+below.");
+ 
+   return (
+-    <main className="login" style={{ gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
+-      <section className="login__form-wrap" style={{ background: "transparent", padding: "2rem 1.25rem", width: "min(100%, 480px)" }}>
++    <main className="login login--focused">
++      <section className="login__form-wrap">
+         <div className="login__card">
+           <div className="app-shell__brand" style={{ marginBottom: "1.25rem" }}>
+             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
+diff --git a/src/app/globals.css b/src/app/globals.css
+index 25f1f8c..e09fe6d 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -1221,6 +1221,36 @@ textarea.field__input {
+   padding-top: 1.25rem;
+ }
+ 
++.login--focused {
++  grid-template-columns: minmax(0, 1fr);
++  place-items: center;
++}
++
++.login--focused .login__form-wrap {
++  background: transparent;
++  padding: 2rem 1.25rem;
++  width: min(100%, 480px);
++}
++
++.login__links {
++  display: flex;
++  justify-content: center;
++  margin-top: 1.1rem;
++}
++
++.login__links a {
++  color: var(--ink-600);
++  font-size: 0.82rem;
++  font-weight: 600;
++  text-decoration: underline;
++  text-underline-offset: 3px;
++}
++
++.login__links a:hover,
++.login__links a:focus-visible {
++  color: var(--coral-dark);
++}
++
+ .empty-state {
+   padding: 3rem 1.5rem;
+   text-align: center;
+@@ -1475,12 +1505,6 @@ textarea.field__input {
+   z-index: 10;
+ }
+ 
+-.form-readiness {
+-  color: var(--ink-600);
+-  font-size: 0.68rem;
+-  margin-right: auto;
+-}
+-
+ @media (max-width: 1200px) {
+   .metric-grid {
+     grid-template-columns: repeat(3, minmax(0, 1fr));
+@@ -1585,7 +1609,7 @@ textarea.field__input {
+     flex-wrap: wrap;
+   }
+ 
+-  .form-actions--sticky .form-readiness {
++  .form-actions--sticky .form-checklist {
+     flex-basis: 100%;
+   }
+ 
+@@ -1686,3 +1710,124 @@ textarea.field__input {
+   .manual-purchase-row__remove { justify-self: end; }
+   .manual-purchases__heading { align-items: flex-start; flex-direction: column; }
+ }
++
++.skip-link {
++  background: var(--navy);
++  border-radius: 0 0 0.6rem 0.6rem;
++  color: #fff;
++  font-size: 0.8rem;
++  font-weight: 700;
++  left: 1rem;
++  padding: 0.55rem 0.9rem;
++  position: fixed;
++  top: -3.5rem;
++  transition: top 0.15s ease;
++  z-index: 60;
++}
++
++.skip-link:focus-visible {
++  top: 0;
++}
++
++.app-shell__topbar-status {
++  align-items: center;
++  display: flex;
++  gap: 0.6rem;
++}
++
++.metric-grid--three {
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++}
++
++.metric-card__value--compact {
++  font-size: 1.2rem;
++}
++
++.metric-card--over-target .metric-card__value {
++  color: var(--red);
++}
++
++.form-checklist {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.35rem 0.7rem;
++  margin-right: auto;
++}
++
++.form-checklist__item {
++  align-items: center;
++  color: var(--ink-600);
++  display: inline-flex;
++  font-size: 0.68rem;
++  font-weight: 700;
++  gap: 0.28rem;
++}
++
++.form-checklist__item svg {
++  color: #b7b1a6;
++}
++
++.form-checklist__item--done {
++  color: var(--sage);
++}
++
++.form-checklist__item--done svg {
++  color: var(--sage);
++}
++
++.week-hint {
++  align-items: center;
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.5rem 0.8rem;
++  margin-top: 0.75rem;
++}
++
++.week-hint--invalid {
++  color: var(--red);
++  font-size: 0.75rem;
++  font-weight: 700;
++}
++
