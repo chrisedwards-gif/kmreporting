@@ -26,6 +26,7 @@ import type { ReportDraftInput } from "@/lib/types";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 
 const initialState: ReportActionState = { status: "idle", message: "" };
+const browserDraftKey = "hos-kitchen-report-browser-draft-v1";
 
 type SourceState = {
   mode: string;
@@ -36,6 +37,26 @@ type SourceState = {
 };
 
 const emptySource = (mode = "manual"): SourceState => ({ mode, confirmed: false, reference: "", message: "", error: "" });
+
+const emptyNarrative: ReportDraftInput["narrative"] = {
+  wins: "",
+  operationalIssues: "",
+  staffingIssues: "",
+  complianceIssues: "",
+  equipmentIssues: "",
+  actionsUnderway: "",
+  supportNeeded: "",
+};
+
+type BrowserDraft = {
+  siteId: string;
+  weekStart: string;
+  weekEnd: string;
+  stocktakeCompleted: boolean;
+  values: ReportDraftInput["values"];
+  sources: ReportDraftInput["sources"];
+  narrative: ReportDraftInput["narrative"];
+};
 
 const restoredSource = (source: ReportDraftInput["sources"]["sales"], label: string): SourceState => ({
   ...source,
@@ -89,9 +110,58 @@ export function ReportForm({
   const [salesSource, setSalesSource] = useState<SourceState>(initial ? restoredSource(initial.sources.sales, "Sales") : emptySource());
   const [purchasingSource, setPurchasingSource] = useState<SourceState>(initial ? restoredSource(initial.sources.purchasing, "Purchasing") : emptySource());
   const [labourSource, setLabourSource] = useState<SourceState>(initial ? restoredSource(initial.sources.labour, "Labour") : emptySource());
+  const [narrative, setNarrative] = useState<ReportDraftInput["narrative"]>(initial?.narrative ?? emptyNarrative);
+  const [browserDraftRestored, setBrowserDraftRestored] = useState(false);
+  const [browserDraftReady, setBrowserDraftReady] = useState(false);
+
+  useEffect(() => {
+    if (initial) {
+      setBrowserDraftReady(true);
+      return;
+    }
+    try {
+      const saved = sessionStorage.getItem(browserDraftKey);
+      if (!saved) return;
+      const draft = JSON.parse(saved) as BrowserDraft;
+      if (!sites.some((site) => site.id === draft.siteId)) return;
+      setSelectedSiteId(draft.siteId);
+      setWeekStart(draft.weekStart);
+      setWeekEnd(draft.weekEnd);
+      setStocktakeCompleted(draft.stocktakeCompleted);
+      setValues(draft.values);
+      setSalesSource(restoredSource(draft.sources.sales, "Sales"));
+      setPurchasingSource(restoredSource(draft.sources.purchasing, "Purchasing"));
+      setLabourSource(restoredSource(draft.sources.labour, "Labour"));
+      setNarrative(draft.narrative);
+      setBrowserDraftRestored(true);
+    } catch {
+      sessionStorage.removeItem(browserDraftKey);
+    } finally {
+      setBrowserDraftReady(true);
+    }
+  }, [initial, sites]);
+
+  useEffect(() => {
+    if (!browserDraftReady) return;
+    const draft: BrowserDraft = {
+      siteId: selectedSiteId,
+      weekStart,
+      weekEnd,
+      stocktakeCompleted,
+      values,
+      sources: {
+        sales: { mode: salesSource.mode, reference: salesSource.reference, confirmed: salesSource.confirmed },
+        purchasing: { mode: purchasingSource.mode, reference: purchasingSource.reference, confirmed: purchasingSource.confirmed },
+        labour: { mode: labourSource.mode, reference: labourSource.reference, confirmed: labourSource.confirmed },
+      },
+      narrative,
+    };
+    sessionStorage.setItem(browserDraftKey, JSON.stringify(draft));
+  }, [browserDraftReady, labourSource.confirmed, labourSource.mode, labourSource.reference, narrative, purchasingSource.confirmed, purchasingSource.mode, purchasingSource.reference, salesSource.confirmed, salesSource.mode, salesSource.reference, selectedSiteId, stocktakeCompleted, values, weekEnd, weekStart]);
 
   useEffect(() => {
     if (state.status !== "success" || !state.reportId) return;
+    sessionStorage.removeItem(browserDraftKey);
     if (state.intent === "submit") router.push(`/reports/${state.reportId}`);
     else router.replace(`/reports/new?report=${state.reportId}`);
     router.refresh();
@@ -220,6 +290,7 @@ export function ReportForm({
   return (
     <form action={formAction} className="report-form">
       {initial ? <div className="form-message form-message--success" role="status"><CheckCircle2 aria-hidden="true" size={15} />Draft restored. Review the totals and confirmations before submitting.</div> : null}
+      {browserDraftRestored ? <div className="form-message form-message--success" role="status"><CheckCircle2 aria-hidden="true" size={15} />Your unsaved browser draft has been restored. Raw upload files are not retained, but their extracted totals and confirmations are.</div> : null}
       <input name="salesSource" type="hidden" value={salesSource.mode} />
       <input name="salesSourceReference" type="hidden" value={salesSource.reference} />
       <input name="salesConfirmed" type="hidden" value={String(salesSource.confirmed)} />
@@ -370,7 +441,7 @@ export function ReportForm({
           ].map(([name, label, placeholder], index) => (
             <label className={`field ${index === 6 ? "field--full" : ""}`} key={name}>
               <span className="field__label">{label}</span>
-              <textarea className="field__input" defaultValue={initial?.narrative[name as keyof ReportDraftInput["narrative"]] ?? ""} name={name} placeholder={placeholder} />
+              <textarea className="field__input" name={name} onChange={(event) => setNarrative((current) => ({ ...current, [name]: event.target.value }))} placeholder={placeholder} value={narrative[name as keyof ReportDraftInput["narrative"]]} />
             </label>
           ))}
         </div>
