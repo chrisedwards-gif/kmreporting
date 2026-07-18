@@ -48,10 +48,14 @@ export async function sendTestNotification(
       return { status: "success", message: `Test queued for ${recipient.notification_email}. Configure REMINDER_WEBHOOK_URL before expecting an email.` };
     }
 
+    const actualDeliveryEmail = environment.reminderRecipientOverride ?? recipient.notification_email;
+    const deliveryRecipient = { ...recipient, notification_email: actualDeliveryEmail };
     const delivery = await deliverReminderWebhook(environment.reminderWebhookUrl, {
       test: true,
       kind,
-      recipient,
+      recipient: deliveryRecipient,
+      intendedRecipientEmail: recipient.notification_email,
+      recipientOverridden: Boolean(environment.reminderRecipientOverride),
       subject: content.subject,
       message: content.message,
       actionPath: content.actionPath,
@@ -59,14 +63,14 @@ export async function sendTestNotification(
 
     const { error: updateError } = await admin.from("notification_log").update({
       delivery_status: delivery.ok ? "sent" : "failed",
-      provider_reference: delivery.providerReference || null,
+      provider_reference: delivery.providerReference || (!delivery.ok ? delivery.error.slice(0, 250) : null),
       sent_at: delivery.ok ? new Date().toISOString() : null,
     }).eq("id", logged.id);
 
     revalidatePath("/notifications");
     if (updateError) return { status: "error", message: "The webhook responded, but its delivery status could not be saved." };
     return delivery.ok
-      ? { status: "success", message: `The delivery webhook accepted the test for ${recipient.notification_email}.` }
+      ? { status: "success", message: `The delivery webhook accepted the test for ${actualDeliveryEmail}${environment.reminderRecipientOverride ? " via the UAT recipient override" : ""}.` }
       : { status: "error", message: `${delivery.error} The failed attempt is recorded.` };
   } catch (error) {
     console.error("notification test failed", error);
