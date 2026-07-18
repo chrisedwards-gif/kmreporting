@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { ChefHat, ShieldCheck } from "lucide-react";
-import { confirmEmailToken } from "@/app/actions/auth";
+import { ChefHat, KeyRound, ShieldCheck } from "lucide-react";
+import { confirmEmailOtp } from "@/app/actions/auth";
 import { safeInternalPath } from "@/lib/utils";
 
-export const metadata = { title: "Confirm your secure link" };
+export const metadata = { title: "Confirm your secure code" };
 export const dynamic = "force-dynamic";
 
 const allowedTypes = new Set(["email", "invite", "recovery"]);
@@ -11,18 +11,18 @@ const allowedTypes = new Set(["email", "invite", "recovery"]);
 export default async function ConfirmAuthPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token_hash?: string; type?: string; next?: string }>;
+  searchParams: Promise<{ email?: string; type?: string; next?: string; error?: string }>;
 }) {
-  const { token_hash: tokenHash, type, next } = await searchParams;
-  if (!tokenHash || tokenHash.length < 20 || !type || !allowedTypes.has(type)) {
+  const { email = "", type, next, error } = await searchParams;
+  if (!type || !allowedTypes.has(type)) {
     redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
   }
 
-  const destination = safeInternalPath(next) ?? "/dashboard";
-  const title = type === "recovery" ? "Continue to reset your password." : "Continue to finish setting up your account.";
+  const destination = safeInternalPath(next) ?? "/auth/set-password";
+  const title = type === "recovery" ? "Enter your reset code." : "Enter your account code.";
   const description = type === "recovery"
-    ? "For your protection, the reset is not completed until you press the button below."
-    : "For your protection, the invitation is not accepted until you press the button below.";
+    ? "Use the one-time code in your password-reset email."
+    : "Use the one-time code in your invitation or confirmation email.";
 
   return (
     <main className="login" style={{ gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
@@ -35,16 +35,44 @@ export default async function ConfirmAuthPage({
           <ShieldCheck aria-hidden="true" color="#eb6b4f" size={26} />
           <h1>{title}</h1>
           <p>{description}</p>
-          <form action={confirmEmailToken} className="login__form">
-            <input name="tokenHash" type="hidden" value={tokenHash} />
+          {error && <div className="form-message form-message--error" role="alert">{error}</div>}
+          <form action={confirmEmailOtp} className="login__form">
+            <label className="field">
+              <span className="field__label">Email address</span>
+              <input
+                autoComplete="email"
+                className="field__input"
+                defaultValue={email}
+                name="email"
+                required
+                type="email"
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">One-time code</span>
+              <input
+                autoComplete="one-time-code"
+                autoFocus
+                className="field__input"
+                inputMode="numeric"
+                maxLength={10}
+                minLength={6}
+                name="token"
+                pattern="[0-9]{6,10}"
+                placeholder="Enter the code from the email"
+                required
+                type="text"
+              />
+              <span className="field__hint">The code can only be used once and expires shortly.</span>
+            </label>
             <input name="type" type="hidden" value={type} />
             <input name="next" type="hidden" value={destination} />
             <button className="button button--primary" type="submit">
-              Confirm and continue
+              <KeyRound aria-hidden="true" size={16} /> Confirm code and continue
             </button>
           </form>
           <p className="field__hint" style={{ marginTop: "1rem" }}>
-            This extra step prevents automated email-security scanners from using your one-time link before you do.
+            The code is kept out of the link so automated email-security scanners cannot use it before you do.
           </p>
         </div>
       </section>
