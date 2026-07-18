@@ -55,17 +55,17 @@ export async function shareApprovedReport(
   const parsed = individualShareSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: "The report is unavailable." };
   await requireRole(["admin", "group_manager"]);
-  if (environment.isDemo) return { status: "success", intent: "individual", message: "Demo individual share recorded." };
+  if (environment.isDemo) return { status: "success", intent: "individual", message: "Demo share record validated; no email was sent." };
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
   const { error } = await supabase.rpc("mark_report_shared", { target_report: parsed.data.reportId, channel: "individual_report" });
-  if (error) return { status: "error", message: "Only an approved kitchen report can be shared individually." };
+  if (error) return { status: "error", message: "Only an approved kitchen report can be recorded as shared." };
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/approvals");
   revalidatePath("/summary");
   revalidatePath(`/reports/${parsed.data.reportId}`);
-  return { status: "success", intent: "individual", message: "Kitchen report shared and recorded in the audit trail." };
+  return { status: "success", intent: "individual", message: "Share recorded in the audit trail. No email was sent by this action." };
 }
 
 export async function releaseManagementSummary(
@@ -75,7 +75,7 @@ export async function releaseManagementSummary(
   const parsed = releaseSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: "The reporting period is unavailable." };
   await requireRole(["admin", "group_manager"]);
-  if (environment.isDemo) return { status: "success", intent: parsed.data.intent, message: "Demo summary action validated." };
+  if (environment.isDemo) return { status: "success", intent: parsed.data.intent, message: "Demo summary action validated; no email was sent." };
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
 
@@ -93,7 +93,7 @@ export async function releaseManagementSummary(
     if (error) return { status: "error", message: "The partial update could not be recorded. Check the approval queue and try again." };
     revalidatePath("/approvals");
     revalidatePath("/summary");
-    return { status: "success", intent: "partial", message: `Partial update recorded. ${Math.max((expectedSiteCount ?? 0) - reports.filter((report) => ["approved", "shared"].includes(report.status)).length, 0)} kitchen report(s) are still awaiting submission or approval.` };
+    return { status: "success", intent: "partial", message: `Partial update recorded in the audit trail; no email was sent. ${Math.max((expectedSiteCount ?? 0) - reports.filter((report) => ["approved", "shared"].includes(report.status)).length, 0)} kitchen report(s) are still awaiting submission or approval.` };
   }
   if (reportsError || !reports?.length || reports.length !== expectedSiteCount || reports.some((report) => !["approved", "shared"].includes(report.status))) {
     return { status: "error", message: "Every active kitchen must have an approved report before release." };
@@ -107,5 +107,5 @@ export async function releaseManagementSummary(
   revalidatePath("/reports");
   revalidatePath("/approvals");
   revalidatePath("/summary");
-  return { status: "success", intent: "complete", message: "Management summary released and recorded in the audit trail." };
+  return { status: "success", intent: "complete", message: "Management summary marked as released in the audit trail. No email was sent by this action." };
 }
