@@ -42,33 +42,43 @@ export async function requestPasswordReset(formData: FormData) {
     // The response is identical whether or not the address has an account,
     // so this form cannot be used to enumerate valid emails.
     await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-      redirectTo: `${origin}/auth/callback?next=/auth/set-password`,
+      redirectTo: `${origin}/auth/set-password`,
     });
   }
   redirect("/auth/forgot-password?sent=1");
 }
 
-const confirmTokenSchema = z.object({
-  tokenHash: z.string().min(20).max(2048),
+const confirmOtpSchema = z.object({
+  email: z.email().transform((value) => value.toLowerCase()),
+  token: z.string().trim().regex(/^\d{6,10}$/, "Enter the numeric code from the email."),
   type: z.enum(["email", "invite", "recovery"]),
   next: z.string().max(200).optional(),
 });
 
-// Verification is intentionally a POST action. Microsoft Safe Links and other
-// email scanners may prefetch GET links; requiring a human button press keeps
-// them from consuming Supabase's one-time token before the recipient arrives.
-export async function confirmEmailToken(formData: FormData) {
-  const parsed = confirmTokenSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
+// The one-time code is entered by the recipient rather than embedded in the
+// link. Microsoft Safe Links can therefore prefetch the page without consuming
+// the authentication credential before the user arrives.
+export async function confirmEmailOtp(formData: FormData) {
+  const parsed = confirmOtpSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? "Check your email address and code.";
+    redirect(`/auth/confirm?error=${encodeURIComponent(message)}`);
+  }
 
   const supabase = await createServerSupabaseClient();
   if (!supabase) redirect("/login?error=The+database+connection+is+unavailable.");
 
   const { error } = await supabase.auth.verifyOtp({
-    token_hash: parsed.data.tokenHash,
+    email: parsed.data.email,
+    token: parsed.data.token,
     type: parsed.data.type as EmailOtpType,
   });
-  if (error) redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
+  if (error) {
+    const errorCode = "code" in error && typeof error.code === "string" ? error.code : "invalid_code";
+    console.error("auth.otp_confirmation_failed", { code: errorCode, type: parsed.data.type });
+    const next = safeInternalPath(parsed.data.next) ?? "/auth/set-password";
+    redirect(`/auth/confirm?type=${parsed.data.type}&email=${encodeURIComponent(parsed.data.email)}&next=${encodeURIComponent(next)}&error=That+code+is+invalid+or+has+expired.+Request+a+new+one.`);
+  }
 
   redirect(safeInternalPath(parsed.data.next) ?? "/dashboard");
 }
