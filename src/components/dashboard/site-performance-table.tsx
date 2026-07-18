@@ -43,9 +43,13 @@ export function SitePerformanceTable({ sites }: { sites: SitePerformance[] }) {
               </td>
               <td><StatusBadge status={site.status} /></td>
               <td>
-                <Link aria-label={`Open ${site.name} report`} href={`/reports/${site.reportId ?? site.id}`}>
-                  <ChevronRight aria-hidden="true" size={18} />
-                </Link>
+                {site.reportId ? (
+                  <Link aria-label={`Open ${site.name} report`} href={`/reports/${site.reportId}`}>
+                    <ChevronRight aria-hidden="true" size={18} />
+                  </Link>
+                ) : (
+                  <span aria-label={`No report yet for ${site.name}`} className="data-table__no-report">—</span>
+                )}
               </td>
             </tr>
           ))}

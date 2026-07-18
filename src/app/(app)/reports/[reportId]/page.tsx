@@ -48,7 +48,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
           <h1 className="page-header__title">{report.siteName}</h1>
           <p className="page-header__copy">Submitted by {report.manager}. Financial outputs are current safe aggregates; no pay rates are included.</p>
         </div>
-        <div style={{ display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+        <div className="page-header__actions">
           <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> Reports</Link>
           {report.status === "draft" ? <Link className="button button--primary" href={`/reports/new?report=${report.id}`}><Pencil aria-hidden="true" size={16} /> Continue draft</Link> : null}
         </div>
@@ -106,7 +106,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
                   {report.costs.flags.map((flag) => <div className={`review-item review-item--${flag.severity}`} key={flag.code}><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></div>)}
                 </div>
               ) : (
-                <div className="privacy-callout"><CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".35rem", verticalAlign: "text-bottom" }} />All automated checks have passed.</div>
+                <div className="privacy-callout"><CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />All automated checks have passed.</div>
               )}
             </div>
           </section>

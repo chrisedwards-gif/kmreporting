@@ -31,6 +31,14 @@ export default async function DashboardPage() {
     })),
   );
   const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
+  // Group targets are each kitchen's own target weighted by its share of sales,
+  // so one small site with a loose target cannot mask a large site running hot.
+  const weightedTarget = (selectTarget: (site: (typeof sites)[number]) => number) =>
+    totals.netSales ? sites.reduce((sum, site) => sum + selectTarget(site) * site.netSales, 0) / totals.netSales : 0;
+  const foodTarget = weightedTarget((site) => site.foodCostTarget);
+  const labourTarget = weightedTarget((site) => site.labourTarget);
+  const wasteTarget = weightedTarget((site) => site.wasteTarget);
+  const hasSales = totals.netSales > 0;
 
   return (
     <>
@@ -49,9 +57,9 @@ export default async function DashboardPage() {
 
       <section aria-label="Group metrics" className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
-        <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)}${allStockAdjusted ? "" : " · mixed basis"}`} value={formatPercentage(foodCostPct)} />
-        <MetricCard accent="#2d7a62" label="Staff cost" note={formatCurrency(totals.staffCost)} value={formatPercentage(labourPct)} />
-        <MetricCard accent="#c78324" label="Waste" note={formatCurrency(totals.wasteCost)} value={formatPercentage(wastePct)} />
+        <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)} · target ≤ ${formatPercentage(foodTarget)}${allStockAdjusted ? "" : " · mixed basis"}`} overTarget={hasSales && foodCostPct > foodTarget} value={formatPercentage(foodCostPct)} />
+        <MetricCard accent="#2d7a62" label="Staff cost" note={`${formatCurrency(totals.staffCost)} · target ≤ ${formatPercentage(labourTarget)}`} overTarget={hasSales && labourPct > labourTarget} value={formatPercentage(labourPct)} />
+        <MetricCard accent="#c78324" label="Waste" note={`${formatCurrency(totals.wasteCost)} · target ≤ ${formatPercentage(wasteTarget)}`} overTarget={hasSales && wastePct > wasteTarget} value={formatPercentage(wastePct)} />
         <MetricCard accent="#1e2e35" label="Prime cost" note={formatCurrency(totals.cogs + totals.staffCost)} value={formatPercentage(primeCostPct)} />
         <MetricCard accent="#b93f35" label="Review queue" note="Approval blocks sharing" value={`${reviewFlags.length}`} />
       </section>

@@ -15,8 +15,8 @@ export default async function SetPasswordPage() {
   if (!data.user) redirect("/login?error=Your+link+has+expired.+Request+a+new+one+below.");
 
   return (
-    <main className="login" style={{ gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
-      <section className="login__form-wrap" style={{ background: "transparent", padding: "2rem 1.25rem", width: "min(100%, 480px)" }}>
+    <main className="login login--focused">
+      <section className="login__form-wrap">
         <div className="login__card">
           <div className="app-shell__brand" style={{ marginBottom: "1.25rem" }}>
             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>

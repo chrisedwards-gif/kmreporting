@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
+  CircleDashed,
   FileCheck2,
   FileSpreadsheet,
   Info,
@@ -24,6 +25,7 @@ import {
   parseStockLinkEndOfWeek,
 } from "@/lib/reporting/imports";
 import { calculateCosts } from "@/lib/reporting/calculations";
+import { isSundayToSaturday } from "@/lib/reporting/periods";
 import type { ManualPurchase, ReportDraftInput } from "@/lib/types";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 
@@ -66,6 +68,13 @@ const restoredSource = (source: ReportDraftInput["sources"]["sales"], label: str
   message: `${label} total restored from the saved draft${source.confirmed ? " with its confirmation" : ""}.`,
   error: "",
 });
+
+const saturdayAfter = (sundayIso: string) => {
+  const date = new Date(`${sundayIso}T12:00:00Z`);
+  if (Number.isNaN(date.valueOf())) return "";
+  date.setUTCDate(date.getUTCDate() + 6);
+  return date.toISOString().slice(0, 10);
+};
 
 const readLegacyText = async (file: File) => {
   const buffer = await file.arrayBuffer();
@@ -190,7 +199,16 @@ export function ReportForm({
     }),
     [manualPurchaseTotal, values, stocktakeCompleted],
   );
-  const readyToSubmit = salesSource.confirmed && purchasingSource.confirmed && labourSource.confirmed && values.netSales > 0 && values.staffCost > 0;
+  const weekValid = isSundayToSaturday(weekStart, weekEnd);
+  const checklist = [
+    { label: "Sun–Sat week", done: weekValid },
+    { label: "Net sales", done: values.netSales > 0 },
+    { label: "Sales confirmed", done: salesSource.confirmed },
+    { label: "Food confirmed", done: purchasingSource.confirmed },
+    { label: "Staff cost", done: values.staffCost > 0 },
+    { label: "Labour confirmed", done: labourSource.confirmed },
+  ];
+  const readyToSubmit = checklist.every((item) => item.done);
 
   const resetImports = () => {
     setSalesSource(emptySource());
@@ -337,13 +355,22 @@ export function ReportForm({
           </label>
           <label className="field">
             <span className="field__label">Week starting (Sunday)</span>
-            <input className="field__input" name="weekStart" onChange={(event) => { setWeekStart(event.target.value); resetImports(); }} required type="date" value={weekStart} />
+            <input className="field__input" name="weekStart" onChange={(event) => { setWeekStart(event.target.value); setWeekEnd(saturdayAfter(event.target.value)); resetImports(); }} required type="date" value={weekStart} />
           </label>
           <label className="field">
             <span className="field__label">Week ending (Saturday)</span>
             <input className="field__input" name="weekEnd" onChange={(event) => { setWeekEnd(event.target.value); resetImports(); }} required type="date" value={weekEnd} />
+            <span className="field__hint">Fills automatically when the Sunday is chosen.</span>
           </label>
         </div>
+        {!weekValid && (
+          <div className="week-hint" role="alert">
+            <span className="week-hint--invalid">This is not a complete Sunday-to-Saturday week, so the report cannot be submitted.</span>
+            <button className="week-hint__reset" onClick={() => { setWeekStart(week.start); setWeekEnd(week.end); resetImports(); }} type="button">
+              Use the latest completed week
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="form-section">
@@ -392,7 +419,7 @@ export function ReportForm({
           {manualPurchases.map((item, index) => (
             <div className="manual-purchase-row" key={index}>
               <label className="field"><span className="field__label">What was purchased?</span><input className="field__input" maxLength={120} onChange={(event) => updateManualPurchase(index, "description", event.target.value)} placeholder="e.g. Emergency produce top-up" value={item.description} /></label>
-              <label className="field"><span className="field__label">Amount</span><input className="field__input" min="0.01" onChange={(event) => updateManualPurchase(index, "amount", event.target.value)} placeholder="249.00" step="0.01" type="number" value={item.amount || ""} /></label>
+              <label className="field"><span className="field__label">Amount</span><input className="field__input" min="0.01" inputMode="decimal" onChange={(event) => updateManualPurchase(index, "amount", event.target.value)} placeholder="249.00" step="0.01" type="number" value={item.amount || ""} /></label>
               <label className="field"><span className="field__label">Receipt/reference</span><input className="field__input" maxLength={120} onChange={(event) => updateManualPurchase(index, "receiptReference", event.target.value)} placeholder="Optional receipt number" value={item.receiptReference} /></label>
               <button aria-label={`Remove purchase ${index + 1}`} className="icon-button manual-purchase-row__remove" onClick={() => { setManualPurchases((current) => current.filter((_, itemIndex) => itemIndex !== index)); setPurchasingSource((current) => ({ ...current, confirmed: false })); }} type="button"><Trash2 aria-hidden="true" size={17} /></button>
             </div>
@@ -423,8 +450,8 @@ export function ReportForm({
           </label>
           {stocktakeCompleted && (
             <div className="form-grid form-grid--two">
-              <label className="field"><span className="field__label">Opening stock</span><input className="field__input" min="0" name="openingStock" onChange={(event) => updateNumber("openingStock", event.target.value, "purchasing")} step="0.01" type="number" value={values.openingStock || ""} /></label>
-              <label className="field"><span className="field__label">Closing stock</span><input className="field__input" min="0" name="closingStock" onChange={(event) => updateNumber("closingStock", event.target.value, "purchasing")} step="0.01" type="number" value={values.closingStock || ""} /></label>
+              <label className="field"><span className="field__label">Opening stock</span><input className="field__input" inputMode="decimal" min="0" name="openingStock" onChange={(event) => updateNumber("openingStock", event.target.value, "purchasing")} step="0.01" type="number" value={values.openingStock || ""} /></label>
+              <label className="field"><span className="field__label">Closing stock</span><input className="field__input" inputMode="decimal" min="0" name="closingStock" onChange={(event) => updateNumber("closingStock", event.target.value, "purchasing")} step="0.01" type="number" value={values.closingStock || ""} /></label>
             </div>
           )}
         </details>
@@ -440,8 +467,8 @@ export function ReportForm({
             <span><strong>Upload RotaCloud</strong><small>Daily Totals `.csv` preferred</small></span>
             <input accept=".csv" onChange={(event) => { void importLabour(event.target.files?.[0]); event.target.value = ""; }} type="file" />
           </label>
-          <label className="field"><span className="field__label">Aggregate weekly wage cost</span><input className="field__input" min="0" name="staffCost" onChange={(event) => updateNumber("staffCost", event.target.value, "labour")} step="0.01" type="number" value={values.staffCost || ""} /><span className="field__hint">Use the total shown by RotaCloud.</span></label>
-          <label className="field"><span className="field__label">Paid hours (optional)</span><input className="field__input" min="0" name="paidHours" onChange={(event) => updateNumber("paidHours", event.target.value, "labour")} step="0.01" type="number" value={values.paidHours || ""} /><span className="field__hint">Helpful for trend analysis; no employee detail.</span></label>
+          <label className="field"><span className="field__label">Aggregate weekly wage cost</span><input className="field__input" inputMode="decimal" min="0" name="staffCost" onChange={(event) => updateNumber("staffCost", event.target.value, "labour")} step="0.01" type="number" value={values.staffCost || ""} /><span className="field__hint">Use the total shown by RotaCloud.</span></label>
+          <label className="field"><span className="field__label">Paid hours (optional)</span><input className="field__input" inputMode="decimal" min="0" name="paidHours" onChange={(event) => updateNumber("paidHours", event.target.value, "labour")} step="0.01" type="number" value={values.paidHours || ""} /><span className="field__hint">Helpful for trend analysis; no employee detail.</span></label>
         </div>
         {labourSource.message && <div className="source-result"><FileCheck2 aria-hidden="true" size={16} /><span>{labourSource.message}</span></div>}
         {labourSource.error && <div className="form-message form-message--error" role="alert">{labourSource.error}</div>}
@@ -487,7 +514,14 @@ export function ReportForm({
       )}
 
       <div className="form-actions form-actions--sticky">
-        {!readyToSubmit && <span className="form-readiness">Confirm sales, food spend and labour before submitting.</span>}
+        <div aria-label="Submission readiness" className="form-checklist">
+          {checklist.map((item) => (
+            <span className={`form-checklist__item${item.done ? " form-checklist__item--done" : ""}`} key={item.label}>
+              {item.done ? <CheckCircle2 aria-hidden="true" size={13} /> : <CircleDashed aria-hidden="true" size={13} />}
+              {item.label}
+            </span>
+          ))}
+        </div>
         <button className="button button--secondary" disabled={pending} name="intent" type="submit" value="draft"><Save aria-hidden="true" size={16} /> Save draft</button>
         <button className="button button--primary" disabled={pending || !readyToSubmit} name="intent" type="submit" value="submit"><Send aria-hidden="true" size={16} /> {pending ? "Validating…" : "Submit for review"}</button>
       </div>

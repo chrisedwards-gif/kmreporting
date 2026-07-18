@@ -16,7 +16,7 @@ export function ApprovalForm({ reportId, status, hasFlags }: { reportId: string;
   if (isShared) {
     return (
       <div className="privacy-callout">
-        <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
+        <CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />
         This report is approved and its share has been recorded. This status does not confirm that an email was delivered.
       </div>
     );

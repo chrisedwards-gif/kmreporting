@@ -12,8 +12,8 @@ export default async function ForgotPasswordPage({
   const { sent, error } = await searchParams;
 
   return (
-    <main className="login" style={{ gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
-      <section className="login__form-wrap" style={{ background: "transparent", padding: "2rem 1.25rem", width: "min(100%, 480px)" }}>
+    <main className="login login--focused">
+      <section className="login__form-wrap">
         <div className="login__card">
           <div className="app-shell__brand" style={{ marginBottom: "1.25rem" }}>
             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
@@ -41,8 +41,8 @@ export default async function ForgotPasswordPage({
                 </label>
                 <button className="button button--primary" type="submit">Send reset link</button>
               </form>
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "1.1rem" }}>
-                <Link href="/login" style={{ color: "var(--ink-600)", fontSize: ".82rem", fontWeight: 600, textDecoration: "underline", textUnderlineOffset: "3px" }}>Back to sign in</Link>
+              <div className="login__links">
+                <Link href="/login">Back to sign in</Link>
               </div>
             </>
           )}

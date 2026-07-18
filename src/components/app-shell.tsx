@@ -37,6 +37,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside className={classNames("app-shell__sidebar", navOpen && "app-shell__sidebar--open")}>
         <div className="app-shell__brand">
           <div className="app-shell__brand-mark">
@@ -80,7 +81,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
             {navOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="app-shell__context">Group reporting · Europe/London</div>
-          <div style={{ alignItems: "center", display: "flex", gap: ".6rem" }}>
+          <div className="app-shell__topbar-status">
             <LiveReportingStatus isDemo={isDemo} />
             {isPreview && !isDemo && (
               <div className="demo-banner demo-banner--preview">
@@ -98,7 +99,7 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
             )}
           </div>
         </header>
-        <main className="app-shell__content">{children}</main>
+        <main className="app-shell__content" id="main-content">{children}</main>
       </div>
     </div>
   );
