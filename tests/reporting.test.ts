@@ -4,6 +4,7 @@ import { parseCreditsOverview, parseGoodsDelivered, parseRotaCloudLabour, parseS
 import { getCurrentReportingWeek, getLatestCompletedReportingWeek, isSiteExpectedForReportingWeek, isSundayToSaturday } from "@/lib/reporting/periods";
 import { buildReviewFlags } from "@/lib/reporting/review";
 import { optionalNumericInput } from "@/lib/reporting/validation";
+import { reportSaveErrorMessage } from "@/lib/reporting/errors";
 
 describe("weekly reporting calculations", () => {
   it("calculates COGS and staff cost without exposing individual pay", () => {
@@ -48,6 +49,23 @@ describe("weekly reporting calculations", () => {
     expect(optionalNumericInput.parse(null)).toBe(0);
     expect(optionalNumericInput.parse("")).toBe(0);
     expect(optionalNumericInput.parse("221.75")).toBe(221.75);
+  });
+
+  it("shows safe database diagnostics only in UAT", () => {
+    const error = { code: "P0001", message: "unexpected trigger failure" };
+    expect(reportSaveErrorMessage(error, true)).toBe("UAT database error P0001: unexpected trigger failure");
+    expect(reportSaveErrorMessage(error, false)).toBe(
+      "The report could not be saved. Check your site access and try again.",
+    );
+  });
+
+  it("turns known report database failures into actionable messages", () => {
+    expect(reportSaveErrorMessage({ message: "site access denied" }, false)).toBe(
+      "You do not have permission to submit reports for this kitchen.",
+    );
+    expect(
+      reportSaveErrorMessage({ message: "a submitted or approved report cannot be overwritten" }, false),
+    ).toBe("A submitted or approved report already exists for this kitchen and week.");
   });
 
   it("defaults new reports to the latest completed Sunday-to-Saturday week", () => {

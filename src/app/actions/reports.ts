@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { environment } from "@/lib/env";
 import { requireSessionProfile } from "@/lib/auth/dal";
+import { reportSaveErrorMessage } from "@/lib/reporting/errors";
 import { isSundayToSaturday } from "@/lib/reporting/periods";
 import { optionalNumericInput } from "@/lib/reporting/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -99,7 +100,17 @@ export async function saveWeeklyReport(
       status: parsed.data.intent === "submit" ? "submitted" : "draft",
     },
   });
-  if (error) return { status: "error", message: "The report could not be saved. Check your site access and try again." };
+  if (error) {
+    console.error("save_weekly_report failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      siteId: parsed.data.siteId,
+      userId: profile.id,
+    });
+    return { status: "error", message: reportSaveErrorMessage(error, environment.isPreview) };
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/reports");
