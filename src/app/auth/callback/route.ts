@@ -6,21 +6,26 @@ import { safeInternalPath } from "@/lib/utils";
 
 const allowedEmailOtpTypes = new Set<EmailOtpType>(["email", "invite", "recovery"]);
 
-// Handles Supabase email links. Password recovery can arrive as a PKCE code.
-// Invitations should use the documented token-hash email template because the
-// administrator and invitee normally use different browsers.
+// PKCE callbacks can be exchanged immediately. Token-hash links are forwarded
+// to a confirmation page and only verified after a human POSTs the form, which
+// prevents Microsoft Safe Links from consuming them during email scanning.
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const requestedType = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
   const next = safeInternalPath(request.nextUrl.searchParams.get("next")) ?? "/dashboard";
-  const supabase = await createServerSupabaseClient();
 
-  if (supabase) {
-    if (tokenHash && requestedType && allowedEmailOtpTypes.has(requestedType)) {
-      const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: requestedType });
-      if (!error) return NextResponse.redirect(new URL(next, request.url));
-    } else if (code) {
+  if (tokenHash && requestedType && allowedEmailOtpTypes.has(requestedType)) {
+    const confirmationUrl = new URL("/auth/confirm", request.url);
+    confirmationUrl.searchParams.set("token_hash", tokenHash);
+    confirmationUrl.searchParams.set("type", requestedType);
+    confirmationUrl.searchParams.set("next", next);
+    return NextResponse.redirect(confirmationUrl);
+  }
+
+  if (code) {
+    const supabase = await createServerSupabaseClient();
+    if (supabase) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) return NextResponse.redirect(new URL(next, request.url));
     }
