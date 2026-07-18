@@ -1,18 +1,13 @@
-import { LockKeyhole, Plus, UserRoundCog } from "lucide-react";
+import { LockKeyhole, UserRoundCog } from "lucide-react";
 import { requireRole } from "@/lib/auth/dal";
+import { getSiteDirectory } from "@/lib/data/reporting";
+import { CreateSiteForm } from "@/components/sites/create-site-form";
 
 export const metadata = { title: "Sites and access" };
 
-const sites = [
-  { code: "DR-MCR", name: "Dough Religion", manager: "Warren", state: "Active", access: "1 kitchen manager" },
-  { code: "CW-MCR", name: "Choi Wan", manager: "Ricky", state: "Active", access: "1 kitchen manager" },
-  { code: "KAR-MCR", name: "Kardia", manager: "Manager TBC", state: "Active", access: "Unassigned" },
-  { code: "ANT-MCR", name: "Antoma", manager: "—", state: "Inactive", access: "No access" },
-  { code: "BB-MCR", name: "Bombay Bird", manager: "—", state: "Inactive", access: "No access" },
-];
-
 export default async function SitesPage() {
   await requireRole(["admin"]);
+  const sites = await getSiteDirectory();
   return (
     <>
       <header className="page-header">
@@ -21,7 +16,7 @@ export default async function SitesPage() {
           <h1 className="page-header__title">Sites & access.</h1>
           <p className="page-header__copy">Kitchen managers see assigned sites only. Group and finance roles are granted separately and audited.</p>
         </div>
-        <button className="button button--primary" type="button"><Plus aria-hidden="true" size={16} /> Add kitchen</button>
+        <CreateSiteForm />
       </header>
 
       <section className="panel">
@@ -29,7 +24,7 @@ export default async function SitesPage() {
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
             <thead><tr><th>Kitchen</th><th>Site code</th><th>Manager</th><th>Reporting</th><th>Scoped access</th></tr></thead>
-            <tbody>{sites.map((site) => <tr key={site.code}><td><strong>{site.name}</strong></td><td>{site.code}</td><td>{site.manager}</td><td><span className={`status-badge status-badge--${site.state === "Active" ? "approved" : "draft"}`}>{site.state}</span></td><td>{site.access}</td></tr>)}</tbody>
+            <tbody>{sites.map((site) => <tr key={site.id}><td><strong>{site.name}</strong></td><td>{site.code}</td><td>Manager TBC</td><td><span className={`status-badge status-badge--${site.active ? "approved" : "draft"}`}>{site.active ? "Active" : "Inactive"}</span></td><td>Assign manager next</td></tr>)}</tbody>
           </table>
         </div>
       </section>
