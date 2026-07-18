@@ -18,27 +18,28 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const missingReports = Math.max(expectedSiteCount - reports.length, 0);
   const ready = reports.length > 0 && reports.length === expectedSiteCount && reports.every((report) => ["approved", "shared"].includes(report.status));
   const released = ready && reports.every((report) => report.status === "shared");
+  const hasApprovedReports = reports.some((report) => ["approved", "shared"].includes(report.status));
   const totals = sites.reduce((sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }), { sales: 0, cogs: 0, labour: 0 });
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
   const labourPct = totals.sales ? totals.labour / totals.sales * 100 : 0;
   const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
 
   return (
-    <div className={`management-summary ${released ? "management-summary--released" : "management-summary--locked"}`}>
-      <div className="print-lock-message">This management summary has not been released. Return to the app and complete every required approval before sharing.</div>
+    <div className={`management-summary ${released ? "management-summary--released" : "management-summary--partial"}`}>
+      {!ready && <div className="print-partial-message">PARTIAL MANAGEMENT UPDATE — awaiting remaining kitchen reports or named approvals. Figures shown are only from currently submitted kitchens.</div>}
       <header className="page-header">
         <div>
           <p className="page-header__eyebrow">Consistent group output</p>
           <h1 className="page-header__title">Management summary.</h1>
           <p className="page-header__copy">Week ending {formatDate(week.end)} · Generated from the current approved site records.</p>
         </div>
-        <div className="page-header__actions"><PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} /><SummaryControls canRelease={["admin", "group_manager"].includes(profile.role)} periodId={selectedPeriod} ready={ready} released={released} /></div>
+        <div className="page-header__actions"><PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} /><SummaryControls canRelease={["admin", "group_manager"].includes(profile.role)} hasApprovedReports={hasApprovedReports} periodId={selectedPeriod} ready={ready} released={released} /></div>
       </header>
 
       {!ready && (
         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
           <LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
-          Sharing is locked. Every active kitchen needs a report and named approval before this summary can be released.{missingReports ? ` ${missingReports} active kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : ""}
+          Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} active kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
         </div>
       )}
 

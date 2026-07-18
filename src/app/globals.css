@@ -1641,16 +1641,17 @@ textarea.field__input {
   .management-summary .panel { border: 0; }
   .management-summary .review-item { break-inside: avoid; }
   .print-lock-message { display: none; }
-  .management-summary--locked > :not(.print-lock-message) { display: none !important; }
-  .management-summary--locked .print-lock-message {
-    border: 2px solid #b93f35;
-    color: #5d211c;
+  .print-partial-message {
+    border: 2px solid #c78324;
+    color: #74470f;
     display: block !important;
     font-family: Arial, sans-serif;
-    font-size: 14pt;
-    margin: 2cm;
-    padding: 1cm;
+    font-size: 12pt;
+    font-weight: 700;
+    margin: 0 0 1cm;
+    padding: .45cm;
   }
 }
 
 .print-lock-message { display: none; }
+.print-partial-message { display: none; }
