@@ -217,9 +217,13 @@ export async function GET(request: NextRequest) {
     if (!environment.reminderWebhookUrl) continue;
 
     const content = reminderContent(kind, site?.name, week.end);
+    const actualDeliveryEmail = environment.reminderRecipientOverride ?? recipient.notification_email;
+    const deliveryRecipient = { ...recipient, notification_email: actualDeliveryEmail };
     const delivery = await deliverReminderWebhook(environment.reminderWebhookUrl, {
       kind,
-      recipient,
+      recipient: deliveryRecipient,
+      intendedRecipientEmail: recipient.notification_email,
+      recipientOverridden: Boolean(environment.reminderRecipientOverride),
       site,
       reportId: row.report_id,
       week,
@@ -228,7 +232,9 @@ export async function GET(request: NextRequest) {
       actionPath: content.actionPath,
     });
 
-    const providerReference = delivery.providerReference || (delivery.status ? `HTTP ${delivery.status}` : null);
+    const providerReference = delivery.providerReference
+      || (!delivery.ok ? delivery.error.slice(0, 250) : null)
+      || (delivery.status ? `HTTP ${delivery.status}` : null);
     await supabase.from("notification_log").update({
       delivery_status: delivery.ok ? "sent" : "failed",
       provider_reference: providerReference,
@@ -239,5 +245,14 @@ export async function GET(request: NextRequest) {
     else failed += 1;
   }
 
-  return NextResponse.json({ ok: true, kind, week, queued: created, delivered, failed, skippedNoEmail });
+  return NextResponse.json({
+    ok: true,
+    kind,
+    week,
+    queued: created,
+    delivered,
+    failed,
+    skippedNoEmail,
+    recipientOverrideActive: Boolean(environment.reminderRecipientOverride),
+  });
 }
