@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2, ClipboardCheck, Send } from "lucide-react";
+import { CheckCircle2, ClipboardCheck } from "lucide-react";
 import { processApproval, shareApprovedReport, type ApprovalActionState } from "@/app/actions/approvals";
 import type { ReportStatus } from "@/lib/types";
 
