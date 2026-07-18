@@ -2,6 +2,12 @@ import { calculateCosts } from "@/lib/reporting/calculations";
 import { buildReviewFlags } from "@/lib/reporting/review";
 import type { SitePerformance, WeeklyReport } from "@/lib/types";
 
+const demoReportIds: Record<string, string> = {
+  "dough-religion": "10000000-0000-4000-8000-000000000001",
+  "choi-wan": "10000000-0000-4000-8000-000000000002",
+  kardia: "10000000-0000-4000-8000-000000000003",
+};
+
 const siteDefinitions = [
   {
     id: "dough-religion",
@@ -88,7 +94,7 @@ export const demoSites: SitePerformance[] = siteDefinitions.map((site) => {
   });
 
   return {
-    reportId: site.id,
+    reportId: demoReportIds[site.id],
     id: site.id,
     code: site.code,
     name: site.name,
@@ -103,12 +109,12 @@ export const demoSites: SitePerformance[] = siteDefinitions.map((site) => {
 
 const copyBySite: Record<string, Omit<WeeklyReport, "costs">> = {
   "dough-religion": {
-    id: "10000000-0000-4000-8000-000000000001",
+    id: demoReportIds["dough-religion"],
     siteId: "dough-religion",
     siteName: "Dough Religion",
     manager: "Warren",
-    weekStart: "2026-07-06",
-    weekEnd: "2026-07-12",
+    weekStart: "2026-07-05",
+    weekEnd: "2026-07-11",
     status: "approved",
     updatedAt: "2026-07-14T09:18:00Z",
     submittedAt: "2026-07-13T10:22:00Z",
@@ -119,14 +125,15 @@ const copyBySite: Record<string, Omit<WeeklyReport, "costs">> = {
     equipmentIssues: "Mixer belt replacement booked for Wednesday morning.",
     actionsUnderway: "Rebalanced Friday prep plan and retained the new pass positions.",
     supportNeeded: "",
+    sources: { sales: "stocklink_upload", purchasing: "procure_wizard_upload", labour: "rotacloud_upload", pendingCredits: 0, awaitingInvoice: 145.01, stocktakeCompleted: true },
   },
   "choi-wan": {
-    id: "10000000-0000-4000-8000-000000000002",
+    id: demoReportIds["choi-wan"],
     siteId: "choi-wan",
     siteName: "Choi Wan",
     manager: "Ricky",
-    weekStart: "2026-07-06",
-    weekEnd: "2026-07-12",
+    weekStart: "2026-07-05",
+    weekEnd: "2026-07-11",
     status: "review_required",
     updatedAt: "2026-07-14T11:42:00Z",
     submittedAt: "2026-07-14T11:42:00Z",
@@ -137,14 +144,15 @@ const copyBySite: Record<string, Omit<WeeklyReport, "costs">> = {
     equipmentIssues: "Dishwasher rinse pressure is being monitored after an engineer visit.",
     actionsUnderway: "Rota rebuilt around confirmed availability; ordering cut-off moved earlier.",
     supportNeeded: "Short-term CDP cover for next Saturday.",
+    sources: { sales: "manual", purchasing: "manual", labour: "manual", pendingCredits: 12.4, awaitingInvoice: 0, stocktakeCompleted: false },
   },
   kardia: {
-    id: "10000000-0000-4000-8000-000000000003",
+    id: demoReportIds.kardia,
     siteId: "kardia",
     siteName: "Kardia",
     manager: "Manager TBC",
-    weekStart: "2026-07-06",
-    weekEnd: "2026-07-12",
+    weekStart: "2026-07-05",
+    weekEnd: "2026-07-11",
     status: "submitted",
     updatedAt: "2026-07-14T08:06:00Z",
     submittedAt: "2026-07-14T08:06:00Z",
@@ -155,6 +163,7 @@ const copyBySite: Record<string, Omit<WeeklyReport, "costs">> = {
     equipmentIssues: "No material issues.",
     actionsUnderway: "Continue daily waste checks and confirm new produce specification.",
     supportNeeded: "",
+    sources: { sales: "manual", purchasing: "manual", labour: "manual", pendingCredits: 0, awaitingInvoice: 0, stocktakeCompleted: false },
   },
 };
 
@@ -164,7 +173,7 @@ export const demoReports: WeeklyReport[] = demoSites.map((costs) => ({
 }));
 
 export const demoWeek = {
-  start: "2026-07-06",
-  end: "2026-07-12",
-  dueAt: "2026-07-14T12:00:00+01:00",
+  start: "2026-07-05",
+  end: "2026-07-11",
+  dueAt: "2026-07-13T12:00:00+01:00",
 };

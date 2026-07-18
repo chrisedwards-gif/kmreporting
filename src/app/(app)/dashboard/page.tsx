@@ -9,7 +9,7 @@ import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 export const metadata = { title: "Group overview" };
 
 export default async function DashboardPage() {
-  const { sites, week, expectedSiteCount } = await getReportingBundle();
+  const { sites, reports, week, expectedSiteCount } = await getReportingBundle();
   const totals = sites.reduce(
     (sum, site) => ({
       netSales: sum.netSales + site.netSales,
@@ -24,8 +24,13 @@ export default async function DashboardPage() {
   const wastePct = totals.netSales ? (totals.wasteCost / totals.netSales) * 100 : 0;
   const primeCostPct = totals.netSales ? ((totals.cogs + totals.staffCost) / totals.netSales) * 100 : 0;
   const reviewFlags = sites.flatMap((site) =>
-    site.flags.map((flag) => ({ ...flag, siteName: site.name, siteId: site.id })),
+    site.flags.filter((flag) => flag.severity !== "info").map((flag) => ({
+      ...flag,
+      siteName: site.name,
+      reportId: reports.find((report) => report.siteId === site.id)?.id,
+    })),
   );
+  const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
 
   return (
     <>
@@ -44,7 +49,7 @@ export default async function DashboardPage() {
 
       <section aria-label="Group metrics" className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
-        <MetricCard accent="#eb6b4f" label="COGS" note={formatCurrency(totals.cogs)} value={formatPercentage(foodCostPct)} />
+        <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)}${allStockAdjusted ? "" : " · mixed basis"}`} value={formatPercentage(foodCostPct)} />
         <MetricCard accent="#2d7a62" label="Staff cost" note={formatCurrency(totals.staffCost)} value={formatPercentage(labourPct)} />
         <MetricCard accent="#c78324" label="Waste" note={formatCurrency(totals.wasteCost)} value={formatPercentage(wastePct)} />
         <MetricCard accent="#1e2e35" label="Prime cost" note={formatCurrency(totals.cogs + totals.staffCost)} value={formatPercentage(primeCostPct)} />
@@ -66,8 +71,8 @@ export default async function DashboardPage() {
           <section className="panel">
             <div className="panel__header">
               <div>
-                <h2 className="panel__title">Food and labour cost</h2>
-                <p className="panel__subtitle">Percentage of net sales by kitchen</p>
+                <h2 className="panel__title">Food cost / spend and labour</h2>
+                <p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p>
               </div>
             </div>
             <div className="panel__body"><CostChart sites={sites} /></div>
@@ -86,7 +91,7 @@ export default async function DashboardPage() {
               {reviewFlags.map((flag, index) => (
                 <Link
                   className={`review-item review-item--${flag.severity}`}
-                  href={`/reports/${flag.siteId}`}
+                  href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"}
                   key={`${flag.code}-${index}`}
                 >
                   <div className="review-item__site">{flag.siteName}</div>

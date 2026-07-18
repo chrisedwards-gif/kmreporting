@@ -8,15 +8,16 @@ The app runs immediately with deterministic demo data. Connect Supabase to enabl
 
 - Multi-site Supabase Auth with `admin`, `group_manager`, `finance`, `kitchen_manager` and `viewer` roles.
 - Row-level security: kitchen managers only read and submit for assigned sites.
-- Monday-to-Sunday period validation in both the application and database.
+- Sunday-to-Saturday period validation matching the current StockLink and Procure Wizard exports.
 - Sales, purchases, stock, waste and concise operational narratives.
-- Private payroll schema. Individual salaries, rates, employee references and time entries are never exposed to browser roles.
+- Manager-confirmed aggregate RotaCloud wage cost, with an optional private payroll connector. Individual salaries, rates and employee rows are never stored by the browser workflow.
 - Safe weekly snapshots for COGS, food cost, staff cost, labour, waste and prime cost.
 - Automatic review gates for target exceptions, missing payroll data, missing pay rates, compliance issues and support requests.
 - Named resolution/approval records and an audit trail.
 - A consistent group management summary that stays locked until every site is approved.
 - Tuesday reminders for missing reports and management review, with deduplication.
-- A server-only cost import API for payroll/time integrations.
+- Browser-side StockLink, Procure Wizard and RotaCloud CSV parsing with manual fallbacks and no raw-file retention.
+- A server-only cost import API remains available for future payroll/time integrations.
 - Live dashboard refresh through Supabase Realtime when reports or imported metrics change.
 - A normalized operations API for EPOS sales/covers, purchasing/credits and waste feeds.
 - Admin site controls for kitchen targets, activation and audited manager invitations/assignments.
@@ -26,7 +27,7 @@ The app runs immediately with deterministic demo data. Connect Supabase to enabl
 ## Architecture
 
 ```text
-Kitchen manager ──> weekly report + source totals ──> public Supabase tables (RLS)
+Kitchen manager ──> local file parsing + confirmed weekly totals ──> public Supabase tables (RLS)
                                                             │
 Payroll/time provider ──> authenticated import endpoint ──> payroll_private schema
                                                             │
@@ -76,11 +77,12 @@ npm run build
 
    Existing installations should apply every later file in `supabase/migrations` in filename order. Migration `002_production_hardening.sql` prevents draft or already-shared reports from receiving an approval decision.
 
-4. Create users with Supabase Auth. Insert a matching `profiles` row for each user and add `site_memberships` for kitchen managers. Do not give kitchen users `admin`, `group_manager` or `finance` roles.
-5. Deploy to Vercel or another Node-compatible host and add the same environment variables there.
-6. Put the deployed app URL and `CRON_SECRET` into Supabase Vault as `app_base_url` and `cron_secret`, then run `supabase/reminder_schedule.sql` once.
+4. Existing databases must also apply `005_manager_source_imports.sql` before deploying the matching application update. It changes future periods to Sunday–Saturday and adds safe source metadata and aggregate labour inputs.
+5. Create users with Supabase Auth. Insert a matching `profiles` row for each user and add `site_memberships` for kitchen managers. Do not give kitchen users `admin`, `group_manager` or `finance` roles.
+6. Deploy to Vercel or another Node-compatible host and add the same environment variables there.
+7. Put the deployed app URL and `CRON_SECRET` into Supabase Vault as `app_base_url` and `cron_secret`, then run `supabase/reminder_schedule.sql` once.
 
-The reminder job invokes the app hourly on Tuesdays, but the endpoint only sends at 09:00, 11:00 and 13:00 Europe/London. This preserves UK daylight-saving behaviour and uses a unique dedupe key so retries do not duplicate reminders.
+The reminder job invokes the app hourly on Mondays and Tuesdays. Kitchen reminders send at 09:00 and 12:00 Monday; approval reminders send at 10:00 Tuesday. Every reminder has a unique dedupe key.
 
 ## Roles and data visibility
 
@@ -98,14 +100,26 @@ Finance payroll administration should occur in the payroll system or a separate 
 ## Cost rules
 
 ```text
-COGS       = opening stock + purchases - credits + transfers in - transfers out - closing stock + adjustments
-Food cost  = COGS / net sales
-Staff cost = paid hours × effective loaded rate + agency cost + overtime premium
+Stock-adjusted COGS = opening stock + purchases - credits + transfers in - transfers out - closing stock + adjustments
+Spend basis         = purchases - credits + transfers in - transfers out + adjustments
+Food cost / spend   = selected basis / net sales
+Staff cost          = confirmed aggregate RotaCloud total, or private payroll calculation
 Labour     = staff cost / net sales
-Prime cost = COGS + staff cost
+Prime cost = selected food basis + staff cost
 ```
 
-Effective loaded rates include configured employer NI, pension and other on-cost percentages. If time data or a required private rate is missing, the report receives a critical review flag instead of silently reporting a low labour percentage.
+Until a kitchen completes reliable opening and closing stocktakes, the UI explicitly labels its result as spend-based rather than stock-adjusted food cost. Pending supplier credits do not reduce spend and enter the review queue. If labour data is missing, the report cannot be submitted.
+
+## Manager file imports
+
+The weekly report accepts these current source formats:
+
+- StockLink End of Week `.xls` exports (HTML-formatted Excel files): extracts the site, exact period and net sales excluding VAT and service charge.
+- Procure Wizard Goods Delivered `.csv`: sums Food-category rows by delivery date and includes delivered items awaiting invoice.
+- Procure Wizard Credits Overview `.csv`: deducts issued credit notes only and flags pending investigations separately.
+- RotaCloud Daily Totals `.csv` (preferred): detects the site, exact week, aggregate wage cost and paid hours without retaining employee rows. Employee Totals is also handled without double-counting its summary rows, but contains unnecessary personal data. If a tenant-specific export uses different headings, the kitchen can enter the aggregate total manually.
+
+Files are decoded and parsed in the signed-in browser. Only safe totals, source mode and a short SHA-256 fingerprint are submitted; the raw files and employee/product rows are not uploaded or retained.
 
 ## Payroll/time import
 
@@ -135,7 +149,7 @@ Example shape (use non-sensitive test data only in development):
 }
 ```
 
-For an existing payroll/rota product, map its employee identifier to `employeeRef`; never use employee names in the reporting UI.
+This connector is optional. The normal manager workflow stores a single site/week RotaCloud total. If an enterprise payroll connector is added later, map its employee identifier to `employeeRef`; never use employee names in the reporting UI.
 
 ## EPOS, purchasing and waste integrations
 

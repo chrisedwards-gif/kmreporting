@@ -629,6 +629,15 @@ a {
   font-weight: 800;
 }
 
+.basis-label {
+  color: var(--ink-600);
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+  text-transform: uppercase;
+}
+
 .review-list {
   display: grid;
   gap: 0.75rem;
@@ -1230,6 +1239,242 @@ textarea.field__input {
   max-width: 30rem;
 }
 
+.form-section__heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.form-section__step {
+  color: var(--coral-dark);
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.source-chip {
+  align-items: center;
+  background: #f0eeea;
+  border: 1px solid #d8d3ca;
+  border-radius: 999px;
+  color: var(--ink-600);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  text-transform: uppercase;
+}
+
+.source-chip--safe {
+  background: #e7f2ed;
+  border-color: #c9ded5;
+  color: #22664f;
+}
+
+.source-chip--attention {
+  background: #fff0e2;
+  border-color: #efd4b7;
+  color: #96561c;
+}
+
+.source-layout {
+  align-items: end;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: minmax(15rem, 0.85fr) minmax(16rem, 1.15fr);
+}
+
+.source-layout--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.source-upload {
+  align-items: center;
+  background: #faf7f1;
+  border: 1px dashed #bdb5a8;
+  border-radius: 0.8rem;
+  color: var(--ink-800);
+  cursor: pointer;
+  display: flex;
+  gap: 0.7rem;
+  min-height: 4.9rem;
+  padding: 0.85rem;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.source-upload:hover,
+.source-upload:focus-within {
+  background: #fffaf4;
+  border-color: var(--coral);
+  transform: translateY(-1px);
+}
+
+.source-upload > svg {
+  color: var(--coral-dark);
+  flex: 0 0 auto;
+}
+
+.source-upload span,
+.source-upload strong,
+.source-upload small {
+  display: block;
+}
+
+.source-upload strong {
+  font-size: 0.78rem;
+}
+
+.source-upload small {
+  color: var(--ink-600);
+  font-size: 0.66rem;
+  font-weight: 500;
+  margin-top: 0.2rem;
+}
+
+.source-upload input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.source-stat {
+  background: #f7f4ee;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  display: grid;
+  min-height: 4.9rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.source-stat span,
+.source-stat small {
+  color: var(--ink-600);
+  font-size: 0.66rem;
+}
+
+.source-stat strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.source-result,
+.source-note {
+  align-items: flex-start;
+  background: #edf4f1;
+  border: 1px solid #c9ded5;
+  border-radius: 0.7rem;
+  color: #285e4c;
+  display: flex;
+  font-size: 0.72rem;
+  gap: 0.5rem;
+  line-height: 1.5;
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.source-result svg,
+.source-note svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.source-note {
+  background: #fff7e5;
+  border-color: #e9d5a4;
+  color: #795415;
+}
+
+.source-confirmation {
+  align-items: flex-start;
+  color: var(--ink-600);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.7rem;
+  gap: 0.55rem;
+  line-height: 1.45;
+  margin-top: 0.85rem;
+}
+
+.source-confirmation input {
+  accent-color: var(--sage);
+  height: 1rem;
+  margin: 0.05rem 0 0;
+  width: 1rem;
+}
+
+.source-confirmation--standalone {
+  background: #f7f4ee;
+  border-radius: 0.7rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+}
+
+.manual-details {
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+}
+
+.manual-details summary {
+  color: var(--ink-800);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 0.9rem;
+}
+
+.preview-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.preview-grid > div {
+  background: #faf7f1;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem;
+}
+
+.preview-grid span,
+.preview-grid small {
+  color: var(--ink-600);
+  font-size: 0.68rem;
+}
+
+.preview-grid strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.form-actions--sticky {
+  background: rgb(244 240 232 / 92%);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  bottom: 0.75rem;
+  box-shadow: var(--shadow);
+  padding: 0.75rem;
+  position: sticky;
+  z-index: 10;
+}
+
+.form-readiness {
+  color: var(--ink-600);
+  font-size: 0.68rem;
+  margin-right: auto;
+}
+
 @media (max-width: 1200px) {
   .metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1271,6 +1516,12 @@ textarea.field__input {
   .login__story {
     min-height: 22rem;
     padding: 2rem;
+  }
+
+  .source-layout,
+  .source-layout--three,
+  .preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1315,8 +1566,25 @@ textarea.field__input {
   }
 
   .form-grid,
-  .form-grid--three {
+  .form-grid--three,
+  .source-layout,
+  .source-layout--three,
+  .preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .form-actions--sticky {
+    align-items: stretch;
+    bottom: 0;
+    flex-wrap: wrap;
+  }
+
+  .form-actions--sticky .form-readiness {
+    flex-basis: 100%;
+  }
+
+  .form-actions--sticky .button {
+    flex: 1;
   }
 
   .modal-backdrop {
@@ -1366,4 +1634,17 @@ textarea.field__input {
   .app-shell__content { max-width: none; padding: 0; }
   .management-summary .panel { border: 0; }
   .management-summary .review-item { break-inside: avoid; }
+  .print-lock-message { display: none; }
+  .management-summary--locked > :not(.print-lock-message) { display: none !important; }
+  .management-summary--locked .print-lock-message {
+    border: 2px solid #b93f35;
+    color: #5d211c;
+    display: block !important;
+    font-family: Arial, sans-serif;
+    font-size: 14pt;
+    margin: 2cm;
+    padding: 1cm;
+  }
 }
+
+.print-lock-message { display: none; }

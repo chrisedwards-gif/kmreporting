@@ -5,7 +5,6 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
 
 export type SiteActionState = {
   status: "idle" | "success" | "error";
@@ -18,6 +17,10 @@ const siteSchema = z.object({
   foodCostTarget: z.coerce.number().min(0).max(100),
   labourTarget: z.coerce.number().min(0).max(100),
   wasteTarget: z.coerce.number().min(0).max(100),
+});
+
+const createSiteSchema = siteSchema.extend({
+  reportingStartDate: z.iso.date().refine((value) => new Date(`${value}T00:00:00Z`).getUTCDay() === 0, "The first reporting week must start on a Sunday."),
 });
 
 const updateSiteSchema = siteSchema.extend({
@@ -35,7 +38,7 @@ export async function createSite(
   _previousState: SiteActionState,
   formData: FormData,
 ): Promise<SiteActionState> {
-  const parsed = siteSchema.safeParse(Object.fromEntries(formData));
+  const parsed = createSiteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the kitchen details." };
   }
@@ -49,7 +52,7 @@ export async function createSite(
     name: parsed.data.name,
     code: parsed.data.code,
     active: true,
-    reporting_start_date: getLatestCompletedReportingWeek().start,
+    reporting_start_date: parsed.data.reportingStartDate,
     food_cost_target: parsed.data.foodCostTarget,
     labour_target: parsed.data.labourTarget,
     waste_target: parsed.data.wasteTarget,

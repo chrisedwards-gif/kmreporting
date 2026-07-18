@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/dal";
 import { getSiteDirectory } from "@/lib/data/reporting";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { ManageSiteForm } from "@/components/sites/manage-site-form";
+import { getCurrentReportingWeek } from "@/lib/reporting/periods";
 
 export const metadata = { title: "Sites and access" };
 
@@ -17,11 +18,11 @@ export default async function SitesPage() {
           <h1 className="page-header__title">Sites & access.</h1>
           <p className="page-header__copy">Kitchen managers see assigned sites only. Group and finance roles are granted separately and audited.</p>
         </div>
-        <CreateSiteForm />
+        <CreateSiteForm defaultReportingStartDate={getCurrentReportingWeek().start} />
       </header>
 
       <section className="panel">
-        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites receive a report every Monday</p></div><UserRoundCog aria-hidden="true" color="#5f6e68" size={19} /></div>
+        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5f6e68" size={19} /></div>
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
             <thead><tr><th>Kitchen</th><th>Site code</th><th>Manager</th><th>Reporting</th><th>Scoped access</th><th><span className="sr-only">Actions</span></th></tr></thead>

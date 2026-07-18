@@ -21,9 +21,11 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const totals = sites.reduce((sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }), { sales: 0, cogs: 0, labour: 0 });
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
   const labourPct = totals.sales ? totals.labour / totals.sales * 100 : 0;
+  const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
 
   return (
-    <div className="management-summary">
+    <div className={`management-summary ${released ? "management-summary--released" : "management-summary--locked"}`}>
+      <div className="print-lock-message">This management summary has not been released. Return to the app and complete every required approval before sharing.</div>
       <header className="page-header">
         <div>
           <p className="page-header__eyebrow">Consistent group output</p>
@@ -42,13 +44,13 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
 
       <section className="panel">
         <div className="panel__header">
-          <div><h2 className="panel__title">House of Social · Kitchen performance</h2><p className="panel__subtitle">Monday {formatDate(week.start)} to Sunday {formatDate(week.end)}</p></div>
+          <div><h2 className="panel__title">House of Social · Kitchen performance</h2><p className="panel__subtitle">Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)}</p></div>
           <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal draft"}</span>
         </div>
         <div className="panel__body">
           <section aria-label="Summary metrics" className="metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
             <article className="metric-card"><div className="metric-card__label">Net sales</div><div className="metric-card__value">{formatCurrency(totals.sales)}</div></article>
-            <article className="metric-card"><div className="metric-card__label">Food cost</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}</div></article>
+            <article className="metric-card"><div className="metric-card__label">{allStockAdjusted ? "Food cost" : "Food cost / spend"}</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}{!allStockAdjusted ? " · includes spend-basis sites" : ""}</div></article>
             <article className="metric-card"><div className="metric-card__label">Staff cost</div><div className="metric-card__value">{formatPercentage(labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.labour)}</div></article>
             <article className="metric-card"><div className="metric-card__label">Prime cost</div><div className="metric-card__value">{formatPercentage(foodPct + labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs + totals.labour)}</div></article>
           </section>
@@ -62,7 +64,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
                   <StatusBadge status={report.status} />
                 </div>
                 <div className="review-item__detail" style={{ marginTop: ".75rem" }}>
-                  <strong>Performance:</strong> {formatCurrency(report.costs.netSales)} net sales · {formatPercentage(report.costs.foodCostPct)} food · {formatPercentage(report.costs.labourPct)} labour.
+                  <strong>Performance:</strong> {formatCurrency(report.costs.netSales)} net sales · {formatPercentage(report.costs.foodCostPct)} {report.costs.foodCostBasis === "stock_adjusted" ? "food cost" : "food spend"} · {formatPercentage(report.costs.labourPct)} labour.
                 </div>
                 <div className="review-item__detail"><strong>Win:</strong> {report.wins || "No material win recorded."}</div>
                 <div className="review-item__detail"><strong>Attention:</strong> {report.operationalIssues || report.staffingIssues || report.complianceIssues || "No material issue recorded."}</div>

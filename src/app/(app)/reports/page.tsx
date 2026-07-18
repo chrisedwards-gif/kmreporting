@@ -20,11 +20,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <h1 className="page-header__title">Weekly reports.</h1>
           <p className="page-header__copy">One submission per kitchen, rolled into one controlled group view.</p>
         </div>
-        <div className="page-header__actions"><PeriodSelector periods={periods} selected={selectedPeriod} /><Link className="button button--primary" href="/reports/new"><Plus aria-hidden="true" size={16} /> New report</Link></div>
+        <div className="page-header__actions"><PeriodSelector periods={periods} selected={selectedPeriod} /><Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> New report</Link></div>
       </header>
       <div className="report-list">
         {reports.map((report) => (
-          <Link className="report-row" href={`/reports/${report.id}`} key={report.id}>
+          <Link className="report-row" href={report.status === "draft" ? `/reports/new?report=${report.id}` : `/reports/${report.id}`} key={report.id}>
             <div className="site-cell">
               <div className="site-cell__mark">{report.costs.code.slice(0, 2)}</div>
               <div>
@@ -33,13 +33,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </div>
             </div>
             <div><span className="report-row__metric-label">Sales</span>{formatCurrency(report.costs.netSales)}</div>
-            <div><span className="report-row__metric-label">Food</span>{formatPercentage(report.costs.foodCostPct)}</div>
+            <div><span className="report-row__metric-label">{report.costs.foodCostBasis === "stock_adjusted" ? "Food cost" : "Food spend"}</span>{formatPercentage(report.costs.foodCostPct)}</div>
             <div><span className="report-row__metric-label">Labour</span>{formatPercentage(report.costs.labourPct)}</div>
             <StatusBadge status={report.status} />
             <ArrowRight aria-hidden="true" size={18} />
           </Link>
         ))}
-        {!reports.length ? <section className="panel empty-state"><h2>No reports for this week.</h2><p>Start the first kitchen report or select another reporting period.</p><Link className="button button--primary" href="/reports/new"><Plus aria-hidden="true" size={16} /> Start a report</Link></section> : null}
+        {!reports.length ? <section className="panel empty-state"><h2>No reports for this week.</h2><p>Start the first kitchen report or select another reporting period.</p><Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> Start a report</Link></section> : null}
       </div>
     </>
   );

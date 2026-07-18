@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { environment } from "@/lib/env";
+import { isSiteExpectedForReportingWeek } from "@/lib/reporting/periods";
+import { hasValidBearerSecret } from "@/lib/security/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type ReminderKind = "report_initial" | "report_final" | "approval_review";
@@ -34,33 +36,29 @@ const londonNoon = (value: string) => {
 };
 
 const getPreviousWeek = (now: Date) => {
-  const weekday = now.getUTCDay() || 7;
-  const thisMonday = new Date(now);
-  thisMonday.setUTCDate(now.getUTCDate() - weekday + 1);
-  const start = new Date(thisMonday);
-  start.setUTCDate(thisMonday.getUTCDate() - 7);
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 6);
+  const daysSinceSaturday = ((now.getUTCDay() + 1) % 7) || 7;
+  const end = new Date(now);
+  end.setUTCDate(now.getUTCDate() - daysSinceSaturday);
+  const start = new Date(end);
+  start.setUTCDate(end.getUTCDate() - 6);
   return { start: toDate(start), end: toDate(end) };
 };
 
 export async function GET(request: NextRequest) {
-  if (!environment.cronSecret || request.headers.get("authorization") !== `Bearer ${environment.cronSecret}`) {
+  if (!hasValidBearerSecret(request.headers.get("authorization"), environment.cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const now = new Date();
   const london = getLondonParts(now);
   const hour = Number(london.hour);
-  const kind: ReminderKind | null = london.weekday !== "Tue"
-    ? null
-    : hour === 9
-      ? "report_initial"
-      : hour === 11
-        ? "report_final"
-        : hour === 13
-          ? "approval_review"
-          : null;
+  const kind: ReminderKind | null = london.weekday === "Mon" && hour === 9
+    ? "report_initial"
+    : london.weekday === "Mon" && hour === 12
+      ? "report_final"
+      : london.weekday === "Tue" && hour === 10
+        ? "approval_review"
+        : null;
 
   if (!kind) return NextResponse.json({ ok: true, skipped: "Outside reminder windows" });
 
@@ -76,14 +74,14 @@ export async function GET(request: NextRequest) {
     const dueAt = londonNoon(addDays(week.end, 2));
     const { data: period, error: periodError } = await supabase
       .from("reporting_periods")
-      .upsert({ organisation_id: organisation.id, week_start: week.start, week_end: week.end, due_at: dueAt }, { onConflict: "organisation_id,week_start" })
+      .upsert({ organisation_id: organisation.id, week_start: week.start, week_end: week.end, due_at: dueAt, reporting_cycle: "sunday_saturday" }, { onConflict: "organisation_id,week_start" })
       .select("id")
       .single();
     if (periodError || !period) continue;
 
     const { data: sites } = await supabase
       .from("sites")
-      .select("id, name")
+      .select("id, name, active, reporting_start_date, reporting_end_date")
       .eq("organisation_id", organisation.id)
       .eq("active", true);
     const { data: reports } = await supabase
@@ -116,7 +114,12 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      const outstanding = (sites ?? []).filter((site) => {
+      const expectedSites = (sites ?? []).filter((site) => isSiteExpectedForReportingWeek({
+        active: site.active,
+        reportingStartDate: site.reporting_start_date,
+        reportingEndDate: site.reporting_end_date,
+      }, week));
+      const outstanding = expectedSites.filter((site) => {
         const report = reportBySite.get(site.id);
         return !report || report.status === "draft";
       });

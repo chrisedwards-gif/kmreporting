@@ -40,7 +40,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                     <StatusBadge status={report.status} />
                   </div>
                   <div className="review-item__detail" style={{ marginTop: ".6rem" }}>
-                    Food {formatPercentage(report.costs.foodCostPct)} · Labour {formatPercentage(report.costs.labourPct)} · {report.costs.flags.length} review checks
+                    {report.costs.foodCostBasis === "stock_adjusted" ? "Food" : "Spend"} {formatPercentage(report.costs.foodCostPct)} · Labour {formatPercentage(report.costs.labourPct)} · {report.costs.flags.filter((flag) => flag.severity !== "info").length} actionable checks
                   </div>
                   <div style={{ alignItems: "center", display: "flex", fontSize: ".72rem", fontWeight: 750, gap: ".3rem", marginTop: ".65rem" }}>Open decision <ArrowRight aria-hidden="true" size={14} /></div>
                 </Link>

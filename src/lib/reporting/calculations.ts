@@ -5,17 +5,12 @@ const safePercentage = (value: number, total: number) =>
 
 export function calculateCosts(input: CostInputs): CostSnapshot {
   const netPurchases = input.purchases - input.credits;
-  const cogs =
-    input.openingStock +
-    netPurchases +
-    input.transfersIn -
-    input.transfersOut -
-    input.closingStock +
-    input.adjustments;
-  const staffCost =
-    input.paidHours * input.averageLoadedRate +
-    input.agencyCost +
-    input.overtimePremium;
+  const stocktakeCompleted = input.stocktakeCompleted ?? true;
+  const cogs = stocktakeCompleted
+    ? input.openingStock + netPurchases + input.transfersIn - input.transfersOut - input.closingStock + input.adjustments
+    : netPurchases + input.transfersIn - input.transfersOut + input.adjustments;
+  const calculatedStaffCost = input.paidHours * input.averageLoadedRate + input.agencyCost + input.overtimePremium;
+  const staffCost = input.staffCostOverride ?? calculatedStaffCost;
   const primeCost = cogs + staffCost;
 
   return {
@@ -26,6 +21,7 @@ export function calculateCosts(input: CostInputs): CostSnapshot {
     wastePct: safePercentage(input.wasteCost, input.netSales),
     primeCost,
     primeCostPct: safePercentage(primeCost, input.netSales),
+    foodCostBasis: stocktakeCompleted ? "stock_adjusted" : "spend",
   };
 }
 
@@ -39,6 +35,7 @@ export const sumSnapshots = (snapshots: CostSnapshot[]): CostSnapshot =>
       wastePct: 0,
       primeCost: total.primeCost + snapshot.primeCost,
       primeCostPct: 0,
+      foodCostBasis: snapshots.every((item) => item.foodCostBasis === "stock_adjusted") ? "stock_adjusted" : "spend",
     }),
     {
       cogs: 0,
@@ -48,5 +45,6 @@ export const sumSnapshots = (snapshots: CostSnapshot[]): CostSnapshot =>
       wastePct: 0,
       primeCost: 0,
       primeCostPct: 0,
+      foodCostBasis: "stock_adjusted",
     },
   );
