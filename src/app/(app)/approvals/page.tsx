@@ -41,14 +41,14 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             <div className="report-list">
               {pending.map((report) => (
                 <Link className="review-item" href={`/reports/${report.id}`} key={report.id}>
-                  <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+                  <div className="approval-card__top">
                     <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
                     <StatusBadge status={report.status} />
                   </div>
-                  <div className="review-item__detail" style={{ marginTop: ".6rem" }}>
+                  <div className="review-item__detail approval-card__meta">
                     {report.costs.foodCostBasis === "stock_adjusted" ? "Food" : "Spend"} {formatPercentage(report.costs.foodCostPct)} · Labour {formatPercentage(report.costs.labourPct)} · {report.costs.flags.filter((flag) => flag.severity !== "info").length} actionable checks
                   </div>
-                  <div style={{ alignItems: "center", display: "flex", fontSize: ".72rem", fontWeight: 750, gap: ".3rem", marginTop: ".65rem" }}>Open decision <ArrowRight aria-hidden="true" size={14} /></div>
+                  <div className="approval-card__cta">Open decision <ArrowRight aria-hidden="true" size={14} /></div>
                 </Link>
               ))}
               {!pending.length ? <div className="empty-inline empty-inline--compact">Nothing is waiting for approval.</div> : null}
