@@ -5,6 +5,7 @@ import { z } from "zod";
 import { environment } from "@/lib/env";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { isSundayToSaturday } from "@/lib/reporting/periods";
+import { optionalNumericInput } from "@/lib/reporting/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type ReportActionState = {
@@ -14,25 +15,24 @@ export type ReportActionState = {
   reportId?: string;
 };
 
-const optionalMoney = z.preprocess((value) => value === "" ? 0 : value, z.coerce.number().finite());
 const booleanString = z.enum(["true", "false"]).transform((value) => value === "true");
 const reportSchema = z.object({
   siteId: z.string().min(1),
   weekStart: z.iso.date(),
   weekEnd: z.iso.date(),
-  netSales: optionalMoney.pipe(z.number().nonnegative()),
-  openingStock: optionalMoney.pipe(z.number().nonnegative()),
-  purchases: optionalMoney.pipe(z.number().nonnegative()),
-  credits: optionalMoney.pipe(z.number().nonnegative()),
-  transfersIn: optionalMoney.pipe(z.number().nonnegative()),
-  transfersOut: optionalMoney.pipe(z.number().nonnegative()),
-  closingStock: optionalMoney.pipe(z.number().nonnegative()),
-  adjustments: optionalMoney,
-  wasteCost: optionalMoney.pipe(z.number().nonnegative()),
-  staffCost: optionalMoney.pipe(z.number().nonnegative()),
-  paidHours: optionalMoney.pipe(z.number().nonnegative()),
-  pendingCredits: optionalMoney.pipe(z.number().nonnegative()),
-  awaitingInvoice: optionalMoney.pipe(z.number().nonnegative()),
+  netSales: optionalNumericInput.pipe(z.number().nonnegative()),
+  openingStock: optionalNumericInput.pipe(z.number().nonnegative()),
+  purchases: optionalNumericInput.pipe(z.number().nonnegative()),
+  credits: optionalNumericInput.pipe(z.number().nonnegative()),
+  transfersIn: optionalNumericInput.pipe(z.number().nonnegative()),
+  transfersOut: optionalNumericInput.pipe(z.number().nonnegative()),
+  closingStock: optionalNumericInput.pipe(z.number().nonnegative()),
+  adjustments: optionalNumericInput,
+  wasteCost: optionalNumericInput.pipe(z.number().nonnegative()),
+  staffCost: optionalNumericInput.pipe(z.number().nonnegative()),
+  paidHours: optionalNumericInput.pipe(z.number().nonnegative()),
+  pendingCredits: optionalNumericInput.pipe(z.number().nonnegative()),
+  awaitingInvoice: optionalNumericInput.pipe(z.number().nonnegative()),
   stocktakeCompleted: booleanString,
   salesSource: z.string().min(1).max(80),
   salesSourceReference: z.string().max(250).default(""),

@@ -3,6 +3,7 @@ import { calculateCosts } from "@/lib/reporting/calculations";
 import { parseCreditsOverview, parseGoodsDelivered, parseRotaCloudLabour, parseStockLinkEndOfWeek } from "@/lib/reporting/imports";
 import { getCurrentReportingWeek, getLatestCompletedReportingWeek, isSiteExpectedForReportingWeek, isSundayToSaturday } from "@/lib/reporting/periods";
 import { buildReviewFlags } from "@/lib/reporting/review";
+import { optionalNumericInput } from "@/lib/reporting/validation";
 
 describe("weekly reporting calculations", () => {
   it("calculates COGS and staff cost without exposing individual pay", () => {
@@ -40,6 +41,13 @@ describe("weekly reporting calculations", () => {
     expect(isSiteExpectedForReportingWeek({ active: true, reportingStartDate: "2026-07-05", reportingEndDate: null }, week)).toBe(true);
     expect(isSiteExpectedForReportingWeek({ active: true, reportingStartDate: "2026-07-12", reportingEndDate: null }, week)).toBe(false);
     expect(isSiteExpectedForReportingWeek({ active: false, reportingStartDate: "2026-07-05", reportingEndDate: null }, week)).toBe(false);
+  });
+
+  it("treats hidden or blank optional numeric fields as zero", () => {
+    expect(optionalNumericInput.parse(undefined)).toBe(0);
+    expect(optionalNumericInput.parse(null)).toBe(0);
+    expect(optionalNumericInput.parse("")).toBe(0);
+    expect(optionalNumericInput.parse("221.75")).toBe(221.75);
   });
 
   it("defaults new reports to the latest completed Sunday-to-Saturday week", () => {
