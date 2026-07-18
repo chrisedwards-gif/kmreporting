@@ -1,6 +1,6 @@
-# UAT 004 — operations import repair and account self-service
+# UAT 004–005 — operations hardening, account self-service and usability
 
-This update fixes two defects found in review and closes the last workflow gap before kitchen teams are invited.
+This update fixes the final data-integrity and account-lifecycle defects found in UAT, then applies a focused usability pass across the weekly reporting workflow.
 
 ## What changed
 
@@ -15,6 +15,13 @@ This update fixes two defects found in review and closes the last workflow gap b
    - `/auth/confirm` — scanner-safe one-time-code entry. The credential is not embedded in the email link, so Microsoft Safe Links cannot consume it during prefetching.
    - `/auth/callback` remains available for PKCE callback flows.
    - Auth emails derive an origin from request headers with Vercel deployment variables as a fallback, avoiding null redirect URLs in proxied Server Actions.
+3. **UAT 005 usability and design pass**
+   - Selecting the reporting Sunday now fills the Saturday automatically and invalid weeks cannot be submitted.
+   - The report footer shows a live six-item readiness checklist instead of a vague status sentence.
+   - Dashboard targets are sales-weighted and food, labour and waste metrics visibly flag when over target.
+   - Kitchens without a report no longer link to a dead report route.
+   - Auth, approval, cost and report-detail layouts use reusable BEM classes rather than remaining inline layout styles.
+   - Keyboard users get a skip-to-content link, and money/hours inputs request decimal keypads on mobile.
 
 ## Deploy in this order
 
@@ -60,3 +67,5 @@ This update fixes two defects found in review and closes the last workflow gap b
 - Invite a test kitchen manager from **Settings → Sites**: the email shows a one-time code, the link opens the code-entry page, and the account can choose a password, sign out and sign back in.
 - *Forgotten your password?* sends a one-time code that opens the same code-entry page and then the set-password screen.
 - Microsoft Safe Links can prefetch the email link without invalidating the one-time code.
+- Selecting a reporting Sunday fills the corresponding Saturday and the submit button remains disabled until all six readiness checks pass.
+- A kitchen with no report displays a dash rather than a broken report link.
