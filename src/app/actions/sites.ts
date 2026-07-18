@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
 
 export type SiteActionState = {
   status: "idle" | "success" | "error";
@@ -48,6 +49,7 @@ export async function createSite(
     name: parsed.data.name,
     code: parsed.data.code,
     active: true,
+    reporting_start_date: getLatestCompletedReportingWeek().start,
     food_cost_target: parsed.data.foodCostTarget,
     labour_target: parsed.data.labourTarget,
     waste_target: parsed.data.wasteTarget,

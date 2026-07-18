@@ -130,7 +130,7 @@ export async function getReportingBundle(periodId?: string, reportId?: string): 
     week: { id: period.id, start: period.week_start, end: period.week_end, dueAt: period.due_at },
     sites: performance,
     reports: weeklyReports,
-    expectedSiteCount: expectedSiteCount ?? 0,
+    expectedSiteCount: Math.max(expectedSiteCount ?? 0, new Set(reports.map((report) => report.site_id)).size),
   };
 }
 

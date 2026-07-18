@@ -16,7 +16,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
   const { reports, sites, week, expectedSiteCount } = await getReportingBundle(selectedPeriod);
   const missingReports = Math.max(expectedSiteCount - reports.length, 0);
-  const ready = reports.length > 0 && missingReports === 0 && reports.every((report) => ["approved", "shared"].includes(report.status));
+  const ready = reports.length > 0 && reports.length === expectedSiteCount && reports.every((report) => ["approved", "shared"].includes(report.status));
   const released = ready && reports.every((report) => report.status === "shared");
   const totals = sites.reduce((sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }), { sales: 0, cogs: 0, labour: 0 });
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
