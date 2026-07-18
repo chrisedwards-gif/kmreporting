@@ -17,7 +17,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
   const approvedReports = reports.filter((report) => ["approved", "shared"].includes(report.status));
   const approvedReportIds = new Set(approvedReports.map((report) => report.id));
-  const approvedSites = sites.filter((site) => approvedReportIds.has(site.reportId));
+  const approvedSites = sites.filter((site) => Boolean(site.reportId) && approvedReportIds.has(site.reportId as string));
   const missingReports = expectedSites.filter((site) => !reportBySite.has(site.id)).length;
   const ready = expectedSites.length > 0 && expectedSites.every((site) => ["approved", "shared"].includes(reportBySite.get(site.id)?.status ?? "draft"));
   const released = ready && expectedSites.every((site) => reportBySite.get(site.id)?.status === "shared");
