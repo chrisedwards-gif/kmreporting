@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { CheckCircle2, LockKeyhole, ShieldAlert } from "lucide-react";
+import { CheckCircle2, LockKeyhole } from "lucide-react";
 import { SummaryControls } from "@/components/reports/summary-controls";
 import { PeriodSelector } from "@/components/reports/period-selector";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -14,25 +13,34 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, sites, week, expectedSiteCount, expectedSites } = await getReportingBundle(selectedPeriod);
-  const missingReports = Math.max(expectedSiteCount - reports.length, 0);
-  const ready = reports.length > 0 && reports.length === expectedSiteCount && reports.every((report) => ["approved", "shared"].includes(report.status));
-  const released = ready && reports.every((report) => report.status === "shared");
-  const hasApprovedReports = reports.some((report) => ["approved", "shared"].includes(report.status));
-  const outstandingSiteNames = expectedSites.filter((site) => !reports.some((report) => report.siteId === site.id) || !["approved", "shared"].includes(reports.find((report) => report.siteId === site.id)?.status ?? "draft")).map((site) => site.name);
-  const totals = sites.reduce((sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }), { sales: 0, cogs: 0, labour: 0 });
+  const { reports, sites, week, expectedSites } = await getReportingBundle(selectedPeriod);
+  const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
+  const approvedReports = reports.filter((report) => ["approved", "shared"].includes(report.status));
+  const approvedReportIds = new Set(approvedReports.map((report) => report.id));
+  const approvedSites = sites.filter((site) => approvedReportIds.has(site.reportId));
+  const missingReports = expectedSites.filter((site) => !reportBySite.has(site.id)).length;
+  const ready = expectedSites.length > 0 && expectedSites.every((site) => ["approved", "shared"].includes(reportBySite.get(site.id)?.status ?? "draft"));
+  const released = ready && expectedSites.every((site) => reportBySite.get(site.id)?.status === "shared");
+  const hasApprovedReports = approvedReports.length > 0;
+  const outstandingSiteNames = expectedSites
+    .filter((site) => !["approved", "shared"].includes(reportBySite.get(site.id)?.status ?? "draft"))
+    .map((site) => site.name);
+  const totals = approvedSites.reduce(
+    (sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }),
+    { sales: 0, cogs: 0, labour: 0 },
+  );
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
   const labourPct = totals.sales ? totals.labour / totals.sales * 100 : 0;
-  const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
+  const allStockAdjusted = approvedSites.length > 0 && approvedSites.every((site) => site.foodCostBasis === "stock_adjusted");
 
   return (
     <div className={`management-summary ${released ? "management-summary--released" : "management-summary--partial"}`}>
-      {!ready && <div className="print-partial-message">PARTIAL MANAGEMENT UPDATE — awaiting remaining kitchen reports or named approvals. Figures shown are only from currently submitted kitchens.</div>}
+      {!ready && <div className="print-partial-message">PARTIAL MANAGEMENT UPDATE — awaiting remaining kitchen reports or named approvals. Figures shown include approved kitchen reports only.</div>}
       <header className="page-header">
         <div>
           <p className="page-header__eyebrow">Consistent group output</p>
           <h1 className="page-header__title">Management summary.</h1>
-          <p className="page-header__copy">Week ending {formatDate(week.end)} · Generated from the current approved site records.</p>
+          <p className="page-header__copy">Week ending {formatDate(week.end)} · Generated only from approved kitchen records.</p>
         </div>
         <div className="page-header__actions"><PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} /><SummaryControls canRelease={["admin", "group_manager"].includes(profile.role)} hasApprovedReports={hasApprovedReports} periodId={selectedPeriod} ready={ready} released={released} /></div>
       </header>
@@ -40,27 +48,27 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
       {!ready && (
         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
           <LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
-          Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} active kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
+          Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
           {outstandingSiteNames.length ? ` Outstanding: ${outstandingSiteNames.join(", ")}.` : ""}
         </div>
       )}
 
       <section className="panel">
         <div className="panel__header">
-          <div><h2 className="panel__title">House of Social · Kitchen performance</h2><p className="panel__subtitle">Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)}</p></div>
-          <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal draft"}</span>
+          <div><h2 className="panel__title">House of Social · Kitchen performance</h2><p className="panel__subtitle">Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)} · {approvedReports.length} of {expectedSites.length} approved</p></div>
+          <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal partial"}</span>
         </div>
         <div className="panel__body">
           <section aria-label="Summary metrics" className="metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-            <article className="metric-card"><div className="metric-card__label">Net sales</div><div className="metric-card__value">{formatCurrency(totals.sales)}</div></article>
-            <article className="metric-card"><div className="metric-card__label">{allStockAdjusted ? "Food cost" : "Food cost / spend"}</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}{!allStockAdjusted ? " · includes spend-basis sites" : ""}</div></article>
+            <article className="metric-card"><div className="metric-card__label">Approved net sales</div><div className="metric-card__value">{formatCurrency(totals.sales)}</div></article>
+            <article className="metric-card"><div className="metric-card__label">{allStockAdjusted ? "Food cost" : "Food cost / spend"}</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}{approvedSites.length && !allStockAdjusted ? " · includes spend-basis sites" : ""}</div></article>
             <article className="metric-card"><div className="metric-card__label">Staff cost</div><div className="metric-card__value">{formatPercentage(labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.labour)}</div></article>
             <article className="metric-card"><div className="metric-card__label">Prime cost</div><div className="metric-card__value">{formatPercentage(foodPct + labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs + totals.labour)}</div></article>
           </section>
 
-          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.45rem", fontWeight: 500, margin: "1.5rem 0 1rem" }}>Kitchen updates</h2>
+          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.45rem", fontWeight: 500, margin: "1.5rem 0 1rem" }}>Approved kitchen updates</h2>
           <div className="stack">
-            {reports.map((report) => (
+            {approvedReports.map((report) => (
               <article className="review-item review-item--info" key={report.id}>
                 <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
                   <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
@@ -73,15 +81,14 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
                 <div className="review-item__detail"><strong>Attention:</strong> {report.operationalIssues || report.staffingIssues || report.complianceIssues || "No material issue recorded."}</div>
                 <div className="review-item__detail"><strong>Action:</strong> {report.actionsUnderway || "No follow-up action recorded."}</div>
                 {report.supportNeeded && <div className="review-item__detail"><strong>Group support:</strong> {report.supportNeeded}</div>}
-                {!['approved', 'shared'].includes(report.status) && <Link href={`/reports/${report.id}`} style={{ alignItems: "center", display: "inline-flex", fontSize: ".72rem", fontWeight: 800, gap: ".3rem", marginTop: ".7rem" }}><ShieldAlert aria-hidden="true" size={14} /> Resolve approval</Link>}
               </article>
             ))}
-            {!reports.length ? <div className="empty-inline empty-inline--compact">No kitchen reports have been submitted for this reporting period.</div> : null}
+            {!approvedReports.length ? <div className="empty-inline empty-inline--compact">No kitchen report has received named approval for this period yet.</div> : null}
           </div>
 
           <div className="privacy-callout" style={{ marginTop: "1.5rem" }}>
             <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
-            This summary contains site-level totals only. Individual salaries, hourly rates and employee time entries are excluded by design.
+            This summary contains approved site-level totals only. Individual salaries, hourly rates and employee time entries are excluded by design.
           </div>
         </div>
       </section>
