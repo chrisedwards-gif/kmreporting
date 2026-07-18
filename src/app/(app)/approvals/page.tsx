@@ -16,8 +16,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const { reports, expectedSiteCount, expectedSites } = await getReportingBundle(selectedPeriod);
   const missingReports = Math.max(expectedSiteCount - reports.length, 0);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
-  const approved = reports.filter((report) => report.status === "approved");
+  const approvedOrShared = reports.filter((report) => ["approved", "shared"].includes(report.status));
   const missingSites = expectedSites.filter((site) => !reports.some((report) => report.siteId === site.id));
+
   return (
     <>
       <header className="page-header">
@@ -59,7 +60,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                 <div className="review-item review-item--info"><Clock3 aria-hidden="true" size={16} /><div className="review-item__label">1. Kitchen submits</div><div className="review-item__detail">Period and required source totals are validated.</div></div>
                 <div className="review-item"><ShieldAlert aria-hidden="true" size={16} /><div className="review-item__label">2. Manager reviews</div><div className="review-item__detail">Cost exceptions, compliance and support requests are resolved.</div></div>
                 <div className="review-item review-item--info"><CheckCircle2 aria-hidden="true" size={16} /><div className="review-item__label">3. Named approval</div><div className="review-item__detail">The decision, approver and timestamp enter the audit log.</div></div>
-                <div className="review-item review-item--info"><Share2 aria-hidden="true" size={16} /><div className="review-item__label">4. Controlled share</div><div className="review-item__detail">Only approved safe summaries can be sent outside the app.</div></div>
+                <div className="review-item review-item--info"><Share2 aria-hidden="true" size={16} /><div className="review-item__label">4. Controlled share</div><div className="review-item__detail">The app records the share decision. Email delivery is separate and only occurs when a delivery webhook is configured.</div></div>
               </div>
             </div>
           </section>
@@ -68,10 +69,10 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
             <div className="panel__body">{missingSites.map((site) => <div className="cost-summary__row" key={site.id}><span className="cost-summary__label">{site.name}</span><span className="status-badge status-badge--draft">Not submitted</span></div>)}{!missingSites.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}</div>
           </section>
           <section className="panel">
-            <div className="panel__header"><div><h2 className="panel__title">Approved this week</h2><p className="panel__subtitle">Ready for controlled sharing</p></div></div>
+            <div className="panel__header"><div><h2 className="panel__title">Approved or shared this week</h2><p className="panel__subtitle">Approved reports remain visible after a share is recorded</p></div></div>
             <div className="panel__body">
-              {approved.map((report) => <div className="cost-summary__row" key={report.id}><span className="cost-summary__label">{report.siteName}</span><StatusBadge status={report.status} /></div>)}
-              {!approved.length ? <div className="empty-inline empty-inline--compact">No reports have been approved for this week yet.</div> : null}
+              {approvedOrShared.map((report) => <div className="cost-summary__row" key={report.id}><span className="cost-summary__label">{report.siteName}</span><StatusBadge status={report.status} /></div>)}
+              {!approvedOrShared.length ? <div className="empty-inline empty-inline--compact">No reports have been approved for this week yet.</div> : null}
             </div>
           </section>
         </aside>
