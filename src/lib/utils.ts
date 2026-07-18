@@ -23,3 +23,12 @@ export const formatDate = (value: string) => {
 
 export const classNames = (...values: Array<string | false | null | undefined>) =>
   values.filter(Boolean).join(" ");
+
+// Accepts only same-origin absolute paths, so a crafted auth link can never
+// redirect a signed-in session to an external site.
+export const safeInternalPath = (value: string | null | undefined): string | null => {
+  if (!value || value.length > 200) return null;
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  if (/[\\\s]|:\/\//.test(value)) return null;
+  return value;
+};
