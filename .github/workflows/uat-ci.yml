@@ -6,6 +6,10 @@ on:
       - agent/uat-003-source-imports
   pull_request:
 
+concurrency:
+  group: uat-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
