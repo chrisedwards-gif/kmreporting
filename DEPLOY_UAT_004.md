@@ -13,26 +13,35 @@ This update fixes two defects found in review and closes the last workflow gap b
    - `/auth/set-password` — invited managers and password-recovery users land here and choose a password before entering the app.
    - `/auth/forgot-password` — self-service reset from the sign-in screen. The response never reveals whether an email has an account.
    - `/auth/callback` accepts a `next` parameter restricted to same-origin paths and supports both PKCE recovery codes and server-readable token hashes.
+   - Auth emails derive an origin from request headers with Vercel deployment variables as a fallback, avoiding null redirect URLs in proxied Server Actions.
 
 ## Deploy in this order
 
 1. Back up the Supabase project.
 2. Apply migration `010` in the SQL Editor, or with `supabase db push`. It runs in a transaction and is safe to rerun. Migrations 006 and 008 must already be applied.
-3. In Supabase **Authentication → URL Configuration**, add this to the redirect allow list for every environment that sends invitations or resets:
+3. In Supabase **Authentication → URL Configuration**, set the Site URL to the deployed app origin and add:
 
    ```text
    https://YOUR_DEPLOYED_APP/auth/callback
    ```
 
-4. In **Authentication → Email Templates → Invite user**, use a server-readable token-hash link so an invite works even though the administrator and invitee normally use different browsers:
+   to the redirect allow list.
+
+4. Use the configured **Site URL** directly in the email templates. This is more robust than rendering `.RedirectTo`, which can be null when a proxy/runtime omits request host information.
+
+   **Invite user**
 
    ```html
-   <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=invite">Accept invitation</a>
+   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=invite&next=/auth/set-password">Accept invitation</a>
    ```
 
-   The callback also supports the standard PKCE `code` flow used by password recovery. A custom recovery template may use the same pattern with `type=recovery`.
+   **Reset password**
 
-5. Deploy the app build. No new environment variables are required — invitation and reset links derive the origin from the request.
+   ```html
+   <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/auth/set-password">Choose a new password</a>
+   ```
+
+5. Deploy the app build. `NEXT_PUBLIC_APP_URL` is an optional explicit fallback; Vercel Preview also supplies its deployment URL automatically.
 
 ## Smoke checks
 
