@@ -8,9 +8,11 @@ import {
   FileSpreadsheet,
   Info,
   LockKeyhole,
+  Plus,
   Save,
   Send,
   ShieldCheck,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { saveWeeklyReport, type ReportActionState } from "@/app/actions/reports";
@@ -22,7 +24,7 @@ import {
   parseStockLinkEndOfWeek,
 } from "@/lib/reporting/imports";
 import { calculateCosts } from "@/lib/reporting/calculations";
-import type { ReportDraftInput } from "@/lib/types";
+import type { ManualPurchase, ReportDraftInput } from "@/lib/types";
 import { formatCurrency, formatPercentage } from "@/lib/utils";
 
 const initialState: ReportActionState = { status: "idle", message: "" };
@@ -56,6 +58,7 @@ type BrowserDraft = {
   values: ReportDraftInput["values"];
   sources: ReportDraftInput["sources"];
   narrative: ReportDraftInput["narrative"];
+  manualPurchases: ManualPurchase[];
 };
 
 const restoredSource = (source: ReportDraftInput["sources"]["sales"], label: string): SourceState => ({
@@ -110,6 +113,7 @@ export function ReportForm({
   const [salesSource, setSalesSource] = useState<SourceState>(initial ? restoredSource(initial.sources.sales, "Sales") : emptySource());
   const [purchasingSource, setPurchasingSource] = useState<SourceState>(initial ? restoredSource(initial.sources.purchasing, "Purchasing") : emptySource());
   const [labourSource, setLabourSource] = useState<SourceState>(initial ? restoredSource(initial.sources.labour, "Labour") : emptySource());
+  const [manualPurchases, setManualPurchases] = useState<ManualPurchase[]>(initial?.manualPurchases ?? []);
   const [narrative, setNarrative] = useState<ReportDraftInput["narrative"]>(initial?.narrative ?? emptyNarrative);
   const [browserDraftRestored, setBrowserDraftRestored] = useState(false);
   const [browserDraftReady, setBrowserDraftReady] = useState(false);
@@ -133,6 +137,7 @@ export function ReportForm({
       setPurchasingSource(restoredSource(draft.sources.purchasing, "Purchasing"));
       setLabourSource(restoredSource(draft.sources.labour, "Labour"));
       setNarrative(draft.narrative);
+      setManualPurchases(draft.manualPurchases ?? []);
       setBrowserDraftRestored(true);
     } catch {
       sessionStorage.removeItem(browserDraftKey);
@@ -155,9 +160,10 @@ export function ReportForm({
         labour: { mode: labourSource.mode, reference: labourSource.reference, confirmed: labourSource.confirmed },
       },
       narrative,
+      manualPurchases,
     };
     sessionStorage.setItem(browserDraftKey, JSON.stringify(draft));
-  }, [browserDraftReady, labourSource.confirmed, labourSource.mode, labourSource.reference, narrative, purchasingSource.confirmed, purchasingSource.mode, purchasingSource.reference, salesSource.confirmed, salesSource.mode, salesSource.reference, selectedSiteId, stocktakeCompleted, values, weekEnd, weekStart]);
+  }, [browserDraftReady, labourSource.confirmed, labourSource.mode, labourSource.reference, manualPurchases, narrative, purchasingSource.confirmed, purchasingSource.mode, purchasingSource.reference, salesSource.confirmed, salesSource.mode, salesSource.reference, selectedSiteId, stocktakeCompleted, values, weekEnd, weekStart]);
 
   useEffect(() => {
     if (state.status !== "success" || !state.reportId) return;
@@ -168,10 +174,13 @@ export function ReportForm({
   }, [router, state.intent, state.reportId, state.status]);
 
   const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? sites[0];
+  const manualPurchaseTotal = useMemo(() => manualPurchases.reduce((total, item) => total + (Number(item.amount) || 0), 0), [manualPurchases]);
+  const manualPurchasesPayload = useMemo(() => manualPurchases.filter((item) => item.description.trim() || item.amount > 0 || item.receiptReference.trim()), [manualPurchases]);
   const expectedPeriod = useMemo(() => ({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
   const preview = useMemo(
     () => calculateCosts({
       ...values,
+      purchases: values.purchases + manualPurchaseTotal,
       paidHours: values.paidHours,
       averageLoadedRate: 0,
       agencyCost: 0,
@@ -179,7 +188,7 @@ export function ReportForm({
       staffCostOverride: values.staffCost,
       stocktakeCompleted,
     }),
-    [values, stocktakeCompleted],
+    [manualPurchaseTotal, values, stocktakeCompleted],
   );
   const readyToSubmit = salesSource.confirmed && purchasingSource.confirmed && labourSource.confirmed && values.netSales > 0 && values.staffCost > 0;
 
@@ -188,6 +197,7 @@ export function ReportForm({
     setPurchasingSource(emptySource());
     setLabourSource(emptySource());
     setValues((current) => ({ ...current, netSales: 0, purchases: 0, credits: 0, staffCost: 0, paidHours: 0, pendingCredits: 0, awaitingInvoice: 0 }));
+    setManualPurchases([]);
   };
 
   const updateNumber = (name: keyof typeof values, value: string, domain?: "sales" | "purchasing" | "labour") => {
@@ -195,6 +205,13 @@ export function ReportForm({
     if (domain === "sales") setSalesSource((current) => ({ ...current, mode: current.reference ? "stocklink_adjusted" : "manual", confirmed: false }));
     if (domain === "purchasing") setPurchasingSource((current) => ({ ...current, mode: current.reference ? "procure_wizard_adjusted" : "manual", confirmed: false }));
     if (domain === "labour") setLabourSource((current) => ({ ...current, mode: current.reference ? "rotacloud_adjusted" : "manual", confirmed: false }));
+  };
+
+  const updateManualPurchase = (index: number, field: keyof ManualPurchase, value: string) => {
+    setManualPurchases((current) => current.map((item, itemIndex) => itemIndex === index
+      ? { ...item, [field]: field === "amount" ? Number(value) || 0 : value }
+      : item));
+    setPurchasingSource((current) => ({ ...current, mode: current.reference ? "procure_wizard_adjusted" : "manual", confirmed: false }));
   };
 
   const assertSite = (sourceSiteName: string) => {
@@ -303,6 +320,7 @@ export function ReportForm({
       <input name="stocktakeCompleted" type="hidden" value={String(stocktakeCompleted)} />
       <input name="pendingCredits" type="hidden" value={values.pendingCredits} />
       <input name="awaitingInvoice" type="hidden" value={values.awaitingInvoice} />
+      <input name="manualPurchases" type="hidden" value={JSON.stringify(manualPurchasesPayload)} />
 
       <section className="form-section">
         <div className="form-section__heading">
@@ -362,10 +380,25 @@ export function ReportForm({
             <span><strong>Credits Overview</strong><small>Confirmed and pending credits</small></span>
             <input accept=".csv" onChange={(event) => { void importCredits(event.target.files?.[0]); event.target.value = ""; }} type="file" />
           </label>
-          <div className="source-stat"><span>Net delivered spend</span><strong>{formatCurrency(values.purchases - values.credits, 2)}</strong><small>{formatCurrency(values.pendingCredits, 2)} pending credit</small></div>
+          <div className="source-stat"><span>Total food purchases</span><strong>{formatCurrency(values.purchases + manualPurchaseTotal - values.credits, 2)}</strong><small>{formatCurrency(manualPurchaseTotal, 2)} off-system · {formatCurrency(values.pendingCredits, 2)} pending credit</small></div>
         </div>
         {purchasingSource.message && <div className="source-result"><FileCheck2 aria-hidden="true" size={16} /><span>{purchasingSource.message}</span></div>}
         {purchasingSource.error && <div className="form-message form-message--error" role="alert">{purchasingSource.error}</div>}
+        <div className="manual-purchases">
+          <div className="manual-purchases__heading">
+            <div><h3 className="form-subtitle">Off-system and top-up purchases</h3><p className="form-caption">Add shop runs, emergency ingredients or any food order not captured in Procure Wizard.</p></div>
+            <button className="button button--secondary button--compact" onClick={() => setManualPurchases((current) => [...current, { description: "", amount: 0, receiptReference: "" }])} type="button"><Plus aria-hidden="true" size={14} /> Add purchase</button>
+          </div>
+          {manualPurchases.map((item, index) => (
+            <div className="manual-purchase-row" key={index}>
+              <label className="field"><span className="field__label">What was purchased?</span><input className="field__input" maxLength={120} onChange={(event) => updateManualPurchase(index, "description", event.target.value)} placeholder="e.g. Emergency produce top-up" value={item.description} /></label>
+              <label className="field"><span className="field__label">Amount</span><input className="field__input" min="0.01" onChange={(event) => updateManualPurchase(index, "amount", event.target.value)} placeholder="249.00" step="0.01" type="number" value={item.amount || ""} /></label>
+              <label className="field"><span className="field__label">Receipt/reference</span><input className="field__input" maxLength={120} onChange={(event) => updateManualPurchase(index, "receiptReference", event.target.value)} placeholder="Optional receipt number" value={item.receiptReference} /></label>
+              <button aria-label={`Remove purchase ${index + 1}`} className="icon-button manual-purchase-row__remove" onClick={() => { setManualPurchases((current) => current.filter((_, itemIndex) => itemIndex !== index)); setPurchasingSource((current) => ({ ...current, confirmed: false })); }} type="button"><Trash2 aria-hidden="true" size={17} /></button>
+            </div>
+          ))}
+          {manualPurchases.length ? <div className="source-note"><Info aria-hidden="true" size={16} /><span>Off-system purchase total: <strong>{formatCurrency(manualPurchaseTotal, 2)}</strong>. This is added to delivered food before food spend/cost is calculated.</span></div> : null}
+        </div>
         <details className="manual-details">
           <summary>Manual spend, transfers, waste and stock inputs</summary>
           <div className="form-grid form-grid--three">

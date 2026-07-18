@@ -14,9 +14,11 @@ The app runs immediately with deterministic demo data. Connect Supabase to enabl
 - Safe weekly snapshots for COGS, food cost, staff cost, labour, waste and prime cost.
 - Automatic review gates for target exceptions, missing payroll data, missing pay rates, compliance issues and support requests.
 - Named resolution/approval records and an audit trail.
-- A consistent group management summary that stays locked until every site is approved.
+- Individually shareable approved kitchen reports, plus clearly labelled partial group updates while other sites remain outstanding.
 - Tuesday reminders for missing reports and management review, with deduplication.
 - Browser-side StockLink, Procure Wizard and RotaCloud CSV parsing with manual fallbacks and no raw-file retention.
+- Structured off-system food purchases for shop top-ups and emergency buys, including value and optional receipt reference.
+- A notification centre with safe self-test delivery, queue/sent/failed history and webhook-ready email content.
 - A server-only cost import API remains available for future payroll/time integrations.
 - Live dashboard refresh through Supabase Realtime when reports or imported metrics change.
 - A normalized operations API for EPOS sales/covers, purchasing/credits and waste feeds.
@@ -77,7 +79,7 @@ npm run build
 
    Existing installations should apply every later file in `supabase/migrations` in filename order. Migration `002_production_hardening.sql` prevents draft or already-shared reports from receiving an approval decision.
 
-4. Existing databases must also apply `005_manager_source_imports.sql` before deploying the matching application update. It changes future periods to Sunday–Saturday and adds safe source metadata and aggregate labour inputs.
+4. Existing databases must apply all later migrations in order. `005` changes future periods to Sunday–Saturday; `006` repairs optional daily aggregates; `007` adds individual/partial sharing; and `008` adds structured off-system purchases.
 5. Create users with Supabase Auth. Insert a matching `profiles` row for each user and add `site_memberships` for kitchen managers. Do not give kitchen users `admin`, `group_manager` or `finance` roles.
 6. Deploy to Vercel or another Node-compatible host and add the same environment variables there.
 7. Put the deployed app URL and `CRON_SECRET` into Supabase Vault as `app_base_url` and `cron_secret`, then run `supabase/reminder_schedule.sql` once.
@@ -162,6 +164,8 @@ Use `scripts/push-test-operations.mjs` as the reference adapter. A specific EPOS
 ## Reminder delivery
 
 If `REMINDER_WEBHOOK_URL` is configured, the app posts a small delivery payload for each new reminder. Connect this to an email, Slack, Teams or automation provider. It contains recipient/site context and report IDs, but no payroll figures. If no webhook is configured, reminders remain queued in `notification_log` for an in-app/provider worker.
+
+Before enabling the Monday/Tuesday schedule, open **Notifications** as an admin or group manager and send each test type to your own profile email. Queue-only results confirm the app logic; a `sent` result confirms that the configured webhook accepted delivery. The webhook payload includes a ready-to-use subject, message and application path.
 
 ## Important production checks
 

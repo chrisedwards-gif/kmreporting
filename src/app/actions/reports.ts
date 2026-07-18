@@ -17,6 +17,19 @@ export type ReportActionState = {
 };
 
 const booleanString = z.enum(["true", "false"]).transform((value) => value === "true");
+const manualPurchaseSchema = z.object({
+  description: z.string().trim().min(2).max(120),
+  amount: z.coerce.number().positive().finite(),
+  receiptReference: z.string().trim().max(120).default(""),
+});
+const manualPurchasesJson = z.string().max(12_000).transform((value, context) => {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    context.addIssue({ code: "custom", message: "Check the off-system purchase entries." });
+    return z.NEVER;
+  }
+}).pipe(z.array(manualPurchaseSchema).max(25));
 const reportSchema = z.object({
   siteId: z.string().min(1),
   weekStart: z.iso.date(),
@@ -44,6 +57,7 @@ const reportSchema = z.object({
   labourSource: z.string().min(1).max(80),
   labourSourceReference: z.string().max(250).default(""),
   labourConfirmed: booleanString,
+  manualPurchases: manualPurchasesJson.default([]),
   wins: z.string().max(2_000).default(""),
   operationalIssues: z.string().max(2_000).default(""),
   staffingIssues: z.string().max(2_000).default(""),
@@ -93,7 +107,7 @@ export async function saveWeeklyReport(
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
 
-  const { data: reportId, error } = await supabase.rpc("save_weekly_report", {
+  const { data: reportId, error } = await supabase.rpc("save_weekly_report_v2", {
     payload: {
       ...parsed.data,
       submittedBy: profile.id,

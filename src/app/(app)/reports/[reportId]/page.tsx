@@ -92,6 +92,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
                   <div className="cost-summary__row"><span className="cost-summary__label">Stock basis</span><span className="cost-summary__value">{report.sources.stocktakeCompleted ? "Opening + closing stocktake" : "Spend only"}</span></div>
                   {report.sources.awaitingInvoice > 0 && <div className="cost-summary__row"><span className="cost-summary__label">Awaiting invoice</span><span className="cost-summary__value">{formatCurrency(report.sources.awaitingInvoice)}</span></div>}
                   {report.sources.pendingCredits > 0 && <div className="cost-summary__row"><span className="cost-summary__label">Pending supplier credit</span><span className="cost-summary__value">{formatCurrency(report.sources.pendingCredits)}</span></div>}
+                  {report.manualPurchases?.map((item, index) => <div className="cost-summary__row" key={`${item.description}-${index}`}><span className="cost-summary__label">Off-system: {item.description}{item.receiptReference ? ` · ${item.receiptReference}` : ""}</span><span className="cost-summary__value">{formatCurrency(item.amount)}</span></div>)}
                 </div>
               </div>
             </section>

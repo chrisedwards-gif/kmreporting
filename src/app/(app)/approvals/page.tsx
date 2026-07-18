@@ -13,10 +13,11 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, expectedSiteCount } = await getReportingBundle(selectedPeriod);
+  const { reports, expectedSiteCount, expectedSites } = await getReportingBundle(selectedPeriod);
   const missingReports = Math.max(expectedSiteCount - reports.length, 0);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
   const approved = reports.filter((report) => report.status === "approved");
+  const missingSites = expectedSites.filter((site) => !reports.some((report) => report.siteId === site.id));
   return (
     <>
       <header className="page-header">
@@ -61,6 +62,10 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                 <div className="review-item review-item--info"><Share2 aria-hidden="true" size={16} /><div className="review-item__label">4. Controlled share</div><div className="review-item__detail">Only approved safe summaries can be sent outside the app.</div></div>
               </div>
             </div>
+          </section>
+          <section className="panel">
+            <div className="panel__header"><div><h2 className="panel__title">Still outstanding</h2><p className="panel__subtitle">Kitchen reports not yet started or submitted</p></div></div>
+            <div className="panel__body">{missingSites.map((site) => <div className="cost-summary__row" key={site.id}><span className="cost-summary__label">{site.name}</span><span className="status-badge status-badge--draft">Not submitted</span></div>)}{!missingSites.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}</div>
           </section>
           <section className="panel">
             <div className="panel__header"><div><h2 className="panel__title">Approved this week</h2><p className="panel__subtitle">Ready for controlled sharing</p></div></div>

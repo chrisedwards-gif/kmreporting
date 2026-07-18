@@ -14,11 +14,12 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, sites, week, expectedSiteCount } = await getReportingBundle(selectedPeriod);
+  const { reports, sites, week, expectedSiteCount, expectedSites } = await getReportingBundle(selectedPeriod);
   const missingReports = Math.max(expectedSiteCount - reports.length, 0);
   const ready = reports.length > 0 && reports.length === expectedSiteCount && reports.every((report) => ["approved", "shared"].includes(report.status));
   const released = ready && reports.every((report) => report.status === "shared");
   const hasApprovedReports = reports.some((report) => ["approved", "shared"].includes(report.status));
+  const outstandingSiteNames = expectedSites.filter((site) => !reports.some((report) => report.siteId === site.id) || !["approved", "shared"].includes(reports.find((report) => report.siteId === site.id)?.status ?? "draft")).map((site) => site.name);
   const totals = sites.reduce((sum, site) => ({ sales: sum.sales + site.netSales, cogs: sum.cogs + site.cogs, labour: sum.labour + site.staffCost }), { sales: 0, cogs: 0, labour: 0 });
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
   const labourPct = totals.sales ? totals.labour / totals.sales * 100 : 0;
@@ -40,6 +41,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
           <LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
           Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} active kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
+          {outstandingSiteNames.length ? ` Outstanding: ${outstandingSiteNames.join(", ")}.` : ""}
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  BellRing,
   ChefHat,
   ClipboardList,
   FileCheck2,
@@ -25,6 +26,7 @@ const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; rol
   { href: "/reports", label: "Weekly reports", icon: ClipboardList },
   { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
+  { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },
   { href: "/costs", label: "Cost control", icon: LockKeyhole, roles: ["admin", "group_manager", "finance"] },
   { href: "/settings/sites", label: "Sites & access", icon: Settings2, roles: ["admin"] },
 ];

@@ -10,6 +10,12 @@ export type ReportStatus =
 export type ReviewSeverity = "info" | "warning" | "critical";
 export type FoodCostBasis = "spend" | "stock_adjusted";
 
+export type ManualPurchase = {
+  description: string;
+  amount: number;
+  receiptReference: string;
+};
+
 export type ReviewFlag = {
   code: string;
   label: string;
@@ -84,6 +90,7 @@ export type WeeklyReport = {
   equipmentIssues: string;
   actionsUnderway: string;
   supportNeeded: string;
+  manualPurchases?: ManualPurchase[];
   costs: SitePerformance;
   sources?: {
     sales: string;
@@ -104,6 +111,7 @@ export type ReportDraftInput = {
   weekStart: string;
   weekEnd: string;
   stocktakeCompleted: boolean;
+  manualPurchases: ManualPurchase[];
   values: {
     netSales: number;
     openingStock: number;

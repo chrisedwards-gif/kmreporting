@@ -5,6 +5,7 @@ import { getCurrentReportingWeek, getLatestCompletedReportingWeek, isSiteExpecte
 import { buildReviewFlags } from "@/lib/reporting/review";
 import { optionalNumericInput } from "@/lib/reporting/validation";
 import { reportSaveErrorMessage } from "@/lib/reporting/errors";
+import { reminderContent } from "@/lib/notifications/reminders";
 
 describe("weekly reporting calculations", () => {
   it("calculates COGS and staff cost without exposing individual pay", () => {
@@ -196,5 +197,16 @@ describe("manager source-file imports", () => {
       ",,,,17,270",
     ].join("\n");
     expect(parseRotaCloudLabour(csv, week)).toMatchObject({ siteName: "Test Kitchen", staffCost: 270, paidHours: 17 });
+  });
+});
+
+describe("notification reminders", () => {
+  it("creates a safe approval reminder with an in-app action", () => {
+    const reminder = reminderContent("approval_review", "Dough Religion", "2026-07-11");
+
+    expect(reminder.message).toContain("Dough Religion");
+    expect(reminder.subject).toContain("11 Jul 2026");
+    expect(reminder.actionPath).toBe("/approvals");
+    expect(reminder.message.toLowerCase()).not.toContain("salary");
   });
 });

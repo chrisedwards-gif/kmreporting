@@ -3,8 +3,7 @@ import { environment } from "@/lib/env";
 import { isSiteExpectedForReportingWeek } from "@/lib/reporting/periods";
 import { hasValidBearerSecret } from "@/lib/security/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-type ReminderKind = "report_initial" | "report_final" | "approval_review";
+import { reminderContent, type ReminderKind } from "@/lib/notifications/reminders";
 
 const getLondonParts = (date: Date) => Object.fromEntries(
   new Intl.DateTimeFormat("en-GB", {
@@ -160,10 +159,11 @@ export async function GET(request: NextRequest) {
     created += 1;
 
     if (environment.reminderWebhookUrl) {
+      const content = reminderContent(kind, typeof site === "object" && site && "name" in site ? String(site.name) : undefined, week.end);
       const response = await fetch(environment.reminderWebhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind, recipient, site, reportId: row.report_id, week }),
+        body: JSON.stringify({ kind, recipient, site, reportId: row.report_id, week, subject: content.subject, message: content.message, actionPath: content.actionPath }),
       });
       await supabase.from("notification_log").update({
         delivery_status: response.ok ? "sent" : "failed",

@@ -56,6 +56,10 @@ The simulator sends seven days of synthetic sales, covers, purchasing and waste.
 - A non-approved report cannot be shared or printed as the final group summary.
 - Repeating the test import does not duplicate the week.
 - Individual pay rates never appear in browser network responses, exports or audit details.
+- A shop/top-up purchase is added to the food total, appears on the report and survives a draft restore without storing a receipt image.
+- An approved site report can be shared independently while the complete group release remains locked.
+- A partial group update prints with an unmistakable outstanding-reports label.
+- Notification self-tests create queue history; with a sandbox webhook configured they transition to sent or failed without contacting kitchen teams.
 
 ## Local visual test
 
