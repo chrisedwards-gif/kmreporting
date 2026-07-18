@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Send } from "lucide-react";
 import { processApproval, shareApprovedReport, type ApprovalActionState } from "@/app/actions/approvals";
 import type { ReportStatus } from "@/lib/types";
 
@@ -13,15 +13,30 @@ export function ApprovalForm({ reportId, status, hasFlags }: { reportId: string;
   const isApproved = status === "approved";
   const isShared = status === "shared";
 
-  if (isShared) return <div className="privacy-callout"><CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />This report has been approved and shared.</div>;
-  if (isApproved) return (
-    <form action={shareAction} className="report-form">
-      <input name="reportId" type="hidden" value={reportId} />
-      <div className="privacy-callout">Approved. You may share this kitchen report now; this does not release the incomplete group summary.</div>
-      <button className="button button--primary" disabled={sharing} type="submit"><Send aria-hidden="true" size={16} />{sharing ? "Recording…" : "Share this kitchen report"}</button>
-      {shareState.status !== "idle" && <div className={`form-message ${shareState.status === "error" ? "form-message--error" : "form-message--success"}`} role="status">{shareState.message}</div>}
-    </form>
-  );
+  if (isShared) {
+    return (
+      <div className="privacy-callout">
+        <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
+        This report is approved and its share has been recorded. This status does not confirm that an email was delivered.
+      </div>
+    );
+  }
+
+  if (isApproved) {
+    return (
+      <form action={shareAction} className="report-form">
+        <input name="reportId" type="hidden" value={reportId} />
+        <div className="privacy-callout">
+          Approved and ready to distribute. This action records that the report was shared; it does not send an email unless a delivery integration is configured.
+        </div>
+        <button className="button button--primary" disabled={sharing} type="submit">
+          <ClipboardCheck aria-hidden="true" size={16} />
+          {sharing ? "Recording…" : "Record report as shared"}
+        </button>
+        {shareState.status !== "idle" && <div className={`form-message ${shareState.status === "error" ? "form-message--error" : "form-message--success"}`} role="status">{shareState.message}</div>}
+      </form>
+    );
+  }
 
   return (
     <form action={action} className="report-form">
