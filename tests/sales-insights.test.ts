@@ -71,6 +71,6 @@ describe("StockLink safe detail extraction", () => {
   it("drops a daily extraction that does not reconcile with the weekly total", () => {
     const html = `<html><table><tr><th>Date</th><th>Net Sales</th></tr><tr><td>12/07/2026</td><td>100</td></tr><tr><td>13/07/2026</td><td>100</td></tr></table></html>`;
     const result = parseStockLinkSalesInsights(html, { start: "2026-07-12", end: "2026-07-18" }, 3000);
-    expect(result.days).toHaveLength(2);
+    expect(result.days).toHaveLength(0);
   });
 });
