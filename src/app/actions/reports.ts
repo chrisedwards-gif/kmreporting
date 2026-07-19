@@ -26,33 +26,13 @@ const manualPurchasesJson = z.string().max(12_000).transform((value, context) =>
   try { return JSON.parse(value) as unknown; }
   catch { context.addIssue({ code: "custom", message: "Check the off-system purchase entries." }); return z.NEVER; }
 }).pipe(z.array(manualPurchaseSchema).max(25));
-
-const salesDaySchema = z.object({
-  businessDate: z.iso.date(),
-  grossSales: z.coerce.number().nonnegative().finite(),
-  netSales: z.coerce.number().nonnegative().finite(),
-  transactions: z.coerce.number().int().nonnegative(),
-  covers: z.coerce.number().int().nonnegative(),
-});
-const salesItemSchema = z.object({
-  itemName: z.string().trim().min(1).max(180),
-  category: z.string().trim().min(1).max(120).default("Uncategorised"),
-  quantity: z.coerce.number().nonnegative().finite(),
-  netSales: z.coerce.number().nonnegative().finite(),
-});
-const salesCategorySchema = z.object({
-  category: z.string().trim().min(1).max(120),
-  quantity: z.coerce.number().nonnegative().finite(),
-  netSales: z.coerce.number().nonnegative().finite(),
-});
+const salesDaySchema = z.object({ businessDate: z.iso.date(), grossSales: z.coerce.number().nonnegative().finite(), netSales: z.coerce.number().nonnegative().finite(), transactions: z.coerce.number().int().nonnegative(), covers: z.coerce.number().int().nonnegative() });
+const salesItemSchema = z.object({ itemName: z.string().trim().min(1).max(180), category: z.string().trim().min(1).max(120).default("Uncategorised"), quantity: z.coerce.number().nonnegative().finite(), netSales: z.coerce.number().nonnegative().finite() });
+const salesCategorySchema = z.object({ category: z.string().trim().min(1).max(120), quantity: z.coerce.number().nonnegative().finite(), netSales: z.coerce.number().nonnegative().finite() });
 const salesInsightsJson = z.string().max(120_000).transform((value, context) => {
   try { return JSON.parse(value) as unknown; }
   catch { context.addIssue({ code: "custom", message: "The imported sales detail could not be validated." }); return z.NEVER; }
-}).pipe(z.object({
-  days: z.array(salesDaySchema).max(7),
-  items: z.array(salesItemSchema).max(100),
-  categories: z.array(salesCategorySchema).max(40),
-}));
+}).pipe(z.object({ days: z.array(salesDaySchema).max(7), items: z.array(salesItemSchema).max(100), categories: z.array(salesCategorySchema).max(40) }));
 
 const reportSchema = z.object({
   siteId: z.string().min(1),
@@ -82,7 +62,7 @@ const reportSchema = z.object({
   labourSourceReference: z.string().max(250).default(""),
   labourConfirmed: booleanString,
   manualPurchases: manualPurchasesJson.default([]),
-  salesInsights: salesInsightsJson.default({ days: [], items: [], categories: [] }),
+  salesInsights: salesInsightsJson.optional(),
   wins: z.string().max(2_000).default(""),
   operationalIssues: z.string().max(2_000).default(""),
   staffingIssues: z.string().max(2_000).default(""),
@@ -97,9 +77,7 @@ export async function saveWeeklyReport(_previousState: ReportActionState, formDa
   const parsed = reportSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the report fields." };
   if (!isSundayToSaturday(parsed.data.weekStart, parsed.data.weekEnd)) return { status: "error", message: "The reporting period must run from Sunday through Saturday." };
-  if (parsed.data.salesInsights.days.some((day) => day.businessDate < parsed.data.weekStart || day.businessDate > parsed.data.weekEnd)) {
-    return { status: "error", message: "The imported daily sales include a date outside this reporting week." };
-  }
+  if (parsed.data.salesInsights?.days.some((day) => day.businessDate < parsed.data.weekStart || day.businessDate > parsed.data.weekEnd)) return { status: "error", message: "The imported daily sales include a date outside this reporting week." };
   if (parsed.data.intent === "submit") {
     if (!parsed.data.salesConfirmed || parsed.data.netSales <= 0) return { status: "error", message: "Confirm a positive net-sales total before submitting." };
     if (!parsed.data.purchasingConfirmed) return { status: "error", message: "Confirm the food-spend and credits position before submitting." };
@@ -108,23 +86,14 @@ export async function saveWeeklyReport(_previousState: ReportActionState, formDa
   }
 
   if (environment.isDemo) return { status: "success", message: parsed.data.intent === "draft" ? "Demo draft validated. Connect Supabase to persist it." : "Demo report passed validation and is ready for management review." };
-
   const profile = await requireSessionProfile();
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
-  const { data: reportId, error } = await supabase.rpc("save_weekly_report_v2", {
-    payload: { ...parsed.data, submittedBy: profile.id, status: parsed.data.intent === "submit" ? "submitted" : "draft" },
-  });
+  const { data: reportId, error } = await supabase.rpc("save_weekly_report_v2", { payload: { ...parsed.data, submittedBy: profile.id, status: parsed.data.intent === "submit" ? "submitted" : "draft" } });
   if (error) {
     console.error("save_weekly_report failed", { code: error.code, message: error.message, details: error.details, hint: error.hint, siteId: parsed.data.siteId, userId: profile.id });
     return { status: "error", message: reportSaveErrorMessage(error, environment.isPreview) };
   }
-
   for (const path of ["/dashboard", "/reports", `/reports/${reportId}`, "/approvals", "/summary", "/costs"]) revalidatePath(path);
-  return {
-    status: "success",
-    message: parsed.data.intent === "submit" ? "Report submitted for review." : "Draft saved.",
-    intent: parsed.data.intent,
-    reportId: typeof reportId === "string" ? reportId : undefined,
-  };
+  return { status: "success", message: parsed.data.intent === "submit" ? "Report submitted for review." : "Draft saved.", intent: parsed.data.intent, reportId: typeof reportId === "string" ? reportId : undefined };
 }
