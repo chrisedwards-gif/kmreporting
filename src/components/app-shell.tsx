@@ -7,6 +7,7 @@ import {
   BarChart3,
   UsersRound,
   BellRing,
+  Beaker,
   ChefHat,
   ClipboardList,
   FileCheck2,
@@ -28,6 +29,7 @@ import { signOut } from "@/app/actions/auth";
 const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
   { href: "/dashboard", label: "Group overview", icon: BarChart3 },
   { href: "/reports", label: "Weekly reports", icon: ClipboardList },
+  { href: "/product-development", label: "Product development", icon: Beaker, roles: ["admin", "group_manager", "finance", "viewer", "kitchen_manager"] },
   { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: ["admin", "group_manager", "finance", "viewer", "kitchen_manager"] },
   { href: "/performance/actions", label: "Action log", icon: ListChecks, roles: ["admin", "group_manager", "finance", "viewer", "kitchen_manager"] },
   { href: "/performance/probation", label: "Probation", icon: Scale, roles: ["admin", "group_manager", "finance", "viewer"] },
