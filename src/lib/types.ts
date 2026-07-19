@@ -16,6 +16,26 @@ export type ManualPurchase = {
   receiptReference: string;
 };
 
+export type SalesDayInput = {
+  businessDate: string;
+  grossSales: number;
+  netSales: number;
+  transactions: number;
+  covers: number;
+};
+
+export type SalesItemInput = {
+  itemName: string;
+  category: string;
+  quantity: number;
+  netSales: number;
+};
+
+export type SalesInsightsInput = {
+  days: SalesDayInput[];
+  items: SalesItemInput[];
+};
+
 export type ReviewFlag = {
   code: string;
   label: string;
@@ -112,6 +132,7 @@ export type ReportDraftInput = {
   weekEnd: string;
   stocktakeCompleted: boolean;
   manualPurchases: ManualPurchase[];
+  salesInsights: SalesInsightsInput;
   values: {
     netSales: number;
     openingStock: number;
