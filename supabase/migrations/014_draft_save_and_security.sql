@@ -203,6 +203,13 @@ revoke all on function public.save_one_to_one(jsonb) from public, anon;
 grant execute on function public.save_one_to_one(jsonb) to authenticated;
 
 -- This is a database event-trigger helper, not an application RPC.
-revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+-- Supabase-hosted projects may provide it, while a fresh local database may not.
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke all on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end;
+$$;
 
 commit;
