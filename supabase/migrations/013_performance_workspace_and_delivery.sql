@@ -46,8 +46,6 @@ create index if not exists one_to_one_manager_status_idx
   on public.one_to_one_reviews(manager_profile_id, status, week_commencing desc)
   where manager_profile_id is not null;
 
--- Recreate finalisation with database-level validation. Drafts stay permissive,
--- but incomplete low scores and actions cannot enter the signed-off record.
 create or replace function public.finalise_one_to_one(
   target_review uuid,
   kpi_snapshot jsonb,
@@ -66,8 +64,7 @@ begin
   end if;
 
   if exists (
-    select 1
-    from public.one_to_one_scores s
+    select 1 from public.one_to_one_scores s
     where s.review_id = target_review
       and s.score < 3
       and length(trim(s.development_note)) = 0
@@ -107,17 +104,17 @@ begin
   insert into public.audit_log (
     organisation_id, actor_id, action, entity_type, entity_id, detail
   ) values (
-    org,
-    auth.uid(),
-    'one_to_one.finalised',
-    'one_to_one_review',
-    target_review,
+    org, auth.uid(), 'one_to_one.finalised', 'one_to_one_review', target_review,
     jsonb_build_object('overall_score', overall)
   );
 end;
 $$;
 
-create or replace function public.acknowledge_one_to_one(
+-- Remove the original one-argument RPC before adding the response-aware version,
+-- otherwise PostgREST can see an ambiguous call when the second argument has a default.
+drop function if exists public.acknowledge_one_to_one(uuid);
+
+create function public.acknowledge_one_to_one(
   target_review uuid,
   response text default ''
 )
@@ -150,18 +147,12 @@ begin
   insert into public.audit_log (
     organisation_id, actor_id, action, entity_type, entity_id, detail
   ) values (
-    org,
-    auth.uid(),
-    'one_to_one.acknowledged',
-    'one_to_one_review',
-    target_review,
+    org, auth.uid(), 'one_to_one.acknowledged', 'one_to_one_review', target_review,
     jsonb_build_object('response_recorded', length(trim(coalesce(response, ''))) > 0)
   );
 end;
 $$;
 
--- Managers may update progress on their own agreed actions without being able
--- to rewrite the action, owner, deadline or the signed-off review.
 create or replace function public.update_own_manager_action(
   target_action uuid,
   next_status text,
@@ -182,10 +173,7 @@ begin
   update public.manager_actions a
      set status = next_status,
          outcome = left(trim(coalesce(next_outcome, '')), 1000),
-         completed_at = case
-           when next_status = 'complete' then coalesce(a.completed_at, now())
-           else null
-         end,
+         completed_at = case when next_status = 'complete' then coalesce(a.completed_at, now()) else null end,
          updated_at = now()
    where a.id = target_action
      and a.organisation_id = org
@@ -201,11 +189,7 @@ begin
   insert into public.audit_log (
     organisation_id, actor_id, action, entity_type, entity_id, detail
   ) values (
-    org,
-    auth.uid(),
-    'manager_action.status_updated',
-    'manager_action',
-    target_action,
+    org, auth.uid(), 'manager_action.status_updated', 'manager_action', target_action,
     jsonb_build_object('status', next_status)
   );
 end;
@@ -215,7 +199,6 @@ revoke all on function public.acknowledge_one_to_one(uuid, text) from public, an
 revoke all on function public.update_own_manager_action(uuid, text, text) from public, anon;
 grant execute on function public.acknowledge_one_to_one(uuid, text) to authenticated;
 grant execute on function public.update_own_manager_action(uuid, text, text) to authenticated;
-
 grant select on public.notification_log to authenticated;
 
 commit;
