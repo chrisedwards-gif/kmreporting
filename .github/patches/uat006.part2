@@ -1,0 +1,106 @@
+matPercentage(wasteTarget)}`} overTarget={hasSales && wastePct > wasteTarget} value={formatPercentage(wastePct)} />
++        <MetricCard accent="#0f2019" label="Prime cost" note={formatCurrency(totals.cogs + totals.staffCost)} value={formatPercentage(primeCostPct)} />
++        <MetricCard accent="#bb3b30" label="Review queue" note="Approval blocks sharing" value={`${reviewFlags.length}`} />
+       </section>
+ 
+       <div className="dashboard-grid">
+@@ -72,7 +72,7 @@ export default async function DashboardPage() {
+                 <h2 className="panel__title">Site performance</h2>
+                 <p className="panel__subtitle">Safe, aggregated commercial metrics only</p>
+               </div>
+-              <CalendarDays aria-hidden="true" color="#5f6e68" size={19} />
++              <CalendarDays aria-hidden="true" color="#5d6b63" size={19} />
+             </div>
+             <SitePerformanceTable sites={sites} />
+           </section>
+diff --git a/src/app/(app)/reports/[reportId]/page.tsx b/src/app/(app)/reports/[reportId]/page.tsx
+index c6a950d..5c99786 100644
+--- a/src/app/(app)/reports/[reportId]/page.tsx
++++ b/src/app/(app)/reports/[reportId]/page.tsx
+@@ -69,7 +69,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
+ 
+         <aside className="stack">
+           <section className="panel">
+-            <div className="panel__header"><div><h2 className="panel__title">Cost summary</h2><p className="panel__subtitle">Calculated from source data</p></div><LockKeyhole aria-hidden="true" color="#2d7a62" size={18} /></div>
++            <div className="panel__header"><div><h2 className="panel__title">Cost summary</h2><p className="panel__subtitle">Calculated from source data</p></div><LockKeyhole aria-hidden="true" color="#1f7a5a" size={18} /></div>
+             <div className="panel__body">
+               <div className="cost-summary">
+                 <div className="cost-summary__row"><span className="cost-summary__label">Net sales</span><span className="cost-summary__value">{formatCurrency(report.costs.netSales)}</span></div>
+@@ -83,7 +83,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
+ 
+           {report.sources && (
+             <section className="panel">
+-              <div className="panel__header"><div><h2 className="panel__title">Source evidence</h2><p className="panel__subtitle">Safe totals and fingerprints only; raw files are not retained</p></div><FileCheck2 aria-hidden="true" color="#2d7a62" size={18} /></div>
++              <div className="panel__header"><div><h2 className="panel__title">Source evidence</h2><p className="panel__subtitle">Safe totals and fingerprints only; raw files are not retained</p></div><FileCheck2 aria-hidden="true" color="#1f7a5a" size={18} /></div>
+               <div className="panel__body">
+                 <div className="cost-summary">
+                   <div className="cost-summary__row"><span className="cost-summary__label">Sales</span><span className="cost-summary__value">{sourceLabel(report.sources.sales)}</span></div>
+@@ -99,7 +99,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
+           )}
+ 
+           <section className="panel">
+-            <div className="panel__header"><div><h2 className="panel__title">Approval gates</h2><p className="panel__subtitle">All must clear before sharing</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={18} /></div>
++            <div className="panel__header"><div><h2 className="panel__title">Approval gates</h2><p className="panel__subtitle">All must clear before sharing</p></div><ShieldAlert aria-hidden="true" color="#b07713" size={18} /></div>
+             <div className="panel__body">
+               {report.costs.flags.length ? (
+                 <div className="review-list">
+diff --git a/src/app/(app)/settings/sites/page.tsx b/src/app/(app)/settings/sites/page.tsx
+index d5d4bac..7c25819 100644
+--- a/src/app/(app)/settings/sites/page.tsx
++++ b/src/app/(app)/settings/sites/page.tsx
+@@ -22,7 +22,7 @@ export default async function SitesPage() {
+       </header>
+ 
+       <section className="panel">
+-        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5f6e68" size={19} /></div>
++        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5d6b63" size={19} /></div>
+         <div style={{ overflowX: "auto" }}>
+           <table className="data-table">
+             <thead><tr><th>Kitchen</th><th>Site code</th><th>Manager</th><th>Reporting</th><th>Scoped access</th><th><span className="sr-only">Actions</span></th></tr></thead>
+diff --git a/src/app/(app)/summary/page.tsx b/src/app/(app)/summary/page.tsx
+index 50c47ef..106ea41 100644
+--- a/src/app/(app)/summary/page.tsx
++++ b/src/app/(app)/summary/page.tsx
+@@ -66,7 +66,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
+             <article className="metric-card"><div className="metric-card__label">Prime cost</div><div className="metric-card__value">{formatPercentage(foodPct + labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs + totals.labour)}</div></article>
+           </section>
+ 
+-          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.45rem", fontWeight: 500, margin: "1.5rem 0 1rem" }}>Approved kitchen updates</h2>
++          <h2 className="summary-section-title">Approved kitchen updates</h2>
+           <div className="stack">
+             {approvedReports.map((report) => (
+               <article className="review-item review-item--info" key={report.id}>
+diff --git a/src/app/auth/confirm/page.tsx b/src/app/auth/confirm/page.tsx
+index 4745f9d..edc3e8a 100644
+--- a/src/app/auth/confirm/page.tsx
++++ b/src/app/auth/confirm/page.tsx
+@@ -32,7 +32,7 @@ export default async function ConfirmAuthPage({
+             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
+             <div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div>
+           </div>
+-          <ShieldCheck aria-hidden="true" color="#eb6b4f" size={26} />
++          <ShieldCheck aria-hidden="true" color="#e8501c" size={26} />
+           <h1>{title}</h1>
+           <p>{description}</p>
+           {error && <div className="form-message form-message--error" role="alert">{error}</div>}
+diff --git a/src/app/auth/forgot-password/page.tsx b/src/app/auth/forgot-password/page.tsx
+index 7c3e38b..a1bd244 100644
+--- a/src/app/auth/forgot-password/page.tsx
++++ b/src/app/auth/forgot-password/page.tsx
+@@ -30,7 +30,7 @@ export default async function ForgotPasswordPage({
+             </>
+           ) : (
+             <>
+-              <MailQuestion aria-hidden="true" color="#eb6b4f" size={24} />
++              <MailQuestion aria-hidden="true" color="#e8501c" size={24} />
+               <h1>Reset your password.</h1>
+               <p>Enter your work email and we will send a secure link to choose a new password.</p>
+               {error && <div className="form-message form-message--error" role="alert" style={{ marginBottom: "1rem" }}>{error}</div>}
+diff --git a/src/app/auth/set-password/page.tsx b/src/app/auth/set-password/page.tsx
+index c32b222..fb446db 100644
+--- a/src/app/auth/set-password/page.tsx
++++ b/src/app/auth/set-password/page.tsx
+@@ -22,7 +22,7 @@ export default async function SetPasswordPage() {
+             <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
+             <div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div>
+      
