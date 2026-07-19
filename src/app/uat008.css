@@ -50,6 +50,191 @@
   margin-bottom: 0.65rem;
 }
 
+.manager-access__secondary {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.65rem;
+  padding-top: 1.1rem;
+}
+
+.page-header--personal .page-header__title {
+  max-width: 18ch;
+}
+
+.section-kicker {
+  color: var(--sage);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin: 1.35rem 0 0.6rem;
+  text-transform: uppercase;
+}
+
+.manager-message-stack {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.manager-home-message,
+.manager-message {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgb(13 43 34 / 5%);
+}
+
+.manager-home-message {
+  align-items: flex-start;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 1rem 1.15rem;
+}
+
+.manager-home-message h2 {
+  font-size: 1.05rem;
+  margin: 0.1rem 0 0.3rem;
+}
+
+.manager-home-message p,
+.manager-message p {
+  color: var(--ink-600);
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.manager-home-message__meta {
+  color: var(--ink-500);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.manager-home-message--important {
+  border-left: 5px solid var(--amber);
+}
+
+.manager-home-message--urgent {
+  border-left: 5px solid var(--danger);
+}
+
+.manager-message {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+}
+
+.manager-message--inactive {
+  opacity: 0.58;
+}
+
+.manager-message__head {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.manager-message__head div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.manager-message__head span:not(.status-badge),
+.manager-message small {
+  color: var(--ink-500);
+  font-size: 0.75rem;
+}
+
+.calendar-panel {
+  overflow: hidden;
+}
+
+.teamup-frame {
+  border: 0;
+  display: block;
+  height: min(74vh, 900px);
+  min-height: 620px;
+  width: 100%;
+}
+
+.action-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.action-list__row {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: inherit;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  text-decoration: none;
+}
+
+.action-list__row div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.action-list__row span {
+  color: var(--ink-500);
+  font-size: 0.75rem;
+}
+
+.read-only-review-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.read-only-review-grid article {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.9rem;
+}
+
+.read-only-review-grid article span {
+  color: var(--ink-500);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.read-only-review-grid article p {
+  line-height: 1.5;
+  margin: 0.4rem 0 0;
+}
+
+.product-card[draggable="true"] {
+  cursor: grab;
+}
+
+.product-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.product-card__version {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.product-board--moving {
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 @media (max-width: 720px) {
   .manager-card__stats {
     flex-wrap: wrap;
@@ -61,5 +246,13 @@
 
   .manager-chip--primary > svg {
     display: none;
+  }
+
+  .read-only-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .teamup-frame {
+    min-height: 520px;
   }
 }
