@@ -1,0 +1,228 @@
+.panel--attention {
+  border-color: rgb(235 107 79 / 35%);
+  box-shadow: 0 16px 42px rgb(235 107 79 / 8%);
+  margin-bottom: 1.2rem;
+}
+
+.performance-chart {
+  min-width: 0;
+}
+
+.performance-chart__svg {
+  display: block;
+  height: auto;
+  max-height: 260px;
+  overflow: visible;
+  width: 100%;
+}
+
+.performance-chart__grid {
+  stroke: var(--line);
+  stroke-dasharray: 4 6;
+  stroke-width: 1;
+}
+
+.performance-chart__axis {
+  fill: var(--ink-500);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 11px;
+}
+
+.performance-chart__line {
+  stroke: var(--coral);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.performance-chart__point {
+  fill: var(--porcelain);
+  stroke: var(--coral-dark);
+  stroke-width: 3;
+}
+
+.performance-chart__labels {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  margin-top: 0.5rem;
+}
+
+.performance-chart__label {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  color: var(--ink-600);
+  display: flex;
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.65rem;
+  justify-content: space-between;
+  padding: 0.45rem 0.55rem;
+}
+
+.performance-chart__label:hover,
+.performance-chart__label:focus-visible {
+  border-color: var(--coral);
+  color: var(--ink-900);
+}
+
+.performance-chart__label strong {
+  color: var(--ink-900);
+  font-size: 0.8rem;
+}
+
+.performance-filters {
+  align-items: end;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+  margin-bottom: 1rem;
+}
+
+.performance-filters__export {
+  white-space: nowrap;
+}
+
+.field--compact {
+  gap: 0.3rem;
+}
+
+.field__input--compact {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.data-table__subtext {
+  color: var(--ink-500);
+  font-size: 0.7rem;
+  margin-top: 0.28rem;
+  max-width: 36rem;
+}
+
+.priority-pill {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  display: inline-flex;
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.63rem;
+  font-weight: 700;
+  padding: 0.28rem 0.48rem;
+  text-transform: uppercase;
+}
+
+.priority-pill--high {
+  background: rgb(185 63 53 / 9%);
+  border-color: rgb(185 63 53 / 24%);
+  color: var(--red);
+}
+
+.priority-pill--medium {
+  background: rgb(199 131 36 / 10%);
+  border-color: rgb(199 131 36 / 25%);
+  color: #8a5913;
+}
+
+.priority-pill--low {
+  background: rgb(45 122 98 / 9%);
+  border-color: rgb(45 122 98 / 22%);
+  color: var(--sage);
+}
+
+.action-status-form {
+  align-items: center;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(160px, 1.2fr) auto;
+  min-width: 390px;
+}
+
+.probation-stage {
+  align-items: flex-start;
+  background: rgb(45 122 98 / 7%);
+  border: 1px solid rgb(45 122 98 / 18%);
+  border-radius: 0.7rem;
+  display: flex;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem;
+}
+
+.probation-stage svg {
+  color: var(--sage);
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.probation-stage div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.probation-stage strong {
+  color: var(--ink-900);
+}
+
+.probation-stage span {
+  color: var(--ink-500);
+  font-size: 0.72rem;
+}
+
+.weight-grid {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.weight-grid__row {
+  align-items: center;
+  display: flex;
+  font-size: 0.72rem;
+  justify-content: space-between;
+  text-transform: capitalize;
+}
+
+.weight-grid__row strong {
+  font-family: var(--font-mono), ui-monospace;
+}
+
+.section-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  margin: 1.5rem 0 0.8rem;
+}
+
+.section-heading h2 {
+  font-size: 1.45rem;
+  margin: 0;
+}
+
+.section-heading p {
+  color: var(--ink-500);
+  font-size: 0.75rem;
+  margin: 0.2rem 0 0;
+}
+
+@media (max-width: 980px) {
+  .performance-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .performance-filters__export {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .performance-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .action-status-form {
+    grid-template-columns: 1fr;
+    min-width: 240px;
+  }
+
+  .performance-chart__labels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
