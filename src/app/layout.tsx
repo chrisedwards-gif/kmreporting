@@ -4,12 +4,10 @@ import "./globals.css";
 import "./uat006.css";
 import "./uat008.css";
 import "./uat009.css";
+import "./uat010.css";
 
 export const metadata: Metadata = {
-  title: {
-    default: "HOS Kitchen Reports",
-    template: "%s · HOS Kitchen Reports",
-  },
+  title: { default: "HOS Kitchen Reports", template: "%s · HOS Kitchen Reports" },
   description: "Secure weekly kitchen reporting, cost control, approvals and management summaries.",
 };
 
