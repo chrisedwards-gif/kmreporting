@@ -1,0 +1,101 @@
+name: Harden UAT 008 SQL
+
+on:
+  push:
+    branches:
+      - agent/uat-008-canonical-managers
+    paths:
+      - .github/workflows/fix-uat008-sql.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uat-008-canonical-managers
+      - name: Apply SQL hardening
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("supabase/migrations/012_canonical_manager_identity.sql")
+          text = path.read_text()
+
+          policies = """create policy one_to_one_action_links_read on public.one_to_one_action_links for select to authenticated
+            using (exists (
+              select 1 from public.one_to_one_reviews r where r.id = review_id
+            ));
+
+          -- Admin-only primary manager replacement."""
+          policies_replacement = """create policy one_to_one_action_links_read on public.one_to_one_action_links for select to authenticated
+            using (exists (
+              select 1 from public.one_to_one_reviews r where r.id = review_id
+            ));
+
+          grant select on public.manager_details to authenticated;
+          grant select on public.site_manager_assignments to authenticated;
+          grant select on public.one_to_one_action_links to authenticated;
+
+          -- Admin-only primary manager replacement."""
+          if policies not in text:
+              raise SystemExit("Policy insertion point not found")
+          text = text.replace(policies, policies_replacement, 1)
+
+          close_assignment = """  if current_assignment.id is not null then
+              update public.site_manager_assignments
+                 set ends_on = effective_from - 1,
+                     updated_at = now()
+               where id = current_assignment.id;
+            end if;
+
+            insert into public.site_manager_assignments ("""
+          close_assignment_replacement = """  if current_assignment.id is not null then
+              if current_assignment.starts_on = effective_from then
+                if exists (
+                  select 1 from public.one_to_one_reviews r
+                  where r.assignment_id = current_assignment.id
+                ) then
+                  raise exception 'That assignment already has a review. Choose the next Sunday as the replacement date.';
+                end if;
+                delete from public.site_manager_assignments where id = current_assignment.id;
+              else
+                update public.site_manager_assignments
+                   set ends_on = effective_from - 1,
+                       updated_at = now()
+                 where id = current_assignment.id;
+              end if;
+            end if;
+
+            insert into public.site_manager_assignments ("""
+          if close_assignment not in text:
+              raise SystemExit("Assignment close block not found")
+          text = text.replace(close_assignment, close_assignment_replacement, 1)
+
+          action_loop = """  for action_item in
+              select value from jsonb_array_elements(coalesce(payload->'actions', '[]'::jsonb))
+            loop
+              action_position := action_position + 1;"""
+          action_loop_replacement = """  for action_item in
+              select value from jsonb_array_elements(coalesce(payload->'actions', '[]'::jsonb))
+            loop
+              action_id := null;
+              action_position := action_position + 1;"""
+          if action_loop not in text:
+              raise SystemExit("Action loop not found")
+          text = text.replace(action_loop, action_loop_replacement, 1)
+
+          path.write_text(text)
+      - name: Remove workflow and commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-uat008-sql.yml
+          git add supabase/migrations/012_canonical_manager_identity.sql
+          git commit -m "Harden canonical manager migration"
+          git push origin HEAD:agent/uat-008-canonical-managers
