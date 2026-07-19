@@ -68,6 +68,33 @@ describe("StockLink safe detail extraction", () => {
     expect(result.categories.find((item) => item.category === "Wraps")?.netSales).toBe(480);
   });
 
+  it("extracts the End of Week date matrix, Number Of Sales and category totals", () => {
+    const html = `<html><body><table>
+      <tr><td></td><td>12/07/2026</td><td>13/07/2026</td><td>Totals</td></tr>
+      <tr><td>Gross Sales Before Adjustment</td></tr>
+      <tr><td>Pizzas</td><td>400</td><td>600</td><td>1000</td></tr>
+      <tr><td>Subs</td><td>800</td><td>1200</td><td>2000</td></tr>
+      <tr><td>Total</td><td>1200</td><td>1800</td><td>3000</td></tr>
+      <tr><td>Adjustments</td></tr>
+      <tr><td>Service Charge</td><td>50</td><td>100</td><td>150</td></tr>
+      <tr><td>Gross Sales After Adjustment</td></tr>
+      <tr><td>Total</td><td>1250</td><td>1900</td><td>3150</td></tr>
+      <tr><td>Vat</td></tr>
+      <tr><td>Total</td><td>200</td><td>300</td><td>500</td></tr>
+      <tr><td>Summary Counts</td></tr>
+      <tr><td>Number Of Sales</td><td>50</td><td>75</td><td>125</td></tr>
+    </table></body></html>`;
+    const result = parseStockLinkSalesInsights(html, { start: "2026-07-12", end: "2026-07-18" }, 2500);
+    expect(result.days.slice(0, 2)).toEqual([
+      { businessDate: "2026-07-12", grossSales: 1250, netSales: 1000, transactions: 50, covers: 0 },
+      { businessDate: "2026-07-13", grossSales: 1900, netSales: 1500, transactions: 75, covers: 0 },
+    ]);
+    expect(result.categories).toEqual([
+      { category: "Subs", quantity: 0, netSales: 2000 },
+      { category: "Pizzas", quantity: 0, netSales: 1000 },
+    ]);
+  });
+
   it("drops a daily extraction that does not reconcile with the weekly total", () => {
     const html = `<html><table><tr><th>Date</th><th>Net Sales</th></tr><tr><td>12/07/2026</td><td>100</td></tr><tr><td>13/07/2026</td><td>100</td></tr></table></html>`;
     const result = parseStockLinkSalesInsights(html, { start: "2026-07-12", end: "2026-07-18" }, 3000);
