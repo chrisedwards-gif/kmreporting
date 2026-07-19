@@ -1,0 +1,50 @@
+name: Add explicit UAT 008 grants
+
+on:
+  push:
+    branches:
+      - agent/uat-008-canonical-managers
+    paths:
+      - .github/workflows/fix-uat008-grants.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uat-008-canonical-managers
+      - name: Expand grants
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("supabase/migrations/012_canonical_manager_identity.sql")
+          text = path.read_text()
+          old = """grant select on public.manager_details to authenticated;
+          grant select on public.site_manager_assignments to authenticated;
+          grant select on public.one_to_one_action_links to authenticated;"""
+          new = """grant select on table
+            public.manager_details,
+            public.site_manager_assignments,
+            public.one_to_one_reviews,
+            public.one_to_one_scores,
+            public.manager_actions,
+            public.one_to_one_action_links
+          to authenticated;"""
+          if old not in text:
+              raise SystemExit("Grant block not found")
+          path.write_text(text.replace(old, new, 1))
+      - name: Remove workflow and commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-uat008-grants.yml
+          git add supabase/migrations/012_canonical_manager_identity.sql
+          git commit -m "Make canonical manager grants explicit"
+          git push origin HEAD:agent/uat-008-canonical-managers
