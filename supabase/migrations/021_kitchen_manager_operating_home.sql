@@ -14,13 +14,13 @@ create table if not exists public.manager_messages (
   title text not null check (char_length(title) between 2 and 140),
   body text not null check (char_length(body) between 2 and 4000),
   priority text not null default 'info' check (priority in ('info','important','urgent')),
-  visible_from timestamptz not null default now(),
-  visible_until timestamptz,
+  visible_from date not null default current_date,
+  visible_until date,
   active boolean not null default true,
   created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint manager_message_window_valid check (visible_until is null or visible_until > visible_from)
+  constraint manager_message_window_valid check (visible_until is null or visible_until >= visible_from)
 );
 
 create index if not exists manager_messages_visibility_idx
@@ -55,17 +55,21 @@ using (
   organisation_id = app_private.current_organisation_id()
   and (
     app_private.current_app_role() in ('admin','group_manager')
-    or recipient_profile_id = auth.uid()
     or (
-      recipient_profile_id is null
-      and site_id is null
-    )
-    or (
-      recipient_profile_id is null
-      and exists (
-        select 1 from public.site_memberships membership
-        where membership.user_id = auth.uid()
-          and membership.site_id = manager_messages.site_id
+      active
+      and visible_from <= current_date
+      and (visible_until is null or visible_until >= current_date)
+      and (
+        recipient_profile_id = auth.uid()
+        or (recipient_profile_id is null and site_id is null)
+        or (
+          recipient_profile_id is null
+          and exists (
+            select 1 from public.site_memberships membership
+            where membership.user_id = auth.uid()
+              and membership.site_id = manager_messages.site_id
+          )
+        )
       )
     )
   )
