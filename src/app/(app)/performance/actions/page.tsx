@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { ActionLogTable } from "@/components/performance/action-log-table";
 import { requireRole } from "@/lib/auth/dal";
@@ -8,20 +7,19 @@ export const metadata = { title: "Manager action log" };
 
 export default async function PerformanceActionsPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
-  if (profile.isAccessPreview) redirect("/dashboard");
-  const actions = await getPerformanceActions();
-  const canUpdate = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
+  const rawActions = await getPerformanceActions();
+  const actions = profile.isAccessPreview
+    ? rawActions.filter((item) => item.managerId === profile.previewManagerId && item.siteId === profile.previewSiteId)
+    : rawActions;
+  const canUpdate = !profile.isAccessPreview && ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
   const openCount = actions.filter((item) => !["complete", "cancelled"].includes(item.status)).length;
   const overdueCount = actions.filter((item) => item.dueDate && item.dueDate < new Date().toISOString().slice(0, 10) && !["complete", "cancelled"].includes(item.status)).length;
 
   return (
     <>
-      <header className="page-header"><div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">Master action log.</h1><p className="page-header__copy">One live record of every agreed action. Managers update progress here; items never disappear when a new 1-1 starts.</p></div></header>
-      <section className="metric-grid metric-grid--three" aria-label="Action summary">
-        <article className="metric-card"><div className="metric-card__label">Open actions</div><div className="metric-card__value">{openCount}</div><div className="metric-card__note">Across visible managers</div></article>
-        <article className={`metric-card${overdueCount ? " metric-card--over-target" : ""}`}><div className="metric-card__label">Overdue</div><div className="metric-card__value">{overdueCount}</div><div className="metric-card__note">Needs a decision or revised date</div></article>
-        <article className="metric-card"><ListChecks aria-hidden="true" size={21} /><div className="metric-card__value metric-card__value--compact">Audit trail</div><div className="metric-card__note">Every status change is recorded</div></article>
-      </section>
+      <header className="page-header"><div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">{profile.role === "kitchen_manager" ? "Today’s actions." : "Master action log."}</h1><p className="page-header__copy">One live record of every agreed action. Items remain visible until they are completed or cancelled.</p></div></header>
+      {profile.isAccessPreview ? <div className="privacy-callout">Read-only preview of {profile.previewManagerName ?? "the manager"}&apos;s actions at {profile.previewSiteName}.</div> : null}
+      <section className="metric-grid metric-grid--three" aria-label="Action summary"><article className="metric-card"><div className="metric-card__label">Open actions</div><div className="metric-card__value">{openCount}</div><div className="metric-card__note">Across visible kitchens</div></article><article className={`metric-card${overdueCount ? " metric-card--over-target" : ""}`}><div className="metric-card__label">Overdue</div><div className="metric-card__value">{overdueCount}</div><div className="metric-card__note">Needs a decision or revised date</div></article><article className="metric-card"><ListChecks aria-hidden="true" size={21} /><div className="metric-card__value metric-card__value--compact">Audit trail</div><div className="metric-card__note">Every status change is recorded</div></article></section>
       <section className="panel"><div className="panel__header"><div><h2 className="panel__title">Actions</h2><p className="panel__subtitle">Filter, update and export the current view</p></div></div><div className="panel__body"><ActionLogTable actions={actions} canUpdate={canUpdate} /></div></section>
     </>
   );
