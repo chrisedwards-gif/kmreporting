@@ -44,6 +44,8 @@ Migration 012 maps legacy rows when a unique profile identity can be resolved. U
 9. In Sites & access, replace the primary manager from a later Sunday.
 10. Confirm the prior manager appears under assignment history, their old 1-1 remains openable, and the new manager receives the future 1-1 card.
 
+Use a test manager account for the replacement check. Do not replace a live kitchen manager during UAT solely to prove the history flow.
+
 ## Identity checks
 
 Run these in the Supabase SQL Editor after assigning a manager:
