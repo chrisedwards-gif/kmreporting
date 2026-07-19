@@ -31,9 +31,16 @@ export type SalesItemInput = {
   netSales: number;
 };
 
+export type SalesCategoryInput = {
+  category: string;
+  quantity: number;
+  netSales: number;
+};
+
 export type SalesInsightsInput = {
   days: SalesDayInput[];
   items: SalesItemInput[];
+  categories: SalesCategoryInput[];
 };
 
 export type ReviewFlag = {
