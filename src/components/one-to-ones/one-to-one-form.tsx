@@ -120,8 +120,11 @@ export function OneToOneForm({
   const editable = !detail || ["draft", "in_review", "reopened"].includes(detail.status);
 
   useEffect(() => {
-    if (state.status === "success" && state.reviewId && !detail) {
+    if (state.status !== "success" || !state.reviewId) return;
+    if (!detail) {
       router.replace(`/one-to-ones/${state.reviewId}`);
+    } else {
+      router.refresh();
     }
   }, [detail, router, state.reviewId, state.status]);
 
@@ -190,13 +193,7 @@ export function OneToOneForm({
   const labourRag = kpis.available ? labourKpi(kpis.labourPct, kpis.labourTarget).rag : "neutral";
 
   return (
-    <form
-      action={(formData) => {
-        formData.set("payload", payload.replace('"intent":"save"', `"intent":"${String(formData.get("intent"))}"`));
-        formAction(formData);
-      }}
-      className="report-form"
-    >
+    <form action={formAction} className="report-form">
       <input name="payload" type="hidden" value={payload} />
 
       <section className="form-section">
@@ -288,8 +285,8 @@ export function OneToOneForm({
               <div className="form-grid form-grid--two">
                 <label className="field"><span className="field__label">Evidence</span><input className="field__input" disabled={!editable} onChange={(event) => setScores((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, evidence: event.target.value } : item)))} value={row.evidence} /></label>
                 <label className="field">
-                  <span className="field__label">Development note{row.score !== "" && Number(row.score) < 3 ? " (required for a score below 3)" : ""}</span>
-                  <input className="field__input" disabled={!editable} onChange={(event) => setScores((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, developmentNote: event.target.value } : item)))} required={row.score !== "" && Number(row.score) < 3} value={row.developmentNote} />
+                  <span className="field__label">Development note{row.score !== "" && Number(row.score) < 3 ? " (required before finalising)" : ""}</span>
+                  <input className="field__input" disabled={!editable} onChange={(event) => setScores((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, developmentNote: event.target.value } : item)))} value={row.developmentNote} />
                 </label>
               </div>
             </div>
@@ -395,8 +392,8 @@ export function OneToOneForm({
             <span className="form-checklist__item form-checklist__item--done">{managerName} · w/c {formatDate(weekCommencing)}</span>
             {overall !== null && <span className="form-checklist__item form-checklist__item--done">Overall {overall.toFixed(1)}</span>}
           </div>
-          <button className="button button--secondary" disabled={pending} name="intent" type="submit" value="save"><Save aria-hidden="true" size={16} /> Save draft</button>
-          <button className="button button--primary" disabled={pending} name="intent" type="submit" value="finalise"><ShieldCheck aria-hidden="true" size={16} /> {pending ? "Saving…" : "Finalise & lock"}</button>
+          <button className="button button--secondary" disabled={pending} name="intent" type="submit" value="save"><Save aria-hidden="true" size={16} /> {pending ? "Saving…" : "Save draft"}</button>
+          <button className="button button--primary" disabled={pending} name="intent" type="submit" value="finalise"><ShieldCheck aria-hidden="true" size={16} /> {pending ? "Saving…" : "Finalise, lock & send"}</button>
         </div>
       )}
     </form>
