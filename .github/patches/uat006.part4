@@ -1,0 +1,323 @@
+   color: var(--ink-800);
+   display: inline-block;
+@@ -609,11 +675,12 @@ a {
+ .site-cell__mark {
+   align-items: center;
+   background: var(--navy);
+-  border-radius: 0.6rem;
++  border-radius: 0.5rem;
+   color: #fff;
+   display: flex;
+-  font-size: 0.65rem;
+-  font-weight: 850;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.62rem;
++  font-weight: 600;
+   height: 2.25rem;
+   justify-content: center;
+   letter-spacing: 0.04em;
+@@ -699,17 +766,50 @@ a {
+   align-items: center;
+   background: var(--surface);
+   border: 1px solid var(--line);
+-  border-radius: 0.85rem;
++  border-radius: 0.6rem;
++  box-shadow: 0 1px 2px rgb(15 32 25 / 4%);
+   display: grid;
+   gap: 1rem;
+   grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(5rem, 0.65fr)) auto;
+-  padding: 1rem;
+-  transition: border 150ms ease, transform 150ms ease;
++  padding: 1rem 1rem 1rem 1.65rem;
++  position: relative;
++  transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
++}
++
++/* Docket spine: the rail every ticket hangs from. */
++.report-row::before {
++  background: var(--line);
++  border-radius: 0.6rem 0 0 0.6rem;
++  content: "";
++  inset: -1px auto -1px -1px;
++  position: absolute;
++  width: 0.45rem;
++}
++
++/* Punched hole. */
++.report-row::after {
++  background: var(--paper);
++  border: 1px solid var(--line);
++  border-radius: 50%;
++  content: "";
++  height: 0.55rem;
++  left: 0.85rem;
++  position: absolute;
++  top: 50%;
++  transform: translateY(-50%);
++  width: 0.55rem;
+ }
+ 
+ .report-row:hover {
+-  border-color: #bdb5a8;
+-  transform: translateY(-1px);
++  border-color: #b9c2ba;
++  box-shadow: var(--shadow);
++  transform: translateY(-2px);
++}
++
++.report-row > div:not(.site-cell) {
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.82rem;
++  font-variant-numeric: tabular-nums;
+ }
+ 
+ .report-row__metric-label {
+@@ -780,8 +880,10 @@ a {
+ }
+ 
+ .cost-summary__value {
+-  font-size: 0.9rem;
+-  font-weight: 800;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.85rem;
++  font-weight: 600;
++  font-variant-numeric: tabular-nums;
+ }
+ 
+ .privacy-callout {
+@@ -807,9 +909,10 @@ a {
+ }
+ 
+ .form-section__title {
+-  font-family: Georgia, "Times New Roman", serif;
+-  font-size: 1.3rem;
+-  font-weight: 500;
++  font-family: var(--font-sans), ui-sans-serif;
++  font-size: 1.25rem;
++  font-weight: 700;
++  letter-spacing: -0.015em;
+   margin: 0;
+ }
+ 
+@@ -852,7 +955,7 @@ a {
+ 
+ .field__input {
+   background: #fff;
+-  border: 1px solid #cfc9bf;
++  border: 1px solid #cbd3cc;
+   border-radius: 0.65rem;
+   color: var(--ink-950);
+   min-height: 2.7rem;
+@@ -868,7 +971,7 @@ textarea.field__input {
+ 
+ .field__input:focus {
+   border-color: var(--coral);
+-  box-shadow: 0 0 0 3px rgb(235 107 79 / 12%);
++  box-shadow: 0 0 0 3px rgb(232 80 28 / 14%);
+   outline: 0;
+ }
+ 
+@@ -914,7 +1017,7 @@ textarea.field__input {
+ }
+ 
+ .form-subtitle {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.15rem;
+   font-weight: 500;
+   margin: 0;
+@@ -996,7 +1099,7 @@ textarea.field__input {
+ }
+ 
+ .modal__title {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.7rem;
+   font-weight: 500;
+   letter-spacing: -0.035em;
+@@ -1047,7 +1150,7 @@ textarea.field__input {
+ 
+ .modal__success h3 {
+   color: var(--ink-950);
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.5rem;
+   font-weight: 500;
+   margin: 0.8rem 0 0;
+@@ -1122,7 +1225,7 @@ textarea.field__input {
+ 
+ .empty-inline--compact {
+   background: #f8f5ef;
+-  border: 1px dashed #cfc9bf;
++  border: 1px dashed #cbd3cc;
+   border-radius: 0.7rem;
+   min-height: 4rem;
+ }
+@@ -1160,8 +1263,9 @@ textarea.field__input {
+ 
+ .login__story {
+   background:
+-    linear-gradient(135deg, rgb(30 46 53 / 95%), rgb(30 46 53 / 80%)),
+-    radial-gradient(circle at 20% 80%, var(--coral), transparent 35rem);
++    linear-gradient(150deg, rgb(15 32 25 / 97%) 30%, rgb(26 49 40 / 92%)),
++    radial-gradient(circle at 18% 85%, rgb(232 80 28 / 55%), transparent 30rem),
++    var(--navy);
+   color: #fff;
+   display: flex;
+   flex-direction: column;
+@@ -1170,10 +1274,10 @@ textarea.field__input {
+ }
+ 
+ .login__headline {
+-  font-family: Georgia, "Times New Roman", serif;
+-  font-size: clamp(2.8rem, 6vw, 5.5rem);
+-  font-weight: 500;
+-  letter-spacing: -0.055em;
++  font-family: var(--font-sans), ui-sans-serif;
++  font-size: clamp(2.6rem, 5.5vw, 4.8rem);
++  font-weight: 800;
++  letter-spacing: -0.04em;
+   line-height: 0.95;
+   max-width: 45rem;
+ }
+@@ -1197,7 +1301,7 @@ textarea.field__input {
+ }
+ 
+ .login__card h1 {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 2.4rem;
+   font-weight: 500;
+   letter-spacing: -0.04em;
+@@ -1262,7 +1366,7 @@ textarea.field__input {
+ }
+ 
+ .empty-state h2 {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.5rem;
+   font-weight: 500;
+   margin: 0;
+@@ -1283,25 +1387,28 @@ textarea.field__input {
+ }
+ 
+ .form-section__step {
+-  color: var(--coral-dark);
+-  font-size: 0.64rem;
+-  font-weight: 850;
+-  letter-spacing: 0.1em;
++  color: var(--sage);
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.63rem;
++  font-weight: 600;
++  letter-spacing: 0.12em;
+   margin: 0 0 0.25rem;
+   text-transform: uppercase;
+ }
+ 
+ .source-chip {
+   align-items: center;
+-  background: #f0eeea;
+-  border: 1px solid #d8d3ca;
+-  border-radius: 999px;
++  background: #eef1ee;
++  border: 1px solid #d5dcd6;
++  border-radius: 0.45rem;
+   color: var(--ink-600);
+   display: inline-flex;
+   flex: 0 0 auto;
+-  font-size: 0.66rem;
+-  font-weight: 800;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.62rem;
++  font-weight: 600;
+   gap: 0.35rem;
++  letter-spacing: 0.05em;
+   padding: 0.4rem 0.6rem;
+   text-transform: uppercase;
+ }
+@@ -1331,8 +1438,8 @@ textarea.field__input {
+ 
+ .source-upload {
+   align-items: center;
+-  background: #faf7f1;
+-  border: 1px dashed #bdb5a8;
++  background: #f7f9f6;
++  border: 1px dashed #b9c2ba;
+   border-radius: 0.8rem;
+   color: var(--ink-800);
+   cursor: pointer;
+@@ -1396,7 +1503,7 @@ textarea.field__input {
+ }
+ 
+ .source-stat strong {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.35rem;
+   font-weight: 500;
+ }
+@@ -1474,7 +1581,7 @@ textarea.field__input {
+ }
+ 
+ .preview-grid > div {
+-  background: #faf7f1;
++  background: #f7f9f6;
+   border: 1px solid var(--line);
+   border-radius: 0.8rem;
+   display: grid;
+@@ -1489,7 +1596,7 @@ textarea.field__input {
+ }
+ 
+ .preview-grid strong {
+-  font-family: Georgia, "Times New Roman", serif;
++  font-family: var(--font-sans), ui-sans-serif;
+   font-size: 1.35rem;
+   font-weight: 500;
+ }
+@@ -1758,13 +1865,16 @@ textarea.field__input {
+   align-items: center;
+   color: var(--ink-600);
+   display: inline-flex;
+-  font-size: 0.68rem;
+-  font-weight: 700;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.64rem;
++  font-weight: 600;
+   gap: 0.28rem;
++  letter-spacing: 0.02em;
++  text-transform: uppercase;
+ }
+ 
+ .form-checklist__item svg {
+-  color: #b7b1a6;
++  color: #a9b3ab;
+ }
+ 
+ .form-checklist__item--done {
+@@ -1823,7 +1933,7 @@ textarea.field__input {
+ }
+ 
+ .data-table__no-report {
+-  color: #b7b1a6;
++  color: #a9b3ab;
+ }
+ 
+ .privacy-callout__icon {
+@@ -1831,3 +1941,11 @@ textarea.field__input {
+   margin-right: 0.4rem;
+   vertical-align: text-bottom;
+ }
++
++.summary-section-title {
++  font-family: var(--font-sans), ui-sans-serif;
++  font-size: 1.35rem;
++  font-weight: 700;
++  letter-spacing: -0.015em;
++  margin: 1.5rem 0 1rem;
++}
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 36142b0..f21827c 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -1,3 +1,4 @@
++/* eslint-disable @next/next/no-page-custom-font -- App Router root layout applies
