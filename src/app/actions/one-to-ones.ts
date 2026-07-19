@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth/dal";
 import { getWeekKpis } from "@/lib/data/one-to-ones";
 import { environment } from "@/lib/env";
 import { deliverReminderWebhook } from "@/lib/notifications/delivery";
+import { sendTransactionalEmail } from "@/lib/notifications/email";
 import { buildFollowUpEmail, overallScore, SCORE_AREAS, type ScoreMap } from "@/lib/performance/scoring";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -53,8 +54,6 @@ type ReviewInput = z.infer<typeof reviewSchema>;
 const parsePayload = (formData: FormData) => {
   try {
     const raw = JSON.parse(String(formData.get("payload") ?? "{}")) as Record<string, unknown>;
-    // The clicked submit button is the source of truth. This avoids the previous
-    // fragile string replacement that could silently submit the wrong intent.
     raw.intent = String(formData.get("intent") ?? raw.intent ?? "save");
     return reviewSchema.safeParse(raw);
   } catch {
@@ -90,13 +89,14 @@ async function deliverFinalisedReview(reviewId: string, input: ReviewInput) {
   });
   const actionPath = `/one-to-ones/${reviewId}`;
   const intendedEmail = recipient.notification_email?.trim() ?? "";
+  const dedupeKey = `one-to-one:${reviewId}`;
   const { data: logged, error: logError } = await admin.from("notification_log").insert({
     organisation_id: review.organisation_id,
     recipient_id: recipient.id,
     site_id: review.site_id,
     one_to_one_review_id: reviewId,
     notification_type: "one_to_one_finalised",
-    dedupe_key: `one-to-one:${reviewId}:${crypto.randomUUID()}`,
+    dedupe_key: `${dedupeKey}:${crypto.randomUUID()}`,
     delivery_status: intendedEmail ? "queued" : "failed",
     recipient_email: intendedEmail || null,
     subject: email.subject,
@@ -107,9 +107,29 @@ async function deliverFinalisedReview(reviewId: string, input: ReviewInput) {
 
   if (logError || !logged) return "Review finalised, but the email record could not be queued.";
   if (!intendedEmail) return "Review finalised. Add a notification email to the manager account before resending.";
+
+  const resendDelivery = await sendTransactionalEmail({
+    to: intendedEmail,
+    subject: email.subject,
+    text: email.body,
+    idempotencyKey: dedupeKey,
+  });
+  if (resendDelivery.configured) {
+    await admin.from("notification_log").update({
+      delivery_status: resendDelivery.ok ? "sent" : "failed",
+      provider_reference: resendDelivery.providerReference || null,
+      error_message: resendDelivery.ok ? null : resendDelivery.error,
+      sent_at: resendDelivery.ok ? new Date().toISOString() : null,
+    }).eq("id", logged.id);
+    revalidatePath("/notifications");
+    return resendDelivery.ok
+      ? `Review finalised and sent by Resend to ${environment.reminderRecipientOverride ?? intendedEmail}${environment.reminderRecipientOverride ? " through the UAT override" : ""}.`
+      : `Review finalised, but Resend delivery failed: ${resendDelivery.error}`;
+  }
+
   if (!environment.reminderWebhookUrl) {
     revalidatePath("/notifications");
-    return `Review finalised and queued for ${intendedEmail}. Configure the delivery webhook before expecting an email.`;
+    return `Review finalised and queued for ${intendedEmail}. Configure Resend or the delivery webhook before expecting an email.`;
   }
 
   const actualEmail = environment.reminderRecipientOverride ?? intendedEmail;
