@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-page-custom-font -- App Router root layout applies globally. */
 import type { Metadata } from "next";
+import { AuthFragmentGuard } from "@/components/auth-fragment-guard";
 import "./globals.css";
 import "./uat006.css";
 import "./uat008.css";
@@ -22,7 +23,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
         <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthFragmentGuard />
+        {children}
+      </body>
     </html>
   );
 }
