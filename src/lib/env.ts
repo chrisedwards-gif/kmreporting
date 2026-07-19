@@ -6,14 +6,22 @@ const hasSupabaseEnvironment = Boolean(
 );
 
 const vercelEnvironment = process.env.VERCEL_ENV;
-const isProduction = vercelEnvironment === "production";
-const isPreview = vercelEnvironment === "preview";
+const netlifyContext = process.env.CONTEXT;
+const isProduction = vercelEnvironment === "production" || netlifyContext === "production";
+const isPreview =
+  vercelEnvironment === "preview" ||
+  netlifyContext === "deploy-preview" ||
+  netlifyContext === "branch-deploy";
 const quickLoginEmail = process.env.UAT_QUICK_LOGIN_EMAIL?.trim().toLowerCase();
 const quickLoginPassword = process.env.UAT_QUICK_LOGIN_PASSWORD;
 const canonicalOrigin = process.env.UAT_CANONICAL_ORIGIN?.trim().replace(/\/$/, "");
+const demoRequested = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 export const environment = {
-  isDemo: process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !hasSupabaseEnvironment,
+  // Production must fail closed when Supabase is misconfigured. Demo mode is
+  // available only when explicitly requested, or on a non-production build
+  // that has no Supabase connection yet.
+  isDemo: !isProduction && (demoRequested || !hasSupabaseEnvironment),
   isPreview,
   isProduction,
   hasSupabase: hasSupabaseEnvironment,
