@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
           ...options,
           path: "/",
           sameSite: "lax",
-          secure: true,
+          secure: request.nextUrl.protocol === "https:",
         }));
       },
     },
