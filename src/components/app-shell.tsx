@@ -10,11 +10,14 @@ import {
   ChefHat,
   ClipboardList,
   FileCheck2,
+  ListChecks,
   LockKeyhole,
   LogOut,
   Menu,
+  Scale,
   Settings2,
   ShieldCheck,
+  UserRoundCog,
   X,
 } from "lucide-react";
 import { classNames } from "@/lib/utils";
@@ -25,7 +28,10 @@ import { signOut } from "@/app/actions/auth";
 const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
   { href: "/dashboard", label: "Group overview", icon: BarChart3 },
   { href: "/reports", label: "Weekly reports", icon: ClipboardList },
-  { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: ["admin", "group_manager", "finance", "viewer"] },
+  { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: ["admin", "group_manager", "finance", "viewer", "kitchen_manager"] },
+  { href: "/performance/actions", label: "Action log", icon: ListChecks, roles: ["admin", "group_manager", "finance", "viewer", "kitchen_manager"] },
+  { href: "/performance/probation", label: "Probation", icon: Scale, roles: ["admin", "group_manager", "finance", "viewer"] },
+  { href: "/performance/managers", label: "Manager admin", icon: UserRoundCog, roles: ["admin"] },
   { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
   { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },
@@ -42,63 +48,25 @@ export function AppShell({ children, isDemo, isPreview, user }: { children: Reac
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside className={classNames("app-shell__sidebar", navOpen && "app-shell__sidebar--open")}>
         <div className="app-shell__brand">
-          <div className="app-shell__brand-mark">
-            <ChefHat aria-hidden="true" size={25} />
-          </div>
-          <div className="app-shell__brand-copy">
-            <strong>HOS Kitchen Reports</strong>
-            <span>Weekly operations</span>
-          </div>
+          <div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div>
+          <div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div>
         </div>
         <nav aria-label="Main navigation" className="app-shell__nav">
           {navItems.filter((item) => !item.roles || item.roles.includes(user.role)).map(({ href, icon: Icon, label }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")}
-                href={href}
-                key={href}
-                onClick={() => setNavOpen(false)}
-              >
-                <Icon aria-hidden="true" size={18} />
-                {label}
-              </Link>
-            );
+            return <Link className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")} href={href} key={href} onClick={() => setNavOpen(false)}><Icon aria-hidden="true" size={18} />{label}</Link>;
           })}
         </nav>
-        <div className="app-shell__profile">
-          <div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.role.replaceAll("_", " ")} · Scoped access</div></div>
-            <form action={signOut}><button className="app-shell__signout" type="submit" aria-label="Sign out" title="Sign out"><LogOut aria-hidden="true" size={16} /></button></form>
-          </div>
-        </div>
+        <div className="app-shell__profile"><div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.role.replaceAll("_", " ")} · Scoped access</div></div><form action={signOut}><button className="app-shell__signout" type="submit" aria-label="Sign out" title="Sign out"><LogOut aria-hidden="true" size={16} /></button></form></div></div>
       </aside>
       <div className="app-shell__main">
         <header className="app-shell__topbar">
-          <button
-            aria-label={navOpen ? "Close navigation" : "Open navigation"}
-            className="app-shell__mobile-button"
-            onClick={() => setNavOpen((value) => !value)}
-            type="button"
-          >
-            {navOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          <button aria-label={navOpen ? "Close navigation" : "Open navigation"} className="app-shell__mobile-button" onClick={() => setNavOpen((value) => !value)} type="button">{navOpen ? <X size={22} /> : <Menu size={22} />}</button>
           <div className="app-shell__context">Group reporting · Europe/London</div>
           <div className="app-shell__topbar-status">
             <LiveReportingStatus isDemo={isDemo} />
-            {isPreview && !isDemo && (
-              <div className="demo-banner demo-banner--preview">
-                <CircleDashedIcon />
-                <strong>UAT preview</strong>
-                <span>Staging data</span>
-              </div>
-            )}
-            {isDemo && (
-              <div className="demo-banner">
-                <CircleDashedIcon />
-                <strong>Test workspace</strong>
-                <span>Safe sample data</span>
-              </div>
-            )}
+            {isPreview && !isDemo ? <div className="demo-banner demo-banner--preview"><CircleDashedIcon /><strong>UAT preview</strong><span>Staging data</span></div> : null}
+            {isDemo ? <div className="demo-banner"><CircleDashedIcon /><strong>Test workspace</strong><span>Safe sample data</span></div> : null}
           </div>
         </header>
         <main className="app-shell__content" id="main-content">{children}</main>
