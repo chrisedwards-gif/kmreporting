@@ -1,0 +1,335 @@
+      </div>
+-          <ShieldCheck aria-hidden="true" color="#eb6b4f" size={24} />
++          <ShieldCheck aria-hidden="true" color="#e8501c" size={24} />
+           <h1>Choose your password.</h1>
+           <p>You are signed in as <strong>{data.user.email}</strong>. Set a password now so you can sign in directly next week.</p>
+           <SetPasswordForm />
+diff --git a/src/app/globals.css b/src/app/globals.css
+index e09fe6d..d878bdc 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -1,19 +1,24 @@
+ @import "tailwindcss";
+ 
+ :root {
+-  --ink-950: #17211e;
+-  --ink-800: #293733;
+-  --ink-600: #5f6e68;
+-  --paper: #f4f0e8;
+-  --surface: #fffdf9;
+-  --line: #ddd8ce;
+-  --coral: #eb6b4f;
+-  --coral-dark: #c84c34;
+-  --sage: #2d7a62;
+-  --amber: #c78324;
+-  --red: #b93f35;
+-  --navy: #1e2e35;
+-  --shadow: 0 12px 40px rgb(23 33 30 / 8%);
++  /* The Pass: deep spruce shell, porcelain worktop, flame reserved for action. */
++  --ink-950: #131c17;
++  --ink-800: #2a3630;
++  --ink-600: #5d6b63;
++  --paper: #f2f4f1;
++  --surface: #fff;
++  --line: #e0e5e0;
++  --coral: #e8501c;
++  --coral-dark: #c73e0e;
++  --sage: #1f7a5a;
++  --amber: #b07713;
++  --red: #bb3b30;
++  --navy: #0f2019;
++  --navy-2: #1a3128;
++  --shadow: 0 1px 2px rgb(15 32 25 / 5%), 0 12px 32px rgb(15 32 25 / 7%);
++  --ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--coral);
++  --font-sans: "Archivo";
++  --font-mono: "Spline Sans Mono";
+ }
+ 
+ * {
+@@ -26,11 +31,11 @@ html {
+ 
+ body {
+   margin: 0;
+-  background:
+-    radial-gradient(circle at 92% 2%, rgb(235 107 79 / 8%), transparent 26rem),
+-    var(--paper);
++  background: var(--paper);
+   color: var(--ink-950);
+-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
++  font-feature-settings: "ss01";
++  -webkit-font-smoothing: antialiased;
+ }
+ 
+ button,
+@@ -46,7 +51,13 @@ a {
+ }
+ 
+ ::selection {
+-  background: rgb(235 107 79 / 25%);
++  background: rgb(232 80 28 / 22%);
++}
++
++:focus-visible {
++  border-radius: 0.4rem;
++  box-shadow: var(--ring);
++  outline: none;
+ }
+ 
+ .app-shell {
+@@ -54,8 +65,9 @@ a {
+ }
+ 
+ .app-shell__sidebar {
+-  background: var(--navy);
+-  color: #fff;
++  background: linear-gradient(178deg, var(--navy) 0%, var(--navy-2) 130%);
++  border-right: 1px solid rgb(255 255 255 / 6%);
++  color: #f2f6f3;
+   display: flex;
+   flex-direction: column;
+   inset: 0 auto 0 0;
+@@ -79,7 +91,6 @@ a {
+   display: flex;
+   height: 2.75rem;
+   justify-content: center;
+-  transform: rotate(-3deg);
+   width: 2.75rem;
+ }
+ 
+@@ -193,8 +204,10 @@ a {
+ 
+ .app-shell__context {
+   color: var(--ink-600);
+-  font-size: 0.82rem;
+-  font-weight: 650;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.72rem;
++  font-weight: 500;
++  letter-spacing: 0.03em;
+ }
+ 
+ .app-shell__content {
+@@ -264,8 +277,8 @@ a {
+ }
+ 
+ .live-status--demo {
+-  background: #f0eeea;
+-  border-color: #d8d3ca;
++  background: #eef1ee;
++  border-color: #d5dcd6;
+   color: #66625c;
+ }
+ 
+@@ -283,19 +296,20 @@ a {
+ }
+ 
+ .page-header__eyebrow {
+-  color: var(--coral-dark);
+-  font-size: 0.72rem;
+-  font-weight: 800;
+-  letter-spacing: 0.13em;
++  color: var(--sage);
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.68rem;
++  font-weight: 600;
++  letter-spacing: 0.14em;
+   margin: 0 0 0.45rem;
+   text-transform: uppercase;
+ }
+ 
+ .page-header__title {
+-  font-family: Georgia, "Times New Roman", serif;
+-  font-size: clamp(2rem, 4vw, 3rem);
+-  font-weight: 500;
+-  letter-spacing: -0.045em;
++  font-family: var(--font-sans), ui-sans-serif;
++  font-size: clamp(1.9rem, 3.6vw, 2.7rem);
++  font-weight: 750;
++  letter-spacing: -0.035em;
+   line-height: 1;
+   margin: 0;
+ }
+@@ -371,7 +385,7 @@ a {
+ .button:focus-visible,
+ .icon-button:focus-visible,
+ .app-shell__nav-link:focus-visible {
+-  outline: 3px solid rgb(235 107 79 / 28%);
++  outline: 3px solid rgb(232 80 28 / 30%);
+   outline-offset: 2px;
+ }
+ 
+@@ -382,21 +396,39 @@ a {
+ }
+ 
+ .button--primary {
+-  background: var(--coral);
+-  box-shadow: 0 6px 18px rgb(235 107 79 / 22%);
++  background: linear-gradient(180deg, var(--coral) 0%, var(--coral-dark) 85%);
++  box-shadow: inset 0 1px 0 rgb(255 255 255 / 22%), 0 1px 2px rgb(199 62 14 / 40%), 0 6px 16px rgb(232 80 28 / 25%);
+   color: #fff;
+ }
+ 
++.button--primary:hover:not(:disabled) {
++  background: linear-gradient(180deg, #f2662f, var(--coral-dark));
++}
++
++.button--primary:active:not(:disabled) {
++  box-shadow: inset 0 2px 4px rgb(120 30 5 / 35%);
++  transform: translateY(1px);
++}
++
+ .button--primary:hover {
+   background: var(--coral-dark);
+ }
+ 
+ .button--secondary {
+   background: var(--surface);
+-  border: 1px solid var(--line);
++  border: 1px solid #cbd3cc;
++  box-shadow: 0 1px 2px rgb(15 32 25 / 6%);
+   color: var(--ink-950);
+ }
+ 
++.button--secondary:hover:not(:disabled) {
++  border-color: var(--ink-600);
++}
++
++.button--secondary:active:not(:disabled) {
++  transform: translateY(1px);
++}
++
+ .button--danger {
+   background: #fff0ee;
+   border: 1px solid #f0c4be;
+@@ -431,13 +463,34 @@ a {
+ }
+ 
+ .metric-card {
++  animation: card-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+   background: var(--surface);
+   border: 1px solid var(--line);
+-  border-radius: 1rem;
++  border-radius: 0.85rem;
++  box-shadow: 0 1px 2px rgb(15 32 25 / 4%);
+   min-height: 9rem;
+   overflow: hidden;
+   padding: 1.15rem;
+   position: relative;
++  transition: transform 150ms ease, box-shadow 150ms ease;
++}
++
++.metric-card:hover {
++  box-shadow: var(--shadow);
++  transform: translateY(-2px);
++}
++
++.metric-card:nth-child(2) { animation-delay: 0.05s; }
++.metric-card:nth-child(3) { animation-delay: 0.1s; }
++.metric-card:nth-child(4) { animation-delay: 0.15s; }
++.metric-card:nth-child(5) { animation-delay: 0.2s; }
++.metric-card:nth-child(6) { animation-delay: 0.25s; }
++
++@keyframes card-in {
++  from {
++    opacity: 0;
++    transform: translateY(8px);
++  }
+ }
+ 
+ .metric-card::after {
+@@ -453,18 +506,21 @@ a {
+ 
+ .metric-card__label {
+   color: var(--ink-600);
+-  font-size: 0.72rem;
+-  font-weight: 750;
+-  letter-spacing: 0.04em;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.65rem;
++  font-weight: 600;
++  letter-spacing: 0.08em;
+   margin-top: 0.35rem;
+   text-transform: uppercase;
+ }
+ 
+ .metric-card__value {
+-  font-family: Georgia, "Times New Roman", serif;
+-  font-size: 1.75rem;
+-  letter-spacing: -0.035em;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 1.6rem;
++  font-weight: 500;
++  letter-spacing: -0.05em;
+   margin-top: 0.65rem;
++  font-variant-numeric: tabular-nums;
+ }
+ 
+ .metric-card__note {
+@@ -506,6 +562,8 @@ a {
+ 
+ .panel__title {
+   font-size: 0.95rem;
++  font-weight: 700;
++  letter-spacing: -0.01em;
+   margin: 0;
+ }
+ 
+@@ -521,13 +579,14 @@ a {
+ 
+ .status-badge {
+   align-items: center;
+-  border-radius: 999px;
++  border-radius: 0.45rem;
+   display: inline-flex;
+-  font-size: 0.68rem;
+-  font-weight: 800;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.62rem;
++  font-weight: 600;
+   gap: 0.35rem;
+-  letter-spacing: 0.03em;
+-  padding: 0.35rem 0.55rem;
++  letter-spacing: 0.06em;
++  padding: 0.32rem 0.5rem;
+   text-transform: uppercase;
+   white-space: nowrap;
+ }
+@@ -567,14 +626,21 @@ a {
+ 
+ .data-table th {
+   color: var(--ink-600);
+-  font-size: 0.66rem;
+-  font-weight: 800;
+-  letter-spacing: 0.07em;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.63rem;
++  font-weight: 600;
++  letter-spacing: 0.09em;
+   text-transform: uppercase;
+ }
+ 
+ .data-table td {
+-  font-size: 0.82rem;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.8rem;
++  font-variant-numeric: tabular-nums;
++}
++
++.data-table td:first-child {
++  font-family: var(--font-sans), ui-sans-serif;
+ }
+ 
+ .data-table tbody tr:last-child td {
+@@ -582,11 +648,11 @@ a {
+ }
+ 
+ .data-table tbody tr:hover {
+-  background: #faf7f1;
++  background: #f7f9f6;
+ }
+ 
+ .code-pill {
+-  background: #f0eeea;
++  background: #eef1ee;
+   border-radius: 0.45rem;
