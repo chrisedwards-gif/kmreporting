@@ -31,17 +31,16 @@ const calendarSchema = z.object({
 export async function createManagerMessage(formData: FormData) {
   const profile = await requireActualRole(["admin", "group_manager"]);
   const parsed = messageSchema.parse(Object.fromEntries(formData));
-  if (parsed.siteId && parsed.recipientProfileId) {
-    throw new Error("Choose either a kitchen audience or one manager, not both.");
-  }
   if (parsed.visibleUntil && parsed.visibleUntil < parsed.visibleFrom) {
     throw new Error("The end date cannot be before the start date.");
   }
+  const recipientProfileId = parsed.recipientProfileId || null;
+  const siteId = recipientProfileId ? null : parsed.siteId || null;
   const admin = createAdminClient();
   const { error } = await admin.from("manager_messages").insert({
     organisation_id: profile.organisationId,
-    site_id: parsed.siteId || null,
-    recipient_profile_id: parsed.recipientProfileId || null,
+    site_id: siteId,
+    recipient_profile_id: recipientProfileId,
     title: parsed.title,
     body: parsed.body,
     priority: parsed.priority,
@@ -57,7 +56,7 @@ export async function createManagerMessage(formData: FormData) {
     action: "manager_message.created",
     entity_type: "manager_message",
     entity_id: null,
-    detail: { site_id: parsed.siteId || null, recipient_profile_id: parsed.recipientProfileId || null, visible_from: parsed.visibleFrom },
+    detail: { site_id: siteId, recipient_profile_id: recipientProfileId, visible_from: parsed.visibleFrom },
   });
   revalidatePath("/dashboard");
   revalidatePath("/messages");
