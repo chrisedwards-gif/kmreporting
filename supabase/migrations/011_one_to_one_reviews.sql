@@ -133,7 +133,8 @@ declare
   review_id uuid;
   score_item jsonb;
   action_item jsonb;
-  incoming_ids uuid[] := '{}';
+  action_id uuid;
+  incoming_count integer := 0;
 begin
   if app_private.current_app_role() not in ('admin', 'group_manager') then
     raise exception 'Only group management can record 1-1 reviews.';
@@ -186,7 +187,8 @@ begin
         completed_at = case when action_item->>'status' = 'complete' then coalesce(completed_at, now()) else null end,
         updated_at = now()
       where id = (action_item->>'id')::uuid and organisation_id = org
-      returning id into strict incoming_ids[cardinality(incoming_ids) + 1];
+      returning id into action_id;
+      incoming_count := incoming_count + 1;
     else
       insert into public.manager_actions (
         organisation_id, manager_id, source_review_id, priority, action,
@@ -197,13 +199,14 @@ begin
         nullif(action_item->>'dueDate', '')::date, coalesce(action_item->>'status', 'not_started'),
         coalesce(action_item->>'outcome', ''), nullif(action_item->>'carriedFrom', '')::uuid
       )
-      returning id into strict incoming_ids[cardinality(incoming_ids) + 1];
+      returning id into action_id;
+      incoming_count := incoming_count + 1;
     end if;
   end loop;
 
   insert into public.audit_log (organisation_id, actor_id, action, entity_type, entity_id, detail)
   values (org, actor, 'one_to_one.saved', 'one_to_one_review', review_id,
-    jsonb_build_object('manager_id', target_manager, 'action_count', cardinality(incoming_ids)));
+    jsonb_build_object('manager_id', target_manager, 'action_count', incoming_count));
   return review_id;
 end;
 $$;
