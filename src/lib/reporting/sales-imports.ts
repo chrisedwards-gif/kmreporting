@@ -54,10 +54,15 @@ const htmlRows = (input: string): HtmlRow[] => [...input.matchAll(/<tr[^>]*>([\s
   raw: match[1],
   cells: [...match[1].matchAll(/<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi)].map((cell) => decodeHtml(cell[1])),
 })).filter((row) => row.cells.length > 0);
-
 const tableRows = (input: string) => [...input.matchAll(/<table[^>]*>([\s\S]*?)<\/table>/gi)].map((table) => htmlRows(table[1]));
 const headerIndex = (headers: string[], candidates: string[]) => headers.findIndex((header) => candidates.some((candidate) => normalise(header).includes(normalise(candidate))));
 const isTotal = (value: string) => /^(grand\s+)?total$/i.test(value.trim());
+
+function reconciles(days: SalesDayInput[], weeklyNetSales: number) {
+  if (!days.length || weeklyNetSales <= 0) return true;
+  const extractedTotal = days.reduce((sum, day) => sum + day.netSales, 0);
+  return extractedTotal <= 0 || Math.abs(extractedTotal - weeklyNetSales) <= Math.max(5, weeklyNetSales * 0.02);
+}
 
 function matrixDailyInsights(rows: HtmlRow[], expected: SourcePeriod, weeklyNetSales: number): SalesDayInput[] {
   const dates = dateRange(expected);
@@ -69,7 +74,6 @@ function matrixDailyInsights(rows: HtmlRow[], expected: SourcePeriod, weeklyNetS
   const directNet = new Map<string, number>();
   const transactions = new Map<string, number>();
   const covers = new Map<string, number>();
-
   const assignValues = (target: Map<string, number>, cells: string[]) => {
     if (dateColumns.size >= 3) {
       for (const [index, date] of dateColumns) target.set(date, parseNumber(cells[index] ?? ""));
@@ -79,20 +83,12 @@ function matrixDailyInsights(rows: HtmlRow[], expected: SourcePeriod, weeklyNetS
     const probable = numericCells.length >= dates.length ? numericCells.slice(0, dates.length) : [];
     probable.forEach((value, index) => target.set(dates[index], value));
   };
-
   for (const row of rows) {
     const recognisedDates = row.cells.map((cell, index) => [index, toIsoDate(cell, dates)] as const).filter((entry): entry is readonly [number, string] => Boolean(entry[1] && dates.includes(entry[1])));
-    if (recognisedDates.length >= 3) {
-      dateColumns = new Map(recognisedDates);
-      continue;
-    }
+    if (recognisedDates.length >= 3) { dateColumns = new Map(recognisedDates); continue; }
     const label = row.cells[0]?.trim() ?? "";
-    const combined = normalise(row.cells.join(" "));
     const rowHasNumbers = row.cells.slice(1).some((cell) => /\d/.test(cell));
-    if (!rowHasNumbers && label) {
-      section = normalise(label);
-      continue;
-    }
+    if (!rowHasNumbers && label) { section = normalise(label); continue; }
     const context = `${section}${normalise(label)}`;
     if ((section.includes("grosssalesafteradjustment") || context.includes("grosssalesafteradjustment")) && isTotal(label)) assignValues(gross, row.cells);
     else if ((section === "vat" || section.includes("vat")) && isTotal(label)) assignValues(vat, row.cells);
@@ -101,9 +97,7 @@ function matrixDailyInsights(rows: HtmlRow[], expected: SourcePeriod, weeklyNetS
     else if (/transaction|orders|checks|bills|receipts/i.test(`${section} ${label}`) && !/value|sales|amount/i.test(label)) assignValues(transactions, row.cells);
     else if (/covers|guests|customers/i.test(`${section} ${label}`) && !/value|sales|amount/i.test(label)) assignValues(covers, row.cells);
   }
-
-  const hasDailySales = dates.some((date) => gross.has(date) || directNet.has(date));
-  if (!hasDailySales) return [];
+  if (!dates.some((date) => gross.has(date) || directNet.has(date))) return [];
   const result = dates.map((date) => ({
     businessDate: date,
     grossSales: roundMoney(gross.get(date) ?? directNet.get(date) ?? 0),
@@ -111,9 +105,7 @@ function matrixDailyInsights(rows: HtmlRow[], expected: SourcePeriod, weeklyNetS
     transactions: Math.max(0, Math.round(transactions.get(date) ?? 0)),
     covers: Math.max(0, Math.round(covers.get(date) ?? 0)),
   }));
-  const extractedTotal = result.reduce((sum, day) => sum + day.netSales, 0);
-  if (weeklyNetSales > 0 && extractedTotal > 0 && Math.abs(extractedTotal - weeklyNetSales) > Math.max(5, weeklyNetSales * 0.02)) return [];
-  return result;
+  return reconciles(result, weeklyNetSales) ? result : [];
 }
 
 function tabularDailyInsights(tables: HtmlRow[][], expected: SourcePeriod): SalesDayInput[] {
@@ -173,7 +165,6 @@ function itemAndCategoryInsights(tables: HtmlRow[][]): { items: SalesItemInput[]
       }
     }
   }
-
   const dedupeItems = new Map<string, SalesItemInput>();
   for (const item of items) {
     const key = `${normalise(item.category)}:${normalise(item.itemName)}`;
@@ -203,8 +194,9 @@ export function parseStockLinkSalesInsights(input: string, expected: SourcePerio
   if (!/<html[\s>]/i.test(input)) return { days: [], items: [], categories: [] };
   const rows = htmlRows(input);
   const tables = tableRows(input);
-  const days = tabularDailyInsights(tables, expected);
-  const matrixDays = days.length ? days : matrixDailyInsights(rows, expected, weeklyNetSales);
+  const tabularDays = tabularDailyInsights(tables, expected);
+  const days = reconciles(tabularDays, weeklyNetSales) ? tabularDays : [];
+  const safeDays = days.length ? days : matrixDailyInsights(rows, expected, weeklyNetSales);
   const { items, categories } = itemAndCategoryInsights(tables);
-  return { days: matrixDays, items, categories };
+  return { days: safeDays, items, categories };
 }
