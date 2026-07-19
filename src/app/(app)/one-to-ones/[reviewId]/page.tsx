@@ -4,6 +4,7 @@ import { acknowledgeOneToOne, reopenOneToOne } from "@/app/actions/one-to-ones";
 import { OneToOneForm } from "@/components/one-to-ones/one-to-one-form";
 import { getSessionProfile } from "@/lib/auth/dal";
 import { getOneToOne, getOpenActions, getReviewActions, getSnapshottedKpis, getWeekKpis } from "@/lib/data/one-to-ones";
+import { getWeeklyReportId } from "@/lib/data/report-links";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "1-1 review" };
@@ -12,10 +13,11 @@ export default async function OneToOneDetailPage({ params }: { params: Promise<{
   const { reviewId } = await params;
   const [detail, profile] = await Promise.all([getOneToOne(reviewId), getSessionProfile()]);
   if (!detail) notFound();
-  const [liveKpis, openActions, reviewActions] = await Promise.all([
+  const [liveKpis, openActions, reviewActions, weeklyReportId] = await Promise.all([
     getWeekKpis(detail.siteId, detail.weekCommencing),
     getOpenActions(detail.managerId),
     getReviewActions(detail.id),
+    getWeeklyReportId(detail.siteId, detail.weekCommencing),
   ]);
   const lockedKpis = ["finalised", "acknowledged"].includes(detail.status) ? getSnapshottedKpis(detail.kpiSnapshot) : null;
   const kpis = lockedKpis ?? liveKpis;
@@ -38,6 +40,7 @@ export default async function OneToOneDetailPage({ params }: { params: Promise<{
           </p>
         </div>
         <div className="page-header__actions">
+          {weeklyReportId ? <Link className="button button--secondary" href={`/reports/${weeklyReportId}`}>Open weekly report</Link> : null}
           <Link className="button button--secondary" href="/performance/actions">Open action log</Link>
           {canManage && (detail.status === "finalised" || detail.status === "acknowledged") ? (
             <form action={reopenOneToOne} className="reopen-form">
