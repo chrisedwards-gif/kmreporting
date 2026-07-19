@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { TrainingTracker } from "@/components/trackers/training-tracker";
 import { requireRole } from "@/lib/auth/dal";
 import { getTrackerSites, getTrainingRecords } from "@/lib/data/trackers";
@@ -7,8 +8,9 @@ export const metadata = { title: "Team training" };
 
 export default async function TrainingPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
+  if (profile.isAccessPreview) redirect("/dashboard");
   const [records, sites] = await Promise.all([getTrainingRecords(), getTrackerSites()]);
-  const canEdit = ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview;
+  const canEdit = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
   const week = getCurrentReportingWeek();
 
   return (
