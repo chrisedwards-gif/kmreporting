@@ -1,0 +1,431 @@
+diff --git a/src/app/(app)/summary/page.tsx b/src/app/(app)/summary/page.tsx
+index 50c47ef..c59cf06 100644
+--- a/src/app/(app)/summary/page.tsx
++++ b/src/app/(app)/summary/page.tsx
+@@ -47,7 +47,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
+ 
+       {!ready && (
+         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
+-          <LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
++          <LockKeyhole aria-hidden="true" className="privacy-callout__icon" size={15} />
+           Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
+           {outstandingSiteNames.length ? ` Outstanding: ${outstandingSiteNames.join(", ")}.` : ""}
+         </div>
+@@ -59,18 +59,18 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
+           <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal partial"}</span>
+         </div>
+         <div className="panel__body">
+-          <section aria-label="Summary metrics" className="metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
++          <section aria-label="Summary metrics" className="metric-grid metric-grid--four">
+             <article className="metric-card"><div className="metric-card__label">Approved net sales</div><div className="metric-card__value">{formatCurrency(totals.sales)}</div></article>
+             <article className="metric-card"><div className="metric-card__label">{allStockAdjusted ? "Food cost" : "Food cost / spend"}</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}{approvedSites.length && !allStockAdjusted ? " · includes spend-basis sites" : ""}</div></article>
+             <article className="metric-card"><div className="metric-card__label">Staff cost</div><div className="metric-card__value">{formatPercentage(labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.labour)}</div></article>
+             <article className="metric-card"><div className="metric-card__label">Prime cost</div><div className="metric-card__value">{formatPercentage(foodPct + labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs + totals.labour)}</div></article>
+           </section>
+ 
+-          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.45rem", fontWeight: 500, margin: "1.5rem 0 1rem" }}>Approved kitchen updates</h2>
++          <h2 className="summary-section-title">Approved kitchen updates</h2>
+           <div className="stack">
+             {approvedReports.map((report) => (
+               <article className="review-item review-item--info" key={report.id}>
+-                <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
++                <div className="approval-card__top">
+                   <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
+                   <StatusBadge status={report.status} />
+                 </div>
+@@ -87,7 +87,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
+           </div>
+ 
+           <div className="privacy-callout" style={{ marginTop: "1.5rem" }}>
+-            <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
++            <CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />
+             This summary contains approved site-level totals only. Individual salaries, hourly rates and employee time entries are excluded by design.
+           </div>
+         </div>
+diff --git a/src/app/actions/one-to-ones.ts b/src/app/actions/one-to-ones.ts
+new file mode 100644
+index 0000000..548eabf
+--- /dev/null
++++ b/src/app/actions/one-to-ones.ts
+@@ -0,0 +1,138 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { z } from "zod";
++import { requireRole } from "@/lib/auth/dal";
++import { environment } from "@/lib/env";
++import { overallScore, SCORE_AREAS, type ScoreMap } from "@/lib/performance/scoring";
++import { getWeekKpis } from "@/lib/data/one-to-ones";
++import { createServerSupabaseClient } from "@/lib/supabase/server";
++
++export type OneToOneActionState = {
++  status: "idle" | "error" | "success";
++  message: string;
++  reviewId?: string;
++};
++
++const scoreSchema = z.object({
++  area: z.enum(SCORE_AREAS),
++  score: z.union([z.coerce.number().min(1).max(5), z.literal("")]),
++  evidence: z.string().max(2000).default(""),
++  developmentNote: z.string().max(2000).default(""),
++});
++
++const actionItemSchema = z.object({
++  id: z.string().default(""),
++  priority: z.enum(["high", "medium", "low"]),
++  action: z.string().max(500),
++  successMeasure: z.string().max(500).default(""),
++  owner: z.string().max(120),
++  dueDate: z.string().default(""),
++  status: z.enum(["not_started", "in_progress", "blocked", "complete", "cancelled"]).default("not_started"),
++  outcome: z.string().max(1000).default(""),
++  carriedFrom: z.string().default(""),
++});
++
++const reviewSchema = z.object({
++  managerId: z.string().uuid(),
++  weekCommencing: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
++  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
++  wins: z.record(z.string(), z.string().max(2000)),
++  kpiManual: z.record(z.string(), z.string().max(2000)),
++  summary: z.record(z.string(), z.string().max(4000)),
++  scores: z.array(scoreSchema),
++  actions: z.array(actionItemSchema).max(7, "A weekly 1-1 holds at most seven agreed actions."),
++  intent: z.enum(["save", "finalise"]),
++});
++
++const parsePayload = (formData: FormData) => {
++  const raw = JSON.parse(String(formData.get("payload") ?? "{}"));
++  return reviewSchema.safeParse(raw);
++};
++
++export async function saveOneToOne(
++  _previous: OneToOneActionState,
++  formData: FormData,
++): Promise<OneToOneActionState> {
++  await requireRole(["admin", "group_manager"]);
++  if (environment.isDemo) {
++    return { status: "error", message: "1-1 reviews cannot be saved in the demo workspace." };
++  }
++  const parsed = parsePayload(formData);
++  if (!parsed.success) {
++    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the highlighted fields." };
++  }
++  const input = parsed.data;
++
++  const scoreMap: ScoreMap = {};
++  for (const item of input.scores) {
++    if (item.score !== "") scoreMap[item.area] = item.score;
++  }
++
++  if (input.intent === "finalise") {
++    const lowWithoutNote = input.scores.find(
++      (item) => item.score !== "" && item.score < 3 && !item.developmentNote.trim(),
++    );
++    if (lowWithoutNote) {
++      return { status: "error", message: `A score below 3 for ${lowWithoutNote.area.replaceAll("_", " ")} needs a development note before finalising.` };
++    }
++    const missingOwner = input.actions.find((item) => item.action.trim() && (!item.owner.trim() || !item.dueDate));
++    if (missingOwner) {
++      return { status: "error", message: "Every agreed action needs an owner and a due date before finalising." };
++    }
++  }
++
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return { status: "error", message: "The database connection is unavailable." };
++
++  const { data: reviewId, error } = await supabase.rpc("save_one_to_one", {
++    payload: {
++      managerId: input.managerId,
++      weekCommencing: input.weekCommencing,
++      reviewDate: input.reviewDate,
++      wins: input.wins,
++      kpiManual: input.kpiManual,
++      summary: input.summary,
++      scores: input.scores.map((item) => ({ ...item, score: item.score === "" ? "" : String(item.score) })),
++      actions: input.actions.filter((item) => item.action.trim()),
++    },
++  });
++  if (error) {
++    return { status: "error", message: error.message.includes("finalised") ? error.message : "The review could not be saved." };
++  }
++
++  if (input.intent === "finalise") {
++    const { data: manager } = await supabase.from("managers").select("site_id").eq("id", input.managerId).maybeSingle();
++    const kpis = await getWeekKpis(manager?.site_id ?? null, input.weekCommencing);
++    const overall = overallScore(scoreMap);
++    const { error: finaliseError } = await supabase.rpc("finalise_one_to_one", {
++      target_review: reviewId,
++      kpi_snapshot: { ...kpis, manual: input.kpiManual },
++      overall,
++    });
++    if (finaliseError) return { status: "error", message: finaliseError.message };
++    revalidatePath("/one-to-ones");
++    return { status: "success", message: "Review finalised and locked.", reviewId };
++  }
++
++  revalidatePath("/one-to-ones");
++  return { status: "success", message: "Draft saved.", reviewId };
++}
++
++export async function acknowledgeOneToOne(formData: FormData) {
++  const reviewId = z.string().uuid().parse(formData.get("reviewId"));
++  const supabase = await createServerSupabaseClient();
++  if (!supabase || environment.isDemo) return;
++  await supabase.rpc("acknowledge_one_to_one", { target_review: reviewId });
++  revalidatePath(`/one-to-ones/${reviewId}`);
++}
++
++export async function reopenOneToOne(formData: FormData) {
++  await requireRole(["admin", "group_manager"]);
++  const reviewId = z.string().uuid().parse(formData.get("reviewId"));
++  const reason = z.string().min(3, "A reason is required.").parse(formData.get("reason"));
++  const supabase = await createServerSupabaseClient();
++  if (!supabase || environment.isDemo) return;
++  await supabase.rpc("reopen_one_to_one", { target_review: reviewId, reason });
++  revalidatePath(`/one-to-ones/${reviewId}`);
++}
+diff --git a/src/app/globals.css b/src/app/globals.css
+index e09fe6d..b7406da 100644
+--- a/src/app/globals.css
++++ b/src/app/globals.css
+@@ -1831,3 +1831,218 @@ textarea.field__input {
+   margin-right: 0.4rem;
+   vertical-align: text-bottom;
+ }
++
++.summary-section-title {
++  font-family: var(--font-sans), ui-sans-serif;
++  font-size: 1.35rem;
++  font-weight: 700;
++  letter-spacing: -0.015em;
++  margin: 1.5rem 0 1rem;
++}
++
++.metric-grid--four {
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++}
++
++.manager-grid {
++  display: grid;
++  gap: 1.25rem;
++  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
++  margin-bottom: 1.5rem;
++}
++
++.manager-card__focus {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.35rem;
++  margin-bottom: 0.9rem;
++}
++
++.manager-card__stats {
++  color: var(--ink-600);
++  display: flex;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.72rem;
++  gap: 1.1rem;
++  margin-bottom: 1rem;
++}
++
++.manager-card__stat--overdue {
++  color: var(--red);
++}
++
++.score-pill {
++  border-radius: 0.45rem;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.78rem;
++  font-weight: 600;
++  padding: 0.3rem 0.55rem;
++}
++
++.score-pill--green { background: rgb(31 122 90 / 12%); color: var(--sage); }
++.score-pill--amber { background: rgb(176 119 19 / 12%); color: var(--amber); }
++.score-pill--red { background: rgb(187 59 48 / 12%); color: var(--red); }
++.score-pill--neutral { background: var(--paper); color: var(--ink-600); }
++
++.rag-chip {
++  border-radius: 0.4rem;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.62rem;
++  font-weight: 600;
++  letter-spacing: 0.04em;
++  padding: 0.22rem 0.45rem;
++  text-transform: uppercase;
++  white-space: nowrap;
++}
++
++.rag-chip--green { background: rgb(31 122 90 / 12%); color: var(--sage); }
++.rag-chip--amber { background: rgb(176 119 19 / 14%); color: var(--amber); }
++.rag-chip--red { background: rgb(187 59 48 / 12%); color: var(--red); }
++.rag-chip--neutral { background: var(--paper); color: var(--ink-600); }
++
++.kpi-grid {
++  display: grid;
++  gap: 0.6rem;
++  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
++  margin-bottom: 1rem;
++}
++
++.kpi-row {
++  align-items: center;
++  background: #f7f9f6;
++  border: 1px solid var(--line);
++  border-radius: 0.6rem;
++  display: flex;
++  gap: 0.6rem;
++  justify-content: space-between;
++  padding: 0.7rem 0.9rem;
++}
++
++.kpi-row span:first-child {
++  color: var(--ink-600);
++  font-size: 0.75rem;
++  font-weight: 650;
++}
++
++.kpi-row strong {
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.9rem;
++  font-variant-numeric: tabular-nums;
++}
++
++.score-list {
++  display: grid;
++  gap: 0.9rem;
++}
++
++.score-row {
++  border: 1px solid var(--line);
++  border-radius: 0.6rem;
++  padding: 0.9rem;
++}
++
++.score-row__head {
++  align-items: center;
++  display: flex;
++  gap: 1rem;
++  justify-content: space-between;
++  margin-bottom: 0.7rem;
++}
++
++.score-row__label {
++  font-size: 0.88rem;
++  font-weight: 700;
++}
++
++.score-row__scale {
++  display: flex;
++  gap: 0.35rem;
++}
++
++.score-dot {
++  background: var(--paper);
++  border: 1px solid var(--line);
++  border-radius: 0.45rem;
++  color: var(--ink-600);
++  cursor: pointer;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.75rem;
++  font-weight: 600;
++  height: 2.1rem;
++  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
++  width: 2.1rem;
++}
++
++.score-dot:hover:not(:disabled) {
++  transform: translateY(-1px);
++}
++
++.score-dot--active {
++  border-color: transparent;
++  color: #fff;
++}
++
++.score-dot--active.score-dot--green { background: var(--sage); }
++.score-dot--active.score-dot--amber { background: var(--amber); }
++.score-dot--active.score-dot--red { background: var(--red); }
++
++.carry-row {
++  align-items: center;
++  border: 1px dashed #cbd3cc;
++  border-radius: 0.6rem;
++  display: flex;
++  gap: 1rem;
++  justify-content: space-between;
++  padding: 0.8rem 0.9rem;
++}
++
++.carry-row__action {
++  font-size: 0.85rem;
++  font-weight: 650;
++}
++
++.carry-row__meta {
++  color: var(--ink-600);
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.68rem;
++  margin-top: 0.2rem;
++}
++
++.action-editor {
++  border: 1px solid var(--line);
++  border-left: 4px solid var(--line);
++  border-radius: 0.6rem;
++  margin-bottom: 0.9rem;
++  padding: 0.9rem;
++  position: relative;
++}
++
++.action-editor--priority {
++  border-left-color: var(--coral);
++}
++
++.action-editor__remove {
++  position: absolute;
++  right: 0.6rem;
++  top: 0.6rem;
++}
++
++.email-preview {
++  background: #f7f9f6;
++  border: 1px solid var(--line);
++  border-radius: 0.6rem;
++  font-family: var(--font-mono), ui-monospace;
++  font-size: 0.78rem;
++  line-height: 1.6;
++  padding: 1.1rem;
++  white-space: pre-wrap;
++}
++
++.report-row--slim {
++  grid-template-columns: minmax(12rem, 2fr) minmax(6rem, 1fr) auto;
++}
++
++.reopen-form {
++  display: flex;
++  gap: 0.5rem;
++}
+diff --git a/src/components/app-shell.tsx b/src/components/app-shell.tsx
+index a506ca0..4ededc2 100644
+--- a/src/components/app-shell.tsx
++++ b/src/components/app-shell.tsx
+@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
+ import { useState } from "react";
+ import {
+   BarChart3,
++  UsersRound,
+   BellRing,
+   ChefHat,
+   ClipboardList,
+@@ -24,6 +25,7 @@ import { signOut } from "@/app/actions/auth";
+ const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
+   { href: "/dashboard", label: "Group overview", icon: BarChart3 },
+   { href: "/reports", label: "Weekly reports", icon: ClipboardList },
++  { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: ["admin", "group_manager", "finance", "viewer"] },
+   { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
+   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
+   { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },
