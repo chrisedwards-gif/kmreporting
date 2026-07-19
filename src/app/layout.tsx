@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./uat006.css";
 import "./uat008.css";
+import "./uat009.css";
 
 export const metadata: Metadata = {
   title: {
@@ -18,10 +19,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <head>
         <link href="https://fonts.googleapis.com" rel="preconnect" />
         <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-        />
+        <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body>{children}</body>
     </html>
