@@ -6,9 +6,9 @@ import { getCurrentReportingWeek } from "@/lib/reporting/periods";
 export const metadata = { title: "Team training" };
 
 export default async function TrainingPage() {
-  const profile = await requireRole(["admin", "group_manager", "finance", "viewer", "kitchen_manager"]);
+  const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
   const [records, sites] = await Promise.all([getTrainingRecords(), getTrackerSites()]);
-  const canEdit = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
+  const canEdit = ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview;
   const week = getCurrentReportingWeek();
 
   return (
