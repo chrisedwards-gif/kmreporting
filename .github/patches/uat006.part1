@@ -1,0 +1,90 @@
+From c4aa47522a8a9814fb2f8c07fedcc33ab5054495 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.local>
+Date: Sat, 18 Jul 2026 23:19:36 +0000
+Subject: [PATCH] Redesign the visual system: The Pass
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Replaces the templated cream/serif/coral look with an identity grounded in
+the product's own world — a back-of-house instrument for service.
+
+- Palette: deep spruce shell (evolving the sage heritage), porcelain
+  content surface, and a flame accent reserved for primary actions and the
+  live signal. Semantic sage/amber/red recalibrated for AA contrast; the
+  primary CTA gradient is bottom-weighted so white text holds contrast.
+- Typography: Archivo (signage grotesque) replaces Georgia for display and
+  Inter for UI; Spline Sans Mono sets every figure — currency, percentages,
+  dates, statuses, site codes, step markers, table headers — as the docket
+  voice with tabular numerals. Fonts load via preconnected stylesheet links
+  so builds never depend on a font fetch.
+- Signature: weekly report rows are rail dockets — status spine, punched
+  hole, lift on hover. Metric cards get a staggered entrance (reduced
+  motion respected) and hover elevation.
+- Global :focus-visible ring, refined buttons with pressed states, quieter
+  chips/badges, spruce login hero with a distant flame ember, and the last
+  inline Georgia heading moved into the design system.
+---
+ src/app/(app)/approvals/page.tsx          |   2 +-
+ src/app/(app)/costs/page.tsx              |   6 +-
+ src/app/(app)/dashboard/page.tsx          |  14 +-
+ src/app/(app)/reports/[reportId]/page.tsx |   6 +-
+ src/app/(app)/settings/sites/page.tsx     |   2 +-
+ src/app/(app)/summary/page.tsx            |   2 +-
+ src/app/auth/confirm/page.tsx             |   2 +-
+ src/app/auth/forgot-password/page.tsx     |   2 +-
+ src/app/auth/set-password/page.tsx        |   2 +-
+ src/app/globals.css                       | 318 +++++++++++++++-------
+ src/app/layout.tsx                        |   9 +
+ src/app/login/page.tsx                    |   2 +-
+ src/components/dashboard/cost-chart.tsx   |   6 +-
+ 13 files changed, 250 insertions(+), 123 deletions(-)
+
+diff --git a/src/app/(app)/approvals/page.tsx b/src/app/(app)/approvals/page.tsx
+index ff994c1..baad574 100644
+--- a/src/app/(app)/approvals/page.tsx
++++ b/src/app/(app)/approvals/page.tsx
+@@ -36,7 +36,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
+ 
+       <div className="dashboard-grid">
+         <section className="panel">
+-          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} waiting for approval · {outstanding.length} not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
++          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} waiting for approval · {outstanding.length} not submitted</p></div><ShieldAlert aria-hidden="true" color="#b07713" size={19} /></div>
+           <div className="panel__body">
+             <div className="report-list">
+               {pending.map((report) => (
+diff --git a/src/app/(app)/costs/page.tsx b/src/app/(app)/costs/page.tsx
+index 77acbb2..de36332 100644
+--- a/src/app/(app)/costs/page.tsx
++++ b/src/app/(app)/costs/page.tsx
+@@ -21,9 +21,9 @@ export default async function CostsPage() {
+       </header>
+ 
+       <section aria-label="Privacy model" className="metric-grid metric-grid--three">
+-        <article className="metric-card" style={{ "--accent": "#1e2e35" } as React.CSSProperties}><LockKeyhole aria-hidden="true" color="#1e2e35" size={22} /><div className="metric-card__value metric-card__value--compact">Aggregate labour</div><div className="metric-card__note">Site total only; no personal rates</div></article>
+-        <article className="metric-card" style={{ "--accent": "#2d7a62" } as React.CSSProperties}><DatabaseZap aria-hidden="true" color="#2d7a62" size={22} /><div className="metric-card__value metric-card__value--compact">Source-controlled</div><div className="metric-card__note">RotaCloud upload, manual or private API</div></article>
+-        <article className="metric-card" style={{ "--accent": "#eb6b4f" } as React.CSSProperties}><EyeOff aria-hidden="true" color="#eb6b4f" size={22} /><div className="metric-card__value metric-card__value--compact">Safe snapshots</div><div className="metric-card__note">Site total and percentage only</div></article>
++        <article className="metric-card" style={{ "--accent": "#0f2019" } as React.CSSProperties}><LockKeyhole aria-hidden="true" color="#0f2019" size={22} /><div className="metric-card__value metric-card__value--compact">Aggregate labour</div><div className="metric-card__note">Site total only; no personal rates</div></article>
++        <article className="metric-card" style={{ "--accent": "#1f7a5a" } as React.CSSProperties}><DatabaseZap aria-hidden="true" color="#1f7a5a" size={22} /><div className="metric-card__value metric-card__value--compact">Source-controlled</div><div className="metric-card__note">RotaCloud upload, manual or private API</div></article>
++        <article className="metric-card" style={{ "--accent": "#e8501c" } as React.CSSProperties}><EyeOff aria-hidden="true" color="#e8501c" size={22} /><div className="metric-card__value metric-card__value--compact">Safe snapshots</div><div className="metric-card__note">Site total and percentage only</div></article>
+       </section>
+ 
+       <section className="panel">
+diff --git a/src/app/(app)/dashboard/page.tsx b/src/app/(app)/dashboard/page.tsx
+index ace3cb2..861e771 100644
+--- a/src/app/(app)/dashboard/page.tsx
++++ b/src/app/(app)/dashboard/page.tsx
+@@ -56,12 +56,12 @@ export default async function DashboardPage() {
+       </header>
+ 
+       <section aria-label="Group metrics" className="metric-grid">
+-        <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
+-        <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)} · target ≤ ${formatPercentage(foodTarget)}${allStockAdjusted ? "" : " · mixed basis"}`} overTarget={hasSales && foodCostPct > foodTarget} value={formatPercentage(foodCostPct)} />
+-        <MetricCard accent="#2d7a62" label="Staff cost" note={`${formatCurrency(totals.staffCost)} · target ≤ ${formatPercentage(labourTarget)}`} overTarget={hasSales && labourPct > labourTarget} value={formatPercentage(labourPct)} />
+-        <MetricCard accent="#c78324" label="Waste" note={`${formatCurrency(totals.wasteCost)} · target ≤ ${formatPercentage(wasteTarget)}`} overTarget={hasSales && wastePct > wasteTarget} value={formatPercentage(wastePct)} />
+-        <MetricCard accent="#1e2e35" label="Prime cost" note={formatCurrency(totals.cogs + totals.staffCost)} value={formatPercentage(primeCostPct)} />
+-        <MetricCard accent="#b93f35" label="Review queue" note="Approval blocks sharing" value={`${reviewFlags.length}`} />
++        <MetricCard accent="#1f7a5a" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
++        <MetricCard accent="#e8501c" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)} · target ≤ ${formatPercentage(foodTarget)}${allStockAdjusted ? "" : " · mixed basis"}`} overTarget={hasSales && foodCostPct > foodTarget} value={formatPercentage(foodCostPct)} />
++        <MetricCard accent="#1f7a5a" label="Staff cost" note={`${formatCurrency(totals.staffCost)} · target ≤ ${formatPercentage(labourTarget)}`} overTarget={hasSales && labourPct > labourTarget} value={formatPercentage(labourPct)} />
++        <MetricCard accent="#b07713" label="Waste" note={`${formatCurrency(totals.wasteCost)} · target ≤ ${for
