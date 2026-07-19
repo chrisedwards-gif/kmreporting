@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
+import { getWeekKpis } from "@/lib/data/one-to-ones";
 import { environment } from "@/lib/env";
 import { overallScore, SCORE_AREAS, type ScoreMap } from "@/lib/performance/scoring";
-import { getWeekKpis } from "@/lib/data/one-to-ones";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type OneToOneActionState = {
@@ -34,7 +34,7 @@ const actionItemSchema = z.object({
 });
 
 const reviewSchema = z.object({
-  managerId: z.string().uuid(),
+  assignmentId: z.string().uuid(),
   weekCommencing: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   wins: z.record(z.string(), z.string().max(2000)),
@@ -46,8 +46,12 @@ const reviewSchema = z.object({
 });
 
 const parsePayload = (formData: FormData) => {
-  const raw = JSON.parse(String(formData.get("payload") ?? "{}"));
-  return reviewSchema.safeParse(raw);
+  try {
+    const raw = JSON.parse(String(formData.get("payload") ?? "{}"));
+    return reviewSchema.safeParse(raw);
+  } catch {
+    return reviewSchema.safeParse({});
+  }
 };
 
 export async function saveOneToOne(
@@ -80,6 +84,9 @@ export async function saveOneToOne(
     if (missingOwner) {
       return { status: "error", message: "Every agreed action needs an owner and a due date before finalising." };
     }
+    if (["amber", "red"].includes(input.kpiManual.compliance ?? "") && !input.kpiManual.complianceAction?.trim()) {
+      return { status: "error", message: "Amber or red compliance needs a corrective action before finalising." };
+    }
   }
 
   const supabase = await createServerSupabaseClient();
@@ -87,7 +94,7 @@ export async function saveOneToOne(
 
   const { data: reviewId, error } = await supabase.rpc("save_one_to_one", {
     payload: {
-      managerId: input.managerId,
+      assignmentId: input.assignmentId,
       weekCommencing: input.weekCommencing,
       reviewDate: input.reviewDate,
       wins: input.wins,
@@ -97,13 +104,21 @@ export async function saveOneToOne(
       actions: input.actions.filter((item) => item.action.trim()),
     },
   });
-  if (error) {
-    return { status: "error", message: error.message.includes("finalised") ? error.message : "The review could not be saved." };
+  if (error || typeof reviewId !== "string") {
+    const safeMessage = error?.message ?? "The review could not be saved.";
+    return {
+      status: "error",
+      message: safeMessage.includes("finalised") || safeMessage.includes("assigned") ? safeMessage : "The review could not be saved.",
+    };
   }
 
   if (input.intent === "finalise") {
-    const { data: manager } = await supabase.from("managers").select("site_id").eq("id", input.managerId).maybeSingle();
-    const kpis = await getWeekKpis(manager?.site_id ?? null, input.weekCommencing);
+    const { data: assignment } = await supabase
+      .from("site_manager_assignments")
+      .select("site_id")
+      .eq("id", input.assignmentId)
+      .maybeSingle();
+    const kpis = await getWeekKpis(assignment?.site_id ?? null, input.weekCommencing);
     const overall = overallScore(scoreMap);
     const { error: finaliseError } = await supabase.rpc("finalise_one_to_one", {
       target_review: reviewId,
@@ -112,10 +127,12 @@ export async function saveOneToOne(
     });
     if (finaliseError) return { status: "error", message: finaliseError.message };
     revalidatePath("/one-to-ones");
+    revalidatePath(`/one-to-ones/${reviewId}`);
     return { status: "success", message: "Review finalised and locked.", reviewId };
   }
 
   revalidatePath("/one-to-ones");
+  revalidatePath(`/one-to-ones/${reviewId}`);
   return { status: "success", message: "Draft saved.", reviewId };
 }
 
@@ -124,6 +141,7 @@ export async function acknowledgeOneToOne(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   if (!supabase || environment.isDemo) return;
   await supabase.rpc("acknowledge_one_to_one", { target_review: reviewId });
+  revalidatePath("/one-to-ones");
   revalidatePath(`/one-to-ones/${reviewId}`);
 }
 
@@ -134,5 +152,6 @@ export async function reopenOneToOne(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   if (!supabase || environment.isDemo) return;
   await supabase.rpc("reopen_one_to_one", { target_review: reviewId, reason });
+  revalidatePath("/one-to-ones");
   revalidatePath(`/one-to-ones/${reviewId}`);
 }
