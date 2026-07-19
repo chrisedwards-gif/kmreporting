@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus, ClipboardCheck, Flame } from "lucide-react";
+import { CalendarPlus, ClipboardCheck, Flame, Link2 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/dal";
 import { getManagers, getOneToOnes, getOpenActions } from "@/lib/data/one-to-ones";
@@ -20,8 +20,9 @@ const reviewStatusMap = {
 export default async function OneToOnesPage() {
   await requireRole(["admin", "group_manager", "finance", "viewer"]);
   const [managers, reviews] = await Promise.all([getManagers(), getOneToOnes()]);
+  const uniqueManagerIds = [...new Set(managers.map((manager) => manager.id))];
   const openActionsByManager = new Map(
-    await Promise.all(managers.map(async (manager) => [manager.id, await getOpenActions(manager.id)] as const)),
+    await Promise.all(uniqueManagerIds.map(async (managerId) => [managerId, await getOpenActions(managerId)] as const)),
   );
   const week = getLatestCompletedReportingWeek();
   const today = new Date().toISOString().slice(0, 10);
@@ -33,7 +34,7 @@ export default async function OneToOnesPage() {
           <p className="page-header__eyebrow">Performance</p>
           <h1 className="page-header__title">Manager 1-1s.</h1>
           <p className="page-header__copy">
-            One weekly conversation per manager: wins, the numbers they already reported, evidence-based scores and a live action log that never loses an item.
+            Each card comes from the kitchen&apos;s current primary-manager assignment. The person UUID is their login UUID; the assignment supplies the kitchen and preserves every previous manager&apos;s history.
           </p>
         </div>
       </header>
@@ -41,12 +42,14 @@ export default async function OneToOnesPage() {
       <div className="manager-grid">
         {managers.map((manager) => {
           const managerReviews = reviews.filter((review) => review.managerId === manager.id);
+          const assignmentReviews = reviews.filter((review) => review.assignmentId === manager.assignmentId);
           const latestScored = managerReviews.find((review) => review.overallScore !== null);
           const openActions = openActionsByManager.get(manager.id) ?? [];
           const overdue = openActions.filter((item) => isActionOverdue(item.dueDate, item.status, today)).length;
-          const currentWeekReview = managerReviews.find((review) => review.weekCommencing === week.start);
+          const currentWeekReview = assignmentReviews.find((review) => review.weekCommencing === week.start);
+          const assignedForWeek = manager.assignmentStartsOn <= week.end && (!manager.assignmentEndsOn || manager.assignmentEndsOn >= week.start);
           return (
-            <section className="panel manager-card" key={manager.id}>
+            <section className="panel manager-card" key={manager.assignmentId}>
               <div className="panel__header">
                 <div>
                   <h2 className="panel__title">{manager.fullName}</h2>
@@ -57,11 +60,14 @@ export default async function OneToOnesPage() {
                 )}
               </div>
               <div className="panel__body">
-                <div className="manager-card__focus">
-                  {manager.focusAreas.slice(0, 6).map((area) => (
-                    <span className="source-chip" key={area}>{area}</span>
-                  ))}
-                </div>
+                <div className="manager-card__identity"><Link2 aria-hidden="true" size={14} /> One login identity · assigned from {formatDate(manager.assignmentStartsOn)}</div>
+                {manager.focusAreas.length ? (
+                  <div className="manager-card__focus">
+                    {manager.focusAreas.slice(0, 6).map((area) => (
+                      <span className="source-chip" key={area}>{area}</span>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="manager-card__stats">
                   <span><strong>{openActions.length}</strong> open actions</span>
                   <span className={overdue ? "manager-card__stat--overdue" : ""}><strong>{overdue}</strong> overdue</span>
@@ -71,10 +77,12 @@ export default async function OneToOnesPage() {
                   <Link className="button button--secondary" href={`/one-to-ones/${currentWeekReview.id}`}>
                     <ClipboardCheck aria-hidden="true" size={16} /> Open this week&apos;s 1-1
                   </Link>
-                ) : (
-                  <Link className="button button--primary" href={`/one-to-ones/new?manager=${manager.id}`}>
+                ) : assignedForWeek ? (
+                  <Link className="button button--primary" href={`/one-to-ones/new?assignment=${manager.assignmentId}`}>
                     <CalendarPlus aria-hidden="true" size={16} /> Start 1-1 for w/c {formatDate(week.start)}
                   </Link>
+                ) : (
+                  <div className="privacy-callout">This manager started after the latest completed reporting week. Their first 1-1 will open once a full assigned week has completed.</div>
                 )}
               </div>
             </section>
@@ -83,15 +91,15 @@ export default async function OneToOnesPage() {
         {!managers.length && (
           <section className="panel empty-state">
             <Flame aria-hidden="true" size={22} />
-            <h2>No managers yet.</h2>
-            <p>Seed the manager records (see supabase/seed_performance.sql) or add them in the database to start running weekly 1-1s.</p>
+            <h2>No primary kitchen managers assigned.</h2>
+            <p>Open Sites & access and assign one primary manager to each kitchen. Their existing login UUID becomes the person record automatically.</p>
           </section>
         )}
       </div>
 
       {reviews.length > 0 && (
         <section className="panel">
-          <div className="panel__header"><div><h2 className="panel__title">Review history</h2><p className="panel__subtitle">Finalised reviews are locked and acknowledged by the manager</p></div></div>
+          <div className="panel__header"><div><h2 className="panel__title">Review history</h2><p className="panel__subtitle">Manager changes do not rewrite previous reviews</p></div></div>
           <div className="report-list">
             {reviews.map((review) => (
               <Link className="report-row report-row--slim" href={`/one-to-ones/${review.id}`} key={review.id}>
@@ -99,7 +107,7 @@ export default async function OneToOnesPage() {
                   <div className="site-cell__mark">{review.managerName.split(" ").map((part) => part[0]).join("").slice(0, 2)}</div>
                   <div>
                     <div className="site-cell__name">{review.managerName}</div>
-                    <div className="site-cell__manager">Week commencing {formatDate(review.weekCommencing)}</div>
+                    <div className="site-cell__manager">{review.siteName} · Week commencing {formatDate(review.weekCommencing)}</div>
                   </div>
                 </div>
                 <div>
