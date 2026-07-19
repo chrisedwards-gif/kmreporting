@@ -140,7 +140,7 @@ with membership_candidates as (
     s.id as site_id,
     sm.user_id as manager_profile_id,
     coalesce(
-      s.reporting_start_date,
+      s.reporting_start_date - extract(dow from s.reporting_start_date)::integer,
       current_date - extract(dow from current_date)::integer
     ) as starts_on,
     count(*) over (partition by s.id) as manager_count
