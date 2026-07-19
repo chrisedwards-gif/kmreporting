@@ -47,25 +47,34 @@ export async function createSite(
   }
 
   const profile = await requireRole(["admin"]);
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) return { status: "error", message: "The database connection is unavailable." };
 
-  const { data: createdSite, error } = await supabase.from("sites").insert({
-    organisation_id: profile.organisationId,
-    name: parsed.data.name,
-    code: parsed.data.code,
-    active: true,
-    reporting_start_date: parsed.data.reportingStartDate,
-    food_cost_target: parsed.data.foodCostTarget,
-    labour_target: parsed.data.labourTarget,
-    waste_target: parsed.data.wasteTarget,
-  }).select("id").single();
-
-  if (error?.code === "23505") return { status: "error", message: "That site code is already in use." };
-  if (error) return { status: "error", message: "The kitchen could not be created. Please try again." };
   try {
-    await createAdminClient().from("audit_log").insert({ organisation_id: profile.organisationId, actor_id: profile.id, action: "site.created", entity_type: "site", entity_id: createdSite.id, detail: { code: parsed.data.code } });
-  } catch { /* Site creation remains RLS-protected if audit delivery is temporarily unavailable. */ }
+    const admin = createAdminClient();
+    const { data: createdSite, error } = await admin.from("sites").insert({
+      organisation_id: profile.organisationId,
+      name: parsed.data.name,
+      code: parsed.data.code,
+      active: true,
+      reporting_start_date: parsed.data.reportingStartDate,
+      food_cost_target: parsed.data.foodCostTarget,
+      labour_target: parsed.data.labourTarget,
+      waste_target: parsed.data.wasteTarget,
+    }).select("id").single();
+
+    if (error?.code === "23505") return { status: "error", message: "That site code is already in use." };
+    if (error || !createdSite) return { status: "error", message: "The kitchen could not be created. Please try again." };
+
+    await admin.from("audit_log").insert({
+      organisation_id: profile.organisationId,
+      actor_id: profile.id,
+      action: "site.created",
+      entity_type: "site",
+      entity_id: createdSite.id,
+      detail: { code: parsed.data.code },
+    });
+  } catch {
+    return { status: "error", message: "The kitchen could not be created because the server-side database connection is unavailable." };
+  }
 
   revalidatePath("/settings/sites");
   revalidatePath("/reports/new");
@@ -81,60 +90,74 @@ export async function updateSite(
   const parsed = updateSiteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the kitchen details." };
   const profile = await requireRole(["admin"]);
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) return { status: "error", message: "The database connection is unavailable." };
 
-  const { data: currentSite, error: currentError } = await supabase
-    .from("sites")
-    .select("id, active, reporting_start_date, reporting_end_date")
-    .eq("id", parsed.data.siteId)
-    .eq("organisation_id", profile.organisationId)
-    .maybeSingle();
-  if (currentError || !currentSite) return { status: "error", message: "That kitchen could not be found." };
-
-  const nextActive = parsed.data.active === "true";
-  const reactivating = nextActive && !currentSite.active;
-  const deactivating = !nextActive && currentSite.active;
-  const today = new Date().toISOString().slice(0, 10);
-  const reportingStartDate = reactivating ? getCurrentReportingWeek().start : currentSite.reporting_start_date;
-  const reportingEndDate = nextActive
-    ? null
-    : deactivating
-      ? today
-      : currentSite.reporting_end_date ?? today;
-
-  const { data: updatedSite, error } = await supabase.from("sites").update({
-    name: parsed.data.name,
-    code: parsed.data.code,
-    active: nextActive,
-    reporting_start_date: reportingStartDate,
-    reporting_end_date: reportingEndDate,
-    food_cost_target: parsed.data.foodCostTarget,
-    labour_target: parsed.data.labourTarget,
-    waste_target: parsed.data.wasteTarget,
-    updated_at: new Date().toISOString(),
-  }).eq("id", parsed.data.siteId).eq("organisation_id", profile.organisationId).select("id").maybeSingle();
-
-  if (error?.code === "23505") return { status: "error", message: "That site code is already in use." };
-  if (error || !updatedSite) return { status: "error", message: "The kitchen settings could not be saved." };
   try {
-    await createAdminClient().from("audit_log").insert({
+    const admin = createAdminClient();
+    const { data: currentSite, error: currentError } = await admin
+      .from("sites")
+      .select("id, active, reporting_start_date, reporting_end_date")
+      .eq("id", parsed.data.siteId)
+      .eq("organisation_id", profile.organisationId)
+      .maybeSingle();
+    if (currentError || !currentSite) return { status: "error", message: "That kitchen could not be found." };
+
+    const nextActive = parsed.data.active === "true";
+    const reactivating = nextActive && !currentSite.active;
+    const deactivating = !nextActive && currentSite.active;
+    const today = new Date().toISOString().slice(0, 10);
+    const reportingStartDate = reactivating ? getCurrentReportingWeek().start : currentSite.reporting_start_date;
+    const reportingEndDate = nextActive
+      ? null
+      : deactivating
+        ? today
+        : currentSite.reporting_end_date ?? today;
+
+    const { data: updatedSite, error } = await admin.from("sites").update({
+      name: parsed.data.name,
+      code: parsed.data.code,
+      active: nextActive,
+      reporting_start_date: reportingStartDate,
+      reporting_end_date: reportingEndDate,
+      food_cost_target: parsed.data.foodCostTarget,
+      labour_target: parsed.data.labourTarget,
+      waste_target: parsed.data.wasteTarget,
+      updated_at: new Date().toISOString(),
+    }).eq("id", parsed.data.siteId).eq("organisation_id", profile.organisationId).select("id").maybeSingle();
+
+    if (error?.code === "23505") return { status: "error", message: "That site code is already in use." };
+    if (error || !updatedSite) return { status: "error", message: "The kitchen settings could not be saved." };
+
+    await admin.from("audit_log").insert({
       organisation_id: profile.organisationId,
       actor_id: profile.id,
       action: "site.updated",
       entity_type: "site",
       entity_id: parsed.data.siteId,
-      detail: { active: nextActive, code: parsed.data.code, reporting_start_date: reportingStartDate, reporting_end_date: reportingEndDate },
+      detail: {
+        active: nextActive,
+        code: parsed.data.code,
+        reporting_start_date: reportingStartDate,
+        reporting_end_date: reportingEndDate,
+      },
     });
-  } catch { /* The primary RLS-protected update has already succeeded. */ }
 
-  revalidatePath("/settings/sites");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
-  revalidatePath("/reports/new");
-  revalidatePath("/approvals");
-  revalidatePath("/summary");
-  return { status: "success", message: reactivating ? "Kitchen reactivated from the current reporting week." : "Kitchen settings saved." };
+    revalidatePath("/settings/sites");
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+    revalidatePath("/reports/new");
+    revalidatePath("/approvals");
+    revalidatePath("/summary");
+    return {
+      status: "success",
+      message: reactivating
+        ? "Kitchen reactivated from the current reporting week."
+        : deactivating
+          ? "Kitchen deactivated. Historical reports and manager records were preserved."
+          : "Kitchen settings saved.",
+    };
+  } catch {
+    return { status: "error", message: "The kitchen settings could not be saved because the server-side database connection is unavailable." };
+  }
 }
 
 export async function assignSiteManager(
@@ -210,6 +233,6 @@ export async function assignSiteManager(
         : "Existing manager profile set as the primary KM. Previous assignment history was preserved.",
     };
   } catch {
-    return { status: "error", message: "Manager invitations require the server-side Supabase secret in Vercel." };
+    return { status: "error", message: "Manager invitations require the server-side Supabase secret in Netlify." };
   }
 }

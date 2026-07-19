@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { ActionLogTable } from "@/components/performance/action-log-table";
 import { requireRole } from "@/lib/auth/dal";
@@ -6,7 +7,8 @@ import { getPerformanceActions } from "@/lib/data/performance";
 export const metadata = { title: "Manager action log" };
 
 export default async function PerformanceActionsPage() {
-  const profile = await requireRole(["admin", "group_manager", "finance", "viewer", "kitchen_manager"]);
+  const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
+  if (profile.isAccessPreview) redirect("/dashboard");
   const actions = await getPerformanceActions();
   const canUpdate = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
   const openCount = actions.filter((item) => !["complete", "cancelled"].includes(item.status)).length;

@@ -12,12 +12,19 @@ import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 export const metadata = { title: "Group overview" };
 
 export default async function DashboardPage() {
-  const [profile, bundle] = await Promise.all([
+  const [profile, rawBundle] = await Promise.all([
     requireSessionProfile(),
     getReportingBundle(),
   ]);
+  const bundle = profile.previewSiteId ? {
+    ...rawBundle,
+    sites: rawBundle.sites.filter((site) => site.id === profile.previewSiteId),
+    reports: rawBundle.reports.filter((report) => report.siteId === profile.previewSiteId),
+    expectedSites: rawBundle.expectedSites.filter((site) => site.id === profile.previewSiteId),
+    expectedSiteCount: rawBundle.expectedSites.some((site) => site.id === profile.previewSiteId) ? 1 : 0,
+  } : rawBundle;
   const { sites, reports, week, expectedSiteCount } = bundle;
-  const workbench = await getWorkbench(profile.role, bundle);
+  const workbench = await getWorkbench(profile.isAccessPreview ? "viewer" : profile.role, bundle);
   const totals = sites.reduce(
     (sum, site) => ({
       netSales: sum.netSales + site.netSales,
@@ -45,26 +52,24 @@ export default async function DashboardPage() {
   const labourTarget = weightedTarget((site) => site.labourTarget);
   const wasteTarget = weightedTarget((site) => site.wasteTarget);
   const hasSales = totals.netSales > 0;
+  const canCreateReport = ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview;
 
   return (
     <>
       <header className="page-header">
         <div>
-          <p className="page-header__eyebrow">Weekly management summary</p>
-          <h1 className="page-header__title">The group at a glance.</h1>
-          <p className="page-header__copy">
-            Week ending {formatDate(week.end)} · {sites.length} of {expectedSiteCount} active kitchens reported · {reviewFlags.length} checks need attention.
-          </p>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? "Kitchen Manager access preview" : "Weekly management summary"}</p>
+          <h1 className="page-header__title">{profile.isAccessPreview && profile.previewSiteName ? `${profile.previewSiteName} at a glance.` : "The group at a glance."}</h1>
+          <p className="page-header__copy">Week ending {formatDate(week.end)} · {sites.length} of {expectedSiteCount} active kitchens reported · {reviewFlags.length} checks need attention.</p>
         </div>
-        <Link className="button button--primary" href="/reports/new">
-          Start a report <ArrowRight aria-hidden="true" size={16} />
-        </Link>
+        {canCreateReport ? <Link className="button button--primary" href="/reports/new">Start a report <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
 
+      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>This is a read-only simulation of the selected Kitchen Manager reporting dashboard. Your real account remains Admin and no permissions have been changed.</div> : null}
       <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
 
       <section aria-label="Group metrics" className="metric-grid">
-        <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
+        <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />
         <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)} · target ≤ ${formatPercentage(foodTarget)}${allStockAdjusted ? "" : " · mixed basis"}`} overTarget={hasSales && foodCostPct > foodTarget} value={formatPercentage(foodCostPct)} />
         <MetricCard accent="#2d7a62" label="Staff cost" note={`${formatCurrency(totals.staffCost)} · target ≤ ${formatPercentage(labourTarget)}`} overTarget={hasSales && labourPct > labourTarget} value={formatPercentage(labourPct)} />
         <MetricCard accent="#c78324" label="Waste" note={`${formatCurrency(totals.wasteCost)} · target ≤ ${formatPercentage(wasteTarget)}`} overTarget={hasSales && wastePct > wasteTarget} value={formatPercentage(wastePct)} />
@@ -74,51 +79,11 @@ export default async function DashboardPage() {
 
       <div className="dashboard-grid">
         <div className="stack">
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <h2 className="panel__title">Site performance</h2>
-                <p className="panel__subtitle">Safe, aggregated commercial metrics only</p>
-              </div>
-              <CalendarDays aria-hidden="true" color="#5f6e68" size={19} />
-            </div>
-            <SitePerformanceTable sites={sites} />
-          </section>
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <h2 className="panel__title">Food cost / spend and labour</h2>
-                <p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p>
-              </div>
-            </div>
-            <div className="panel__body"><CostChart sites={sites} /></div>
-          </section>
+          <section className="panel"><div className="panel__header"><div><h2 className="panel__title">Site performance</h2><p className="panel__subtitle">Safe, aggregated commercial metrics only</p></div><CalendarDays aria-hidden="true" color="#5f6e68" size={19} /></div><SitePerformanceTable sites={sites} /></section>
+          <section className="panel"><div className="panel__header"><div><h2 className="panel__title">Food cost / spend and labour</h2><p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p></div></div><div className="panel__body"><CostChart sites={sites} /></div></section>
         </div>
 
-        <aside className="panel">
-          <div className="panel__header">
-            <div>
-              <h2 className="panel__title">Manual review</h2>
-              <p className="panel__subtitle">Resolve before a report can be shared</p>
-            </div>
-          </div>
-          <div className="panel__body">
-            <div className="review-list">
-              {reviewFlags.map((flag, index) => (
-                <Link
-                  className={`review-item review-item--${flag.severity}`}
-                  href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"}
-                  key={`${flag.code}-${index}`}
-                >
-                  <div className="review-item__site">{flag.siteName}</div>
-                  <div className="review-item__label">{flag.label}</div>
-                  <div className="review-item__detail">{flag.detail}</div>
-                </Link>
-              ))}
-              {!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No automated checks currently need management attention.</div> : null}
-            </div>
-          </div>
-        </aside>
+        <aside className="panel"><div className="panel__header"><div><h2 className="panel__title">Manual review</h2><p className="panel__subtitle">Resolve before a report can be shared</p></div></div><div className="panel__body"><div className="review-list">{reviewFlags.map((flag, index) => <Link className={`review-item review-item--${flag.severity}`} href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"} key={`${flag.code}-${index}`}><div className="review-item__site">{flag.siteName}</div><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></Link>)}{!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No automated checks currently need management attention.</div> : null}</div></div></aside>
       </div>
     </>
   );

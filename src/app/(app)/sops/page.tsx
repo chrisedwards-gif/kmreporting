@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { SopTracker } from "@/components/trackers/sop-tracker";
 import { requireRole } from "@/lib/auth/dal";
 import { getSops, getTrackerSites } from "@/lib/data/trackers";
@@ -5,7 +6,8 @@ import { getSops, getTrackerSites } from "@/lib/data/trackers";
 export const metadata = { title: "SOPs & systems" };
 
 export default async function SopsPage() {
-  const profile = await requireRole(["admin", "group_manager", "finance", "viewer", "kitchen_manager"]);
+  const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
+  if (profile.isAccessPreview) redirect("/dashboard");
   const [sops, sites] = await Promise.all([getSops(), getTrackerSites()]);
   const canEdit = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
 

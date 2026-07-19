@@ -19,16 +19,18 @@ const sourceLabel = (value?: string) => ({
   rotacloud_adjusted: "RotaCloud + manual adjustment",
   private_payroll: "Private payroll integration",
   provider_api: "Provider API",
+  labour_unavailable: "Labour cost unavailable",
   manual: "Manager-entered total",
 }[value ?? ""] ?? "Recorded source");
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ reportId: string }> }) {
   const { reportId } = await params;
-  const { reports } = await getReportingBundle(undefined, reportId);
+  const [{ reports }, profile] = await Promise.all([getReportingBundle(undefined, reportId), getSessionProfile()]);
   const report = reports.find((item) => item.id === reportId);
   if (!report) notFound();
-  const profile = await getSessionProfile();
+  if (profile?.previewSiteId && report.siteId !== profile.previewSiteId) notFound();
   const actionableFlags = report.costs.flags.filter((flag) => flag.severity !== "info");
+  const canEditDraft = Boolean(profile && ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview);
 
   const narrative = [
     ["Wins & guest feedback", report.wins],
@@ -50,20 +52,17 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
         </div>
         <div className="page-header__actions">
           <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> Reports</Link>
-          {report.status === "draft" ? <Link className="button button--primary" href={`/reports/new?report=${report.id}`}><Pencil aria-hidden="true" size={16} /> Continue draft</Link> : null}
+          {report.status === "draft" && canEditDraft ? <Link className="button button--primary" href={`/reports/new?report=${report.id}`}><Pencil aria-hidden="true" size={16} /> Continue draft</Link> : null}
         </div>
       </header>
 
+      {profile?.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Read-only Kitchen Manager access preview. This report cannot be edited or approved from preview mode.</div> : null}
+
       <div className="report-detail-grid">
         <section className="panel">
-          <div className="panel__header">
-            <div><h2 className="panel__title">Management update</h2><p className="panel__subtitle">Manager narrative preserved as submitted</p></div>
-            <StatusBadge status={report.status} />
-          </div>
+          <div className="panel__header"><div><h2 className="panel__title">Management update</h2><p className="panel__subtitle">Manager narrative preserved as submitted</p></div><StatusBadge status={report.status} /></div>
           <div className="narrative-grid">
-            {narrative.map(([label, value]) => (
-              <article className="narrative-item" key={label}><h3>{label}</h3><p>{value}</p></article>
-            ))}
+            {narrative.map(([label, value]) => <article className="narrative-item" key={label}><h3>{label}</h3><p>{value}</p></article>)}
           </div>
         </section>
 
@@ -74,8 +73,8 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
               <div className="cost-summary">
                 <div className="cost-summary__row"><span className="cost-summary__label">Net sales</span><span className="cost-summary__value">{formatCurrency(report.costs.netSales)}</span></div>
                 <div className="cost-summary__row"><span className="cost-summary__label">{report.costs.foodCostBasis === "stock_adjusted" ? "Stock-adjusted food cost" : "Food spend (not stock-adjusted)"}</span><span className="cost-summary__value">{formatCurrency(report.costs.cogs)} · {formatPercentage(report.costs.foodCostPct)}</span></div>
-                <div className="cost-summary__row"><span className="cost-summary__label">Staff cost</span><span className="cost-summary__value">{formatCurrency(report.costs.staffCost)} · {formatPercentage(report.costs.labourPct)}</span></div>
-                <div className="cost-summary__row"><span className="cost-summary__label">Prime cost</span><span className="cost-summary__value">{formatCurrency(report.costs.primeCost)} · {formatPercentage(report.costs.primeCostPct)}</span></div>
+                <div className="cost-summary__row"><span className="cost-summary__label">Staff cost</span><span className="cost-summary__value">{report.sources?.labour === "labour_unavailable" ? "N/A · awaiting access" : `${formatCurrency(report.costs.staffCost)} · ${formatPercentage(report.costs.labourPct)}`}</span></div>
+                <div className="cost-summary__row"><span className="cost-summary__label">Prime cost</span><span className="cost-summary__value">{report.sources?.labour === "labour_unavailable" ? "N/A until labour is available" : `${formatCurrency(report.costs.primeCost)} · ${formatPercentage(report.costs.primeCostPct)}`}</span></div>
               </div>
               <div className="privacy-callout" style={{ marginTop: "1rem" }}>Salary and hourly-rate records stay inside the private database schema. This report only stores the resulting site total.</div>
             </div>
@@ -101,22 +100,13 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
           <section className="panel">
             <div className="panel__header"><div><h2 className="panel__title">Approval gates</h2><p className="panel__subtitle">All must clear before sharing</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={18} /></div>
             <div className="panel__body">
-              {report.costs.flags.length ? (
-                <div className="review-list">
-                  {report.costs.flags.map((flag) => <div className={`review-item review-item--${flag.severity}`} key={flag.code}><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></div>)}
-                </div>
-              ) : (
-                <div className="privacy-callout"><CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />All automated checks have passed.</div>
-              )}
+              {report.costs.flags.length ? <div className="review-list">{report.costs.flags.map((flag) => <div className={`review-item review-item--${flag.severity}`} key={flag.code}><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></div>)}</div> : <div className="privacy-callout"><CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />All automated checks have passed.</div>}
             </div>
           </section>
-          {profile && roleCanApprove(profile.role) && ["submitted", "review_required", "approved", "shared"].includes(report.status) && (
-            <section className="panel">
-              <div className="panel__header"><div><h2 className="panel__title">Management decision</h2><p className="panel__subtitle">Named, timestamped and added to the audit trail</p></div></div>
-              <div className="panel__body"><ApprovalForm hasFlags={actionableFlags.length > 0} reportId={report.id} status={report.status} /></div>
-            </section>
+          {profile && !profile.isAccessPreview && roleCanApprove(profile.role) && ["submitted", "review_required", "approved", "shared"].includes(report.status) && (
+            <section className="panel"><div className="panel__header"><div><h2 className="panel__title">Management decision</h2><p className="panel__subtitle">Named, timestamped and added to the audit trail</p></div></div><div className="panel__body"><ApprovalForm hasFlags={actionableFlags.length > 0} reportId={report.id} status={report.status} /></div></section>
           )}
-          {profile && roleCanApprove(profile.role) && report.status === "draft" ? <div className="privacy-callout">This report is still a draft. It must be submitted by the kitchen before management can approve it.</div> : null}
+          {profile && !profile.isAccessPreview && roleCanApprove(profile.role) && report.status === "draft" ? <div className="privacy-callout">This report is still a draft. It must be submitted by the kitchen before management can approve it.</div> : null}
         </aside>
       </div>
     </>

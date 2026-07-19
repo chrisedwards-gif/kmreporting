@@ -8,21 +8,16 @@ import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Manager probation" };
 
 export default async function ProbationPage() {
-  await requireRole(["admin", "group_manager", "finance", "viewer"]);
+  await requireRole(["admin", "group_manager"]);
   const managers = await getProbationSummaries();
 
   return (
     <>
-      <header className="page-header">
-        <div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">Probation scorecards.</h1><p className="page-header__copy">Role-weighted scores use the latest finalised 1-1 evidence. Missing areas are ignored rather than treated as zero.</p></div>
-      </header>
+      <header className="page-header"><div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">Probation scorecards.</h1><p className="page-header__copy">Role-weighted scores use the latest finalised 1-1 evidence. Missing areas are ignored rather than treated as zero.</p></div></header>
       <div className="manager-grid">
         {managers.map((manager) => (
           <section className="panel manager-card" key={manager.managerId}>
-            <div className="panel__header">
-              <div><h2 className="panel__title">{manager.fullName}</h2><p className="panel__subtitle">{manager.roleTitle} · {manager.siteName}</p></div>
-              {manager.weightedScore !== null ? <span className={`score-pill score-pill--${scoreRag(manager.weightedScore)}`}>{manager.weightedScore.toFixed(1)}</span> : null}
-            </div>
+            <div className="panel__header"><div><h2 className="panel__title">{manager.fullName}</h2><p className="panel__subtitle">{manager.roleTitle} · {manager.siteName}</p></div>{manager.weightedScore !== null ? <span className={`score-pill score-pill--${scoreRag(manager.weightedScore)}`}>{manager.weightedScore.toFixed(1)}</span> : null}</div>
             <div className="panel__body">
               <div className="probation-stage"><CalendarClock aria-hidden="true" size={16} /><div><strong>{manager.stageLabel}</strong><span>{manager.employmentStartDate ? `Started ${formatDate(manager.employmentStartDate)}` : "Set a start date in Manager admin"}</span></div></div>
               <div className="manager-card__stats"><span><strong>{manager.reviewCount}</strong> finalised reviews</span><span><strong>{manager.latestReviewDate ? formatDate(manager.latestReviewDate) : "—"}</strong> latest evidence</span></div>
