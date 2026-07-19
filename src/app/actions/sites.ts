@@ -34,6 +34,7 @@ const assignManagerSchema = z.object({
   siteId: z.uuid(),
   fullName: z.string().trim().min(2, "Enter the manager's name.").max(120),
   email: z.email("Enter a valid work email address.").transform((value) => value.toLowerCase()),
+  effectiveFrom: z.iso.date().refine((value) => new Date(`${value}T00:00:00Z`).getUTCDay() === 0, "The manager assignment must start on a Sunday."),
 });
 
 export async function createSite(
@@ -161,6 +162,7 @@ export async function assignSiteManager(
     if (existingProfile && existingProfile.role !== "kitchen_manager") {
       return { status: "error", message: "That email already belongs to a different application role." };
     }
+
     if (!userId) {
       const origin = await getRequestOrigin();
       const { data: invitation, error: invitationError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
@@ -172,29 +174,41 @@ export async function assignSiteManager(
       }
       userId = invitation.user.id;
       invited = true;
-      const { error: profileError } = await admin.from("profiles").upsert({
-        id: userId,
-        organisation_id: profile.organisationId,
-        full_name: parsed.data.fullName,
-        notification_email: parsed.data.email,
-        role: "kitchen_manager",
-        active: true,
-      });
-      if (profileError) return { status: "error", message: "The account was invited, but its application profile could not be created." };
     }
 
-    const { error: membershipError } = await admin.from("site_memberships").upsert({
-      user_id: userId,
-      site_id: parsed.data.siteId,
-      can_submit: true,
+    const { error: profileError } = await admin.from("profiles").upsert({
+      id: userId,
+      organisation_id: profile.organisationId,
+      full_name: parsed.data.fullName,
+      notification_email: parsed.data.email,
+      role: "kitchen_manager",
+      active: true,
     });
-    if (membershipError) return { status: "error", message: "The manager account exists, but site access could not be assigned." };
+    if (profileError) return { status: "error", message: "The login exists, but its canonical application profile could not be saved." };
 
-    await admin.from("audit_log").insert({ organisation_id: profile.organisationId, actor_id: profile.id, action: "site.manager_assigned", entity_type: "site", entity_id: parsed.data.siteId, detail: { user_id: userId } });
+    const supabase = await createServerSupabaseClient();
+    if (!supabase) return { status: "error", message: "The database connection is unavailable." };
+    const { error: assignmentError } = await supabase.rpc("assign_primary_site_manager", {
+      target_site: parsed.data.siteId,
+      target_profile: userId,
+      effective_from: parsed.data.effectiveFrom,
+    });
+    if (assignmentError) {
+      const message = assignmentError.message.includes("assign_primary_site_manager")
+        ? "Apply migration 012 before assigning the primary manager."
+        : assignmentError.message;
+      return { status: "error", message };
+    }
 
     revalidatePath("/settings/sites");
     revalidatePath("/reports/new");
-    return { status: "success", message: invited ? "Manager invited and assigned to this kitchen." : "Existing manager assigned to this kitchen." };
+    revalidatePath("/one-to-ones");
+    return {
+      status: "success",
+      message: invited
+        ? "Manager invited and set as the primary KM. Their login UUID now owns future site 1-1s."
+        : "Existing manager profile set as the primary KM. Previous assignment history was preserved.",
+    };
   } catch {
     return { status: "error", message: "Manager invitations require the server-side Supabase secret in Vercel." };
   }
