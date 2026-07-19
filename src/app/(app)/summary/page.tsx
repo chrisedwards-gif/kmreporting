@@ -47,7 +47,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
 
       {!ready && (
         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
-          <LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
+          <LockKeyhole aria-hidden="true" className="privacy-callout__icon" size={15} />
           Complete group release is still locked. You can share an approved kitchen individually, or record and print a clearly labelled partial update. {missingReports ? `${missingReports} kitchen report${missingReports === 1 ? " is" : "s are"} still missing.` : "Some submitted kitchen reports are still awaiting named approval."}
           {outstandingSiteNames.length ? ` Outstanding: ${outstandingSiteNames.join(", ")}.` : ""}
         </div>
@@ -59,18 +59,18 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
           <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal partial"}</span>
         </div>
         <div className="panel__body">
-          <section aria-label="Summary metrics" className="metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+          <section aria-label="Summary metrics" className="metric-grid metric-grid--four">
             <article className="metric-card"><div className="metric-card__label">Approved net sales</div><div className="metric-card__value">{formatCurrency(totals.sales)}</div></article>
             <article className="metric-card"><div className="metric-card__label">{allStockAdjusted ? "Food cost" : "Food cost / spend"}</div><div className="metric-card__value">{formatPercentage(foodPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs)}{approvedSites.length && !allStockAdjusted ? " · includes spend-basis sites" : ""}</div></article>
             <article className="metric-card"><div className="metric-card__label">Staff cost</div><div className="metric-card__value">{formatPercentage(labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.labour)}</div></article>
             <article className="metric-card"><div className="metric-card__label">Prime cost</div><div className="metric-card__value">{formatPercentage(foodPct + labourPct)}</div><div className="metric-card__note">{formatCurrency(totals.cogs + totals.labour)}</div></article>
           </section>
 
-          <h2 style={{ fontFamily: "Georgia, serif", fontSize: "1.45rem", fontWeight: 500, margin: "1.5rem 0 1rem" }}>Approved kitchen updates</h2>
+          <h2 className="summary-section-title">Approved kitchen updates</h2>
           <div className="stack">
             {approvedReports.map((report) => (
               <article className="review-item review-item--info" key={report.id}>
-                <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+                <div className="approval-card__top">
                   <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
                   <StatusBadge status={report.status} />
                 </div>
@@ -87,7 +87,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
           </div>
 
           <div className="privacy-callout" style={{ marginTop: "1.5rem" }}>
-            <CheckCircle2 aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />
+            <CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />
             This summary contains approved site-level totals only. Individual salaries, hourly rates and employee time entries are excluded by design.
           </div>
         </div>

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
+  UsersRound,
   BellRing,
   ChefHat,
   ClipboardList,
@@ -24,6 +25,7 @@ import { signOut } from "@/app/actions/auth";
 const navItems: Array<{ href: string; label: string; icon: typeof BarChart3; roles?: AppRole[] }> = [
   { href: "/dashboard", label: "Group overview", icon: BarChart3 },
   { href: "/reports", label: "Weekly reports", icon: ClipboardList },
+  { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: ["admin", "group_manager", "finance", "viewer"] },
   { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
   { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },

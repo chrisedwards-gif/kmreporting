@@ -22,7 +22,7 @@ export default async function SitesPage() {
       </header>
 
       <section className="panel">
-        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5f6e68" size={19} /></div>
+        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5d6b63" size={19} /></div>
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
             <thead><tr><th>Kitchen</th><th>Site code</th><th>Manager</th><th>Reporting</th><th>Scoped access</th><th><span className="sr-only">Actions</span></th></tr></thead>
@@ -42,7 +42,7 @@ export default async function SitesPage() {
           </table>
         </div>
       </section>
-      <div className="privacy-callout" style={{ marginTop: "1rem" }}><LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />Pay-rate access is not assignable here. It remains a server-only finance function, separated from normal application roles.</div>
+      <div className="privacy-callout" style={{ marginTop: "1rem" }}><LockKeyhole aria-hidden="true" className="privacy-callout__icon" size={15} />Pay-rate access is not assignable here. It remains a server-only finance function, separated from normal application roles.</div>
     </>
   );
 }
