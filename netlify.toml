@@ -6,5 +6,8 @@
   NODE_VERSION = "22"
   NETLIFY_NEXT_SKEW_PROTECTION = "true"
 
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 [functions]
   node_bundler = "esbuild"
