@@ -43,28 +43,58 @@ const summaryFields: Array<[string, string]> = [
   ["chrisComments", "Chris comments"],
 ];
 
-type ScoreRow = { area: (typeof SCORE_AREAS)[number]; score: string; evidence: string; developmentNote: string };
-type ActionRow = { id: string; priority: "high" | "medium" | "low"; action: string; successMeasure: string; owner: string; dueDate: string; status: ManagerAction["status"]; outcome: string; carriedFrom: string };
+type ScoreRow = {
+  area: (typeof SCORE_AREAS)[number];
+  score: string;
+  evidence: string;
+  developmentNote: string;
+};
+
+type ActionRow = {
+  id: string;
+  priority: "high" | "medium" | "low";
+  action: string;
+  successMeasure: string;
+  owner: string;
+  dueDate: string;
+  status: ManagerAction["status"];
+  outcome: string;
+  carriedFrom: string;
+};
 
 const ragChip = (rag: Rag, label?: string) => (
   <span className={`rag-chip rag-chip--${rag}`}>{label ?? rag}</span>
 );
 
+const toActionRow = (item: ManagerAction): ActionRow => ({
+  id: item.id,
+  priority: item.priority,
+  action: item.action,
+  successMeasure: item.successMeasure,
+  owner: item.owner,
+  dueDate: item.dueDate ?? "",
+  status: item.status,
+  outcome: item.outcome,
+  carriedFrom: "",
+});
+
 const initialState: OneToOneActionState = { status: "idle", message: "" };
 
 export function OneToOneForm({
+  assignmentId,
   detail,
+  initialActions,
   kpis,
   managerFirstName,
-  managerId,
   managerName,
   openActions,
   weekCommencing,
 }: {
+  assignmentId: string;
   detail: OneToOneDetail | null;
+  initialActions: ManagerAction[];
   kpis: WeekKpis;
   managerFirstName: string;
-  managerId: string;
   managerName: string;
   openActions: ManagerAction[];
   weekCommencing: string;
@@ -78,10 +108,15 @@ export function OneToOneForm({
   const [scores, setScores] = useState<ScoreRow[]>(
     SCORE_AREAS.map((area) => {
       const existing = detail?.scores.find((row) => row.area === area);
-      return { area, score: existing?.score?.toString() ?? "", evidence: existing?.evidence ?? "", developmentNote: existing?.developmentNote ?? "" };
+      return {
+        area,
+        score: existing?.score?.toString() ?? "",
+        evidence: existing?.evidence ?? "",
+        developmentNote: existing?.developmentNote ?? "",
+      };
     }),
   );
-  const [actions, setActions] = useState<ActionRow[]>([]);
+  const [actions, setActions] = useState<ActionRow[]>(initialActions.map(toActionRow));
   const editable = !detail || ["draft", "in_review", "reopened"].includes(detail.status);
 
   useEffect(() => {
@@ -99,26 +134,46 @@ export function OneToOneForm({
 
   const carryForward = (item: ManagerAction) => {
     if (actions.length >= 7 || actions.some((row) => row.id === item.id)) return;
-    setActions((current) => [...current, {
-      id: item.id, priority: item.priority, action: item.action, successMeasure: item.successMeasure,
-      owner: item.owner, dueDate: "", status: item.status, outcome: item.outcome, carriedFrom: item.id,
-    }]);
+    setActions((current) => [
+      ...current,
+      {
+        ...toActionRow(item),
+        carriedFrom: item.id,
+      },
+    ]);
   };
 
   const addAction = () => {
     if (actions.length >= 7) return;
-    setActions((current) => [...current, {
-      id: "", priority: current.length < 5 ? "high" : "medium", action: "", successMeasure: "",
-      owner: managerName, dueDate: "", status: "not_started", outcome: "", carriedFrom: "",
-    }]);
+    setActions((current) => [
+      ...current,
+      {
+        id: "",
+        priority: current.length < 5 ? "high" : "medium",
+        action: "",
+        successMeasure: "",
+        owner: managerName,
+        dueDate: "",
+        status: "not_started",
+        outcome: "",
+        carriedFrom: "",
+      },
+    ]);
   };
 
   const updateAction = (index: number, patch: Partial<ActionRow>) =>
     setActions((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
 
   const payload = JSON.stringify({
-    managerId, weekCommencing, reviewDate, wins, kpiManual, summary,
-    scores, actions, intent: "save",
+    assignmentId,
+    weekCommencing,
+    reviewDate,
+    wins,
+    kpiManual,
+    summary,
+    scores,
+    actions,
+    intent: "save",
   });
 
   const email = buildFollowUpEmail({
@@ -161,22 +216,22 @@ export function OneToOneForm({
       <section className="form-section">
         <div className="form-section__heading">
           <div><p className="form-section__step">Section 2</p><h2 className="form-section__title">KPI dashboard</h2></div>
-          <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Auto from weekly report</span>
+          <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Auto from assigned kitchen</span>
         </div>
         <p className="form-section__copy">
-          Sales, GP, labour, waste, stock and report status come straight from the kitchen&apos;s submitted weekly report for w/c {formatDate(weekCommencing)} — nothing is re-typed. Only audit and compliance are recorded here.
+          Sales, GP, labour, waste, stock and report status come from the weekly report for the kitchen attached to this manager assignment. They are never re-entered in the 1-1.
         </p>
         {kpis.available ? (
           <div className="kpi-grid">
             <div className="kpi-row"><span>Net sales</span><strong>{formatCurrency(kpis.netSales ?? 0)}</strong>{ragChip("neutral", "reported")}</div>
-            <div className="kpi-row"><span>Food GP</span><strong>{kpis.foodGpPct}%</strong>{ragChip(gpRag, kpis.foodGpTarget ? `target ${kpis.foodGpTarget}%` : undefined)}</div>
-            <div className="kpi-row"><span>Labour</span><strong>{kpis.labourPct}%</strong>{ragChip(labourRag, kpis.labourTarget ? `target ≤ ${kpis.labourTarget}%` : undefined)}</div>
+            <div className="kpi-row"><span>Food GP</span><strong>{kpis.foodGpPct === null ? "—" : `${kpis.foodGpPct}%`}</strong>{ragChip(gpRag, kpis.foodGpTarget === null ? undefined : `target ${kpis.foodGpTarget}%`)}</div>
+            <div className="kpi-row"><span>Labour</span><strong>{kpis.labourPct === null ? "—" : `${kpis.labourPct}%`}</strong>{ragChip(labourRag, kpis.labourTarget === null ? undefined : `target ≤ ${kpis.labourTarget}%`)}</div>
             <div className="kpi-row"><span>Waste</span><strong>{formatCurrency(kpis.wasteCost ?? 0)}</strong>{ragChip("neutral", "at cost")}</div>
             <div className="kpi-row"><span>Stock completed</span><strong>{kpis.stockCompleted ? "Yes" : "No"}</strong>{ragChip(kpis.stockCompleted ? "green" : "red")}</div>
             <div className="kpi-row"><span>Weekly report sent</span><strong>{kpis.reportSent ? "Yes" : "No"}</strong>{ragChip(kpis.reportSent ? "green" : "red")}</div>
           </div>
         ) : (
-          <div className="privacy-callout">No weekly report snapshot exists yet for this kitchen and week. The operational KPIs will appear here as soon as the report is saved — they are never entered twice.</div>
+          <div className="privacy-callout">No weekly report snapshot exists yet for this assigned kitchen and week. The operational KPIs will appear automatically once the site report exists.</div>
         )}
         <div className="form-grid form-grid--three">
           <label className="field">
@@ -244,7 +299,7 @@ export function OneToOneForm({
 
       <section className="form-section">
         <div className="form-section__heading">
-          <div><p className="form-section__step">Section 4</p><h2 className="form-section__title">Previous actions</h2></div>
+          <div><p className="form-section__step">Section 4</p><h2 className="form-section__title">Previous open actions</h2></div>
         </div>
         {openActions.length ? (
           <div className="score-list">
@@ -256,7 +311,7 @@ export function OneToOneForm({
                 </div>
                 {editable && (
                   <button className="button button--secondary button--compact" disabled={actions.some((row) => row.id === item.id)} onClick={() => carryForward(item)} type="button">
-                    {actions.some((row) => row.id === item.id) ? "Carried forward" : "Carry forward"}
+                    {actions.some((row) => row.id === item.id) ? "Included" : "Carry forward"}
                   </button>
                 )}
               </div>
