@@ -8,7 +8,7 @@ export const metadata = { title: "Product development" };
 export default async function ProductDevelopmentPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
   const [allItems, allOptions] = await Promise.all([getProductDevelopmentItems(), getProductDevelopmentOptions()]);
-  const items = profile.previewSiteId ? allItems.filter((item) => item.siteId === profile.previewSiteId || item.ownerProfileId === profile.previewManagerId) : allItems;
+  const items = profile.previewSiteId ? allItems.filter((item) => item.siteId === profile.previewSiteId) : allItems;
   const options = profile.previewSiteId ? {
     sites: allOptions.sites.filter((item) => item.id === profile.previewSiteId),
     owners: allOptions.owners.filter((item) => item.id === profile.previewManagerId),
