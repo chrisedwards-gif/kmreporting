@@ -10,6 +10,7 @@ UAT 008 corrects the Phase 1 manager model before live 1-1 data is collected.
 - A 1-1 review stores the canonical profile UUID, the site UUID and the assignment UUID that was effective for that week.
 - Replacing a manager ends the old assignment on the previous Saturday. Old reports, reviews, scores and actions remain attached to the old person/assignment.
 - `site_memberships` remains the access-control record. The assignment RPC updates it when the primary manager changes.
+- Migration 012 grants authenticated read access explicitly and then relies on RLS to scope each person to the records their role permits.
 
 ## Database order
 
