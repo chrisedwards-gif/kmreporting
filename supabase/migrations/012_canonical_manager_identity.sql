@@ -322,9 +322,14 @@ create policy one_to_one_action_links_read on public.one_to_one_action_links for
     select 1 from public.one_to_one_reviews r where r.id = review_id
   ));
 
-grant select on public.manager_details to authenticated;
-grant select on public.site_manager_assignments to authenticated;
-grant select on public.one_to_one_action_links to authenticated;
+grant select on table
+  public.manager_details,
+  public.site_manager_assignments,
+  public.one_to_one_reviews,
+  public.one_to_one_scores,
+  public.manager_actions,
+  public.one_to_one_action_links
+to authenticated;
 
 -- Admin-only primary manager replacement. The prior assignment is ended on the
 -- Saturday before the new assignment begins; its reviews remain untouched.
