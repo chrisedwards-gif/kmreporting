@@ -1,10 +1,12 @@
 "use server";
 
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { environment } from "@/lib/env";
 import { getRequestOrigin } from "@/lib/http";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { safeInternalPath } from "@/lib/utils";
 
@@ -20,12 +22,57 @@ export async function signIn(formData: FormData) {
   if (!supabase) redirect("/login?error=Supabase+is+not+configured");
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) redirect("/login?error=Sign-in+failed.+Check+your+email+and+password.");
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function uatQuickLogin() {
+  if (
+    environment.isProduction ||
+    !environment.uatQuickLoginEnabled ||
+    !environment.uatQuickLoginEmail ||
+    !environment.uatQuickLoginPassword
+  ) {
+    redirect("/login?error=UAT+quick+login+is+not+enabled+for+this+deployment.");
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) redirect("/login?error=Supabase+is+not+configured");
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: environment.uatQuickLoginEmail,
+    password: environment.uatQuickLoginPassword,
+  });
+  if (error || !data.user) redirect("/login?error=The+UAT+test+account+could+not+be+signed+in.");
+
+  try {
+    const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("organisation_id")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profile) {
+      await admin.from("audit_log").insert({
+        organisation_id: profile.organisation_id,
+        actor_id: data.user.id,
+        action: "auth.uat_quick_login",
+        entity_type: "profile",
+        entity_id: data.user.id,
+        detail: { preview: true },
+      });
+    }
+  } catch {
+    // Authentication still succeeds if audit delivery is temporarily unavailable.
+  }
+
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
 export async function signOut() {
   const supabase = await createServerSupabaseClient();
-  if (supabase) await supabase.auth.signOut();
+  if (supabase) await supabase.auth.signOut({ scope: "local" });
+  revalidatePath("/", "layout");
   redirect("/login");
 }
 
@@ -39,8 +86,6 @@ export async function requestPasswordReset(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   const origin = await getRequestOrigin();
   if (supabase && origin) {
-    // The response is identical whether or not the address has an account,
-    // so this form cannot be used to enumerate valid emails.
     await supabase.auth.resetPasswordForEmail(parsed.data.email, {
       redirectTo: `${origin}/auth/set-password`,
     });
@@ -55,9 +100,6 @@ const confirmOtpSchema = z.object({
   next: z.string().max(200).optional(),
 });
 
-// The one-time code is entered by the recipient rather than embedded in the
-// link. Microsoft Safe Links can therefore prefetch the page without consuming
-// the authentication credential before the user arrives.
 export async function confirmEmailOtp(formData: FormData) {
   const parsed = confirmOtpSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -80,6 +122,7 @@ export async function confirmEmailOtp(formData: FormData) {
     redirect(`/auth/confirm?type=${parsed.data.type}&email=${encodeURIComponent(parsed.data.email)}&next=${encodeURIComponent(next)}&error=That+code+is+invalid+or+has+expired.+Request+a+new+one.`);
   }
 
+  revalidatePath("/", "layout");
   redirect(safeInternalPath(parsed.data.next) ?? "/dashboard");
 }
 
@@ -121,5 +164,6 @@ export async function updatePassword(
         : "The password could not be saved. Try a longer, less common password.",
     };
   }
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
