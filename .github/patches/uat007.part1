@@ -1,0 +1,321 @@
+From f1b78f608beb515298eb31efa3943603dcb506a5 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.local>
+Date: Sun, 19 Jul 2026 07:18:22 +0000
+Subject: [PATCH] Add Manager 1-1 performance reviews (Phase 1) and fix merge
+ regressions
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Design fixes: restore the summary page display heading lost in the merge,
+retire the last legacy palette hex, and convert remaining inline layout
+styles on summary/settings into the design system.
+
+Manager 1-1s: migration 011 creates managers (records, not logins),
+one_to_one_reviews with the eight-area scoring model, and a master action
+log whose items carry forward between reviews instead of disappearing.
+All writes go through security-definer RPCs with audit logging; finalised
+reviews lock, snapshot their KPIs, require development notes for scores
+below 3 and owners/dates on every agreed action, and can be reopened only
+with a recorded reason. Managers acknowledge finalised reviews.
+
+The KPI section re-types nothing: sales, GP, labour, waste, stock basis
+and report status pull straight from the kitchen's existing weekly report
+snapshot; only audit score and compliance are recorded in the meeting,
+with corrective action required for amber/red compliance.
+
+Centralised scoring service covers score RAG, overall and dashboard
+category averages, higher/lower-is-better KPI variance in the correct
+units, zero-target safety, probation stages, weighted probation scores,
+overdue action detection and the follow-up email builder — 15 new unit
+tests. Seed script adds Scott Hutton and Warren Raisbeck with their agreed
+focus actions.
+---
+ src/app/(app)/one-to-ones/[reviewId]/page.tsx |  63 ++++
+ src/app/(app)/one-to-ones/new/page.tsx        |  42 +++
+ src/app/(app)/one-to-ones/page.tsx            | 117 ++++++
+ src/app/(app)/settings/sites/page.tsx         |   4 +-
+ src/app/(app)/summary/page.tsx                |  10 +-
+ src/app/actions/one-to-ones.ts                | 138 +++++++
+ src/app/globals.css                           | 215 +++++++++++
+ src/components/app-shell.tsx                  |   2 +
+ .../one-to-ones/one-to-one-form.tsx           | 349 ++++++++++++++++++
+ src/lib/data/one-to-ones.ts                   | 237 ++++++++++++
+ src/lib/performance/scoring.ts                | 179 +++++++++
+ .../migrations/011_one_to_one_reviews.sql     | 290 +++++++++++++++
+ supabase/seed_performance.sql                 |  45 +++
+ tests/performance.test.ts                     | 166 +++++++++
+ 14 files changed, 1850 insertions(+), 7 deletions(-)
+ create mode 100644 src/app/(app)/one-to-ones/[reviewId]/page.tsx
+ create mode 100644 src/app/(app)/one-to-ones/new/page.tsx
+ create mode 100644 src/app/(app)/one-to-ones/page.tsx
+ create mode 100644 src/app/actions/one-to-ones.ts
+ create mode 100644 src/components/one-to-ones/one-to-one-form.tsx
+ create mode 100644 src/lib/data/one-to-ones.ts
+ create mode 100644 src/lib/performance/scoring.ts
+ create mode 100644 supabase/migrations/011_one_to_one_reviews.sql
+ create mode 100644 supabase/seed_performance.sql
+ create mode 100644 tests/performance.test.ts
+
+diff --git a/src/app/(app)/one-to-ones/[reviewId]/page.tsx b/src/app/(app)/one-to-ones/[reviewId]/page.tsx
+new file mode 100644
+index 0000000..9bd59ca
+--- /dev/null
++++ b/src/app/(app)/one-to-ones/[reviewId]/page.tsx
+@@ -0,0 +1,63 @@
++import { notFound } from "next/navigation";
++import { OneToOneForm } from "@/components/one-to-ones/one-to-one-form";
++import { acknowledgeOneToOne, reopenOneToOne } from "@/app/actions/one-to-ones";
++import { getSessionProfile } from "@/lib/auth/dal";
++import { getManagers, getOneToOne, getOpenActions, getWeekKpis } from "@/lib/data/one-to-ones";
++import { formatDate } from "@/lib/utils";
++
++export const metadata = { title: "1-1 review" };
++
++export default async function OneToOneDetailPage({ params }: { params: Promise<{ reviewId: string }> }) {
++  const { reviewId } = await params;
++  const [detail, profile] = await Promise.all([getOneToOne(reviewId), getSessionProfile()]);
++  if (!detail) notFound();
++  const managers = await getManagers();
++  const manager = managers.find((item) => item.id === detail.managerId);
++  const [kpis, openActions] = await Promise.all([
++    getWeekKpis(manager?.siteId ?? null, detail.weekCommencing),
++    getOpenActions(detail.managerId),
++  ]);
++  const canManage = profile && ["admin", "group_manager"].includes(profile.role);
++
++  return (
++    <>
++      <header className="page-header">
++        <div>
++          <p className="page-header__eyebrow">{manager?.siteName ?? "Kitchen"} · Week commencing {formatDate(detail.weekCommencing)}</p>
++          <h1 className="page-header__title">{detail.managerName}.</h1>
++          <p className="page-header__copy">
++            {detail.status === "acknowledged"
++              ? `Finalised and acknowledged${detail.overallScore !== null ? ` · overall ${detail.overallScore.toFixed(1)}` : ""}.`
++              : detail.status === "finalised"
++                ? "Finalised and locked. The manager can acknowledge it below."
++                : "Draft review — scores and actions can still be edited."}
++          </p>
++        </div>
++        <div className="page-header__actions">
++          {detail.status === "finalised" && (
++            <form action={acknowledgeOneToOne}>
++              <input name="reviewId" type="hidden" value={detail.id} />
++              <button className="button button--primary" type="submit">Acknowledge review</button>
++            </form>
++          )}
++          {canManage && (detail.status === "finalised" || detail.status === "acknowledged") && (
++            <form action={reopenOneToOne} className="reopen-form">
++              <input name="reviewId" type="hidden" value={detail.id} />
++              <input className="field__input" name="reason" placeholder="Reason to reopen" required />
++              <button className="button button--secondary" type="submit">Reopen</button>
++            </form>
++          )}
++        </div>
++      </header>
++      <OneToOneForm
++        detail={detail}
++        kpis={kpis}
++        managerFirstName={detail.managerName.split(" ")[0]}
++        managerId={detail.managerId}
++        managerName={detail.managerName}
++        openActions={openActions}
++        weekCommencing={detail.weekCommencing}
++      />
++    </>
++  );
++}
++diff --git a/src/app/(app)/one-to-ones/new/page.tsx b/src/app/(app)/one-to-ones/new/page.tsx
++new file mode 100644
++index 0000000..9744709
++--- /dev/null
+++++ b/src/app/(app)/one-to-ones/new/page.tsx
++@@ -0,0 +1,42 @@
+++import { notFound } from "next/navigation";
+++import { OneToOneForm } from "@/components/one-to-ones/one-to-one-form";
+++import { requireRole } from "@/lib/auth/dal";
+++import { getManagers, getOpenActions, getWeekKpis } from "@/lib/data/one-to-ones";
+++import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
+++import { formatDate } from "@/lib/utils";
+++
+++export const metadata = { title: "New 1-1 review" };
+++
+++export default async function NewOneToOnePage({ searchParams }: { searchParams: Promise<{ manager?: string }> }) {
+++  await requireRole(["admin", "group_manager"]);
+++  const { manager: managerId } = await searchParams;
+++  const managers = await getManagers();
+++  const manager = managers.find((item) => item.id === managerId);
+++  if (!manager) notFound();
+++  const week = getLatestCompletedReportingWeek();
+++  const [kpis, openActions] = await Promise.all([
+++    getWeekKpis(manager.siteId, week.start),
+++    getOpenActions(manager.id),
+++  ]);
+++
+++  return (
+++    <>
+++      <header className="page-header">
+++        <div>
+++          <p className="page-header__eyebrow">{manager.siteName} · Week commencing {formatDate(week.start)}</p>
+++          <h1 className="page-header__title">{manager.fullName}.</h1>
+++          <p className="page-header__copy">Weekly 1-1: the reported numbers, evidence-based scores and up to seven agreed actions.</p>
+++        </div>
+++      </header>
+++      <OneToOneForm
+++        detail={null}
+++        kpis={kpis}
+++        managerFirstName={manager.fullName.split(" ")[0]}
+++        managerId={manager.id}
+++        managerName={manager.fullName}
+++        openActions={openActions}
+++        weekCommencing={week.start}
+++      />
+++    </>
+++  );
+++}
++diff --git a/src/app/(app)/one-to-ones/page.tsx b/src/app/(app)/one-to-ones/page.tsx
++new file mode 100644
++index 0000000..d3e7017
++--- /dev/null
+++++ b/src/app/(app)/one-to-ones/page.tsx
++@@ -0,0 +1,117 @@
+++import Link from "next/link";
+++import { CalendarPlus, ClipboardCheck, Flame } from "lucide-react";
+++import { StatusBadge } from "@/components/ui/status-badge";
+++import { requireRole } from "@/lib/auth/dal";
+++import { getManagers, getOneToOnes, getOpenActions } from "@/lib/data/one-to-ones";
+++import { isActionOverdue, scoreRag } from "@/lib/performance/scoring";
+++import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
+++import { formatDate } from "@/lib/utils";
+++
+++export const metadata = { title: "Manager 1-1s" };
+++
+++const reviewStatusMap = {
+++  draft: "draft",
+++  in_review: "submitted",
+++  reopened: "review_required",
+++  finalised: "approved",
+++  acknowledged: "shared",
+++} as const;
+++
+++export default async function OneToOnesPage() {
+++  await requireRole(["admin", "group_manager", "finance", "viewer"]);
+++  const [managers, reviews] = await Promise.all([getManagers(), getOneToOnes()]);
+++  const openActionsByManager = new Map(
+++    await Promise.all(managers.map(async (manager) => [manager.id, await getOpenActions(manager.id)] as const)),
+++  );
+++  const week = getLatestCompletedReportingWeek();
+++  const today = new Date().toISOString().slice(0, 10);
+++
+++  return (
+++    <>
+++      <header className="page-header">
+++        <div>
+++          <p className="page-header__eyebrow">Performance</p>
+++          <h1 className="page-header__title">Manager 1-1s.</h1>
+++          <p className="page-header__copy">
+++            One weekly conversation per manager: wins, the numbers they already reported, evidence-based scores and a live action log that never loses an item.
+++          </p>
+++        </div>
+++      </header>
+++
+++      <div className="manager-grid">
+++        {managers.map((manager) => {
+++          const managerReviews = reviews.filter((review) => review.managerId === manager.id);
+++          const latestScored = managerReviews.find((review) => review.overallScore !== null);
+++          const openActions = openActionsByManager.get(manager.id) ?? [];
+++          const overdue = openActions.filter((item) => isActionOverdue(item.dueDate, item.status, today)).length;
+++          const currentWeekReview = managerReviews.find((review) => review.weekCommencing === week.start);
+++          return (
+++            <section className="panel manager-card" key={manager.id}>
+++              <div className="panel__header">
+++                <div>
+++                  <h2 className="panel__title">{manager.fullName}</h2>
+++                  <p className="panel__subtitle">{manager.roleTitle} · {manager.siteName}</p>
+++                </div>
+++                {latestScored?.overallScore != null && (
+++                  <span className={`score-pill score-pill--${scoreRag(latestScored.overallScore)}`}>{latestScored.overallScore.toFixed(1)}</span>
+++                )}
+++              </div>
+++              <div className="panel__body">
+++                <div className="manager-card__focus">
+++                  {manager.focusAreas.slice(0, 6).map((area) => (
+++                    <span className="source-chip" key={area}>{area}</span>
+++                  ))}
+++                </div>
+++                <div className="manager-card__stats">
+++                  <span><strong>{openActions.length}</strong> open actions</span>
+++                  <span className={overdue ? "manager-card__stat--overdue" : ""}><strong>{overdue}</strong> overdue</span>
+++                  <span><strong>{managerReviews.length}</strong> reviews</span>
+++                </div>
+++                {currentWeekReview ? (
+++                  <Link className="button button--secondary" href={`/one-to-ones/${currentWeekReview.id}`}>
+++                    <ClipboardCheck aria-hidden="true" size={16} /> Open this week&apos;s 1-1
+++                  </Link>
+++                ) : (
+++                  <Link className="button button--primary" href={`/one-to-ones/new?manager=${manager.id}`}>
+++                    <CalendarPlus aria-hidden="true" size={16} /> Start 1-1 for w/c {formatDate(week.start)}
+++                  </Link>
+++                )}
+++              </div>
+++            </section>
+++          );
+++        })}
+++        {!managers.length && (
+++          <section className="panel empty-state">
+++            <Flame aria-hidden="true" size={22} />
+++            <h2>No managers yet.</h2>
+++            <p>Seed the manager records (see supabase/seed_performance.sql) or add them in the database to start running weekly 1-1s.</p>
+++          </section>
+++        )}
+++      </div>
+++
+++      {reviews.length > 0 && (
+++        <section className="panel">
+++          <div className="panel__header"><div><h2 className="panel__title">Review history</h2><p className="panel__subtitle">Finalised reviews are locked and acknowledged by the manager</p></div></div>
+++          <div className="report-list">
+++            {reviews.map((review) => (
+++              <Link className="report-row report-row--slim" href={`/one-to-ones/${review.id}`} key={review.id}>
+++                <div className="site-cell">
+++                  <div className="site-cell__mark">{review.managerName.split(" ").map((part) => part[0]).join("").slice(0, 2)}</div>
+++                  <div>
+++                    <div className="site-cell__name">{review.managerName}</div>
+++                    <div className="site-cell__manager">Week commencing {formatDate(review.weekCommencing)}</div>
+++                  </div>
+++                </div>
+++                <div>
+++                  <span className="report-row__metric-label">Overall</span>
+++                  {review.overallScore === null ? "—" : review.overallScore.toFixed(1)}
+++                </div>
+++                <StatusBadge status={reviewStatusMap[review.status]} />
+++              </Link>
+++            ))}
+++          </div>
+++        </section>
+++      )}
+++    </>
+++  );
+++}
++diff --git a/src/app/(app)/settings/sites/page.tsx b/src/app/(app)/settings/sites/page.tsx
++index d5d4bac..b9c648a 100644
++--- a/src/app/(app)/settings/sites/page.tsx
+++++ b/src/app/(app)/settings/sites/page.tsx
++@@ -22,7 +22,7 @@ export default async function SitesPage() {
++       </header>
++ 
++       <section className="panel">
++-        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5f6e68" size={19} /></div>
+++        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active sites are included in every Sunday–Saturday reporting cycle</p></div><UserRoundCog aria-hidden="true" color="#5d6b63" size={19} /></div>
++         <div style={{ overflowX: "auto" }}>
++           <table className="data-table">
++             <thead><tr><th>Kitchen</th><th>Site code</th><th>Manager</th><th>Reporting</th><th>Scoped access</th><th><span className="sr-only">Actions</span></th></tr></thead>
++@@ -42,7 +42,7 @@ export default async function SitesPage() {
++           </table>
++         </div>
++       </section>
++-      <div className="privacy-callout" style={{ marginTop: "1rem" }}><LockKeyhole aria-hidden="true" size={15} style={{ display: "inline", marginRight: ".4rem", verticalAlign: "text-bottom" }} />Pay-rate access is not assignable here. It remains a server-only finance function, separated from normal application roles.</div>
+++      <div className="privacy-callout" style={{ marginTop: "1rem" }}><LockKeyhole aria-hidden="true" className="privacy-callout__icon" size={15} />Pay-rate access is not assignable here. It remains a server-only finance function, separated from normal application roles.</div>
++     </>
++   );
++ }
