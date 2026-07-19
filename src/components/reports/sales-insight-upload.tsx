@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { BarChart3, CheckCircle2, FileSpreadsheet, Upload } from "lucide-react";
 import { saveReportSalesInsights, type SalesInsightActionState } from "@/app/actions/report-sales";
 import { parseStockLinkEndOfWeek } from "@/lib/reporting/imports";
@@ -34,10 +34,6 @@ export function SalesInsightUpload({
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (state.status === "success") setInsights(emptyInsights);
-  }, [state.status]);
-
   const importFile = async (file?: File) => {
     if (!file) return;
     setError("");
@@ -67,7 +63,7 @@ export function SalesInsightUpload({
 
   return (
     <section className="panel sales-insight-upload">
-      <div className="panel__header"><div><h2 className="panel__title">Detailed EPOS insight</h2><p className="panel__subtitle">Extract daily sales, ATV inputs, covers, products and category mix without retaining the raw file</p></div><BarChart3 aria-hidden="true" size={19} /></div>
+      <div className="panel__header"><div><h2 className="panel__title">Detailed EPOS insight</h2><p className="panel__subtitle">Extract daily sales, ATV inputs, available guest metrics and category mix without retaining the raw file</p></div><BarChart3 aria-hidden="true" size={19} /></div>
       <form action={action} className="panel__body report-form">
         <input name="reportId" type="hidden" value={reportId} />
         <input name="payload" type="hidden" value={JSON.stringify(insights)} />
@@ -79,7 +75,7 @@ export function SalesInsightUpload({
         {ready ? <div className="sales-import-preview"><FileSpreadsheet aria-hidden="true" size={18} /><div><strong>{fileName}</strong><span>{insights.days.length} daily rows · {insights.items.length} products · {insights.categories.length} categories</span></div></div> : null}
         {error ? <div className="form-message form-message--error" role="alert">{error}</div> : null}
         {state.status !== "idle" ? <div className={`form-message ${state.status === "error" ? "form-message--error" : "form-message--success"}`} role="status">{state.status === "success" ? <CheckCircle2 aria-hidden="true" size={15} /> : null}{state.message}</div> : null}
-        <button className="button button--primary" disabled={!ready || pending} type="submit">{pending ? "Saving insight…" : "Save sales insight"}</button>
+        <button className="button button--primary" disabled={!ready || pending} type="submit">{pending ? "Saving insight…" : state.status === "success" ? "Sales insight saved" : "Save sales insight"}</button>
       </form>
     </section>
   );
