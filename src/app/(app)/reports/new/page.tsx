@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ReportForm } from "@/components/reports/report-form";
+import { ReportSalesBridge } from "@/components/reports/report-sales-bridge";
 import { getAccessibleSites, getEditableDraft, getReportingWeek } from "@/lib/data/reporting";
 import { requireRole } from "@/lib/auth/dal";
 import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
@@ -32,7 +33,7 @@ export default async function NewReportPage({ searchParams }: { searchParams: Pr
         <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> All reports</Link>
       </header>
       {reportId && !editableDraft ? <div className="form-message form-message--error" role="alert">That draft is unavailable, already submitted, inactive, or outside your site access.</div> : null}
-      {sites.length ? <ReportForm initial={editableDraft ?? undefined} sites={sites} week={week} /> : (
+      {sites.length ? <><ReportForm initial={editableDraft ?? undefined} sites={sites} week={week} /><ReportSalesBridge sites={sites} /></> : (
         <section className="panel empty-state"><h2>No active kitchen is available.</h2><p>{profile.role === "admin" ? "Create or activate a kitchen before starting its weekly report." : "Ask an administrator to assign you to an active kitchen."}</p>{profile.role === "admin" ? <Link className="button button--primary" href="/settings/sites">Configure kitchens</Link> : null}</section>
       )}
     </>
