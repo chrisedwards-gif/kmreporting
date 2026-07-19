@@ -1,0 +1,428 @@
+diff --git a/src/lib/data/one-to-ones.ts b/src/lib/data/one-to-ones.ts
+new file mode 100644
+index 0000000..06da0e9
+--- /dev/null
++++ b/src/lib/data/one-to-ones.ts
+@@ -0,0 +1,237 @@
++import { environment } from "@/lib/env";
++import { createServerSupabaseClient } from "@/lib/supabase/server";
++
++export type ManagerRecord = {
++  id: string;
++  fullName: string;
++  roleTitle: string;
++  siteId: string | null;
++  siteName: string;
++  startDate: string | null;
++  focusAreas: string[];
++  active: boolean;
++};
++
++export type ManagerAction = {
++  id: string;
++  managerId: string;
++  priority: "high" | "medium" | "low";
++  action: string;
++  successMeasure: string;
++  owner: string;
++  dueDate: string | null;
++  status: "not_started" | "in_progress" | "blocked" | "complete" | "cancelled";
++  outcome: string;
++  sourceReviewId: string | null;
++};
++
++export type OneToOneListItem = {
++  id: string;
++  managerId: string;
++  managerName: string;
++  weekCommencing: string;
++  reviewDate: string | null;
++  status: "draft" | "in_review" | "finalised" | "acknowledged" | "reopened";
++  overallScore: number | null;
++};
++
++export type OneToOneDetail = OneToOneListItem & {
++  wins: Record<string, string>;
++  kpiManual: Record<string, string>;
++  kpiSnapshot: Record<string, unknown> | null;
++  summary: Record<string, string>;
++  scores: Array<{ area: string; score: number | null; evidence: string; developmentNote: string }>;
++};
++
++export type WeekKpis = {
++  available: boolean;
++  netSales: number | null;
++  foodGpPct: number | null;
++  foodGpTarget: number | null;
++  labourPct: number | null;
++  labourTarget: number | null;
++  wasteCost: number | null;
++  stockCompleted: boolean | null;
++  reportSent: boolean | null;
++};
++
++const demoManagers: ManagerRecord[] = [
++  {
++    id: "demo-scott", fullName: "Scott Hutton", roleTitle: "Kitchen Manager", siteId: "dough-religion",
++    siteName: "Dough Religion", startDate: "2026-06-15", active: true,
++    focusAreas: ["Product quality", "Dough and flour testing", "Menu development", "Greek concept development", "Specs and costings", "Team quality training"],
++  },
++  {
++    id: "demo-warren", fullName: "Warren Raisbeck", roleTitle: "Kitchen Manager", siteId: "dough-religion",
++    siteName: "Dough Religion", startDate: "2026-05-01", active: true,
++    focusAreas: ["Operational ownership", "Stock taking", "Procure Wizard", "GP and waste", "Reporting", "SOPs", "Close-down standards", "Compliance", "Team accountability"],
++  },
++];
++
++export async function getManagers(): Promise<ManagerRecord[]> {
++  if (environment.isDemo) return demoManagers;
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return [];
++  const { data } = await supabase
++    .from("managers")
++    .select("id, full_name, role_title, site_id, start_date, focus_areas, active, sites (name)")
++    .order("full_name");
++  return (data ?? []).map((row) => ({
++    id: row.id,
++    fullName: row.full_name,
++    roleTitle: row.role_title,
++    siteId: row.site_id,
++    siteName: (row.sites as { name?: string } | null)?.name ?? "Unassigned",
++    startDate: row.start_date,
++    focusAreas: row.focus_areas ?? [],
++    active: row.active,
++  }));
++}
++
++export async function getOneToOnes(managerId?: string): Promise<OneToOneListItem[]> {
++  if (environment.isDemo) return [];
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return [];
++  let query = supabase
++    .from("one_to_one_reviews")
++    .select("id, manager_id, week_commencing, review_date, status, overall_score, managers (full_name)")
++    .order("week_commencing", { ascending: false })
++    .limit(60);
++  if (managerId) query = query.eq("manager_id", managerId);
++  const { data } = await query;
++  return (data ?? []).map((row) => ({
++    id: row.id,
++    managerId: row.manager_id,
++    managerName: (row.managers as { full_name?: string } | null)?.full_name ?? "Manager",
++    weekCommencing: row.week_commencing,
++    reviewDate: row.review_date,
++    status: row.status,
++    overallScore: row.overall_score === null ? null : Number(row.overall_score),
++  }));
++}
++
++export async function getOneToOne(reviewId: string): Promise<OneToOneDetail | null> {
++  if (environment.isDemo) return null;
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return null;
++  const [{ data: review }, { data: scores }] = await Promise.all([
++    supabase
++      .from("one_to_one_reviews")
++      .select("id, manager_id, week_commencing, review_date, status, overall_score, wins, kpi_manual, kpi_snapshot, summary, managers (full_name)")
++      .eq("id", reviewId)
++      .maybeSingle(),
++    supabase.from("one_to_one_scores").select("area, score, evidence, development_note").eq("review_id", reviewId),
++  ]);
++  if (!review) return null;
++  return {
++    id: review.id,
++    managerId: review.manager_id,
++    managerName: (review.managers as { full_name?: string } | null)?.full_name ?? "Manager",
++    weekCommencing: review.week_commencing,
++    reviewDate: review.review_date,
++    status: review.status,
++    overallScore: review.overall_score === null ? null : Number(review.overall_score),
++    wins: (review.wins ?? {}) as Record<string, string>,
++    kpiManual: (review.kpi_manual ?? {}) as Record<string, string>,
++    kpiSnapshot: (review.kpi_snapshot ?? null) as Record<string, unknown> | null,
++    summary: (review.summary ?? {}) as Record<string, string>,
++    scores: (scores ?? []).map((row) => ({
++      area: row.area,
++      score: row.score === null ? null : Number(row.score),
++      evidence: row.evidence,
++      developmentNote: row.development_note,
++    })),
++  };
++}
++
++/** Open actions for the manager — the carry-forward list for section 5. */
++export async function getOpenActions(managerId: string): Promise<ManagerAction[]> {
++  if (environment.isDemo) return [];
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return [];
++  const { data } = await supabase
++    .from("manager_actions")
++    .select("id, manager_id, priority, action, success_measure, owner, due_date, status, outcome, source_review_id")
++    .eq("manager_id", managerId)
++    .not("status", "in", "(complete,cancelled)")
++    .order("due_date", { ascending: true, nullsFirst: false });
++  return (data ?? []).map((row) => ({
++    id: row.id,
++    managerId: row.manager_id,
++    priority: row.priority,
++    action: row.action,
++    successMeasure: row.success_measure,
++    owner: row.owner,
++    dueDate: row.due_date,
++    status: row.status,
++    outcome: row.outcome,
++    sourceReviewId: row.source_review_id,
++  }));
++}
++
++/**
++ * The streamlining core: the six operational KPIs already captured by the
++ * weekly report system, pulled for the manager's kitchen and week. Nothing
++ * here is re-typed in the meeting.
++ */
++export async function getWeekKpis(siteId: string | null, weekCommencing: string): Promise<WeekKpis> {
++  const empty: WeekKpis = {
++    available: false, netSales: null, foodGpPct: null, foodGpTarget: null,
++    labourPct: null, labourTarget: null, wasteCost: null, stockCompleted: null, reportSent: null,
++  };
++  if (environment.isDemo || !siteId) return empty;
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return empty;
++
++  const { data: period } = await supabase
++    .from("reporting_periods")
++    .select("id")
++    .eq("week_start", weekCommencing)
++    .maybeSingle();
++  if (!period) return empty;
++
++  const [{ data: snapshot }, { data: site }, { data: report }] = await Promise.all([
++    supabase
++      .from("site_cost_snapshots")
++      .select("net_sales, food_cost_pct, labour_pct, waste_cost, food_cost_basis")
++      .eq("period_id", period.id)
++      .eq("site_id", siteId)
++      .maybeSingle(),
++    supabase.from("sites").select("food_cost_target, labour_target").eq("id", siteId).maybeSingle(),
++    supabase
++      .from("weekly_reports")
++      .select("status")
++      .eq("period_id", period.id)
++      .eq("site_id", siteId)
++      .maybeSingle(),
++  ]);
++  if (!snapshot) return empty;
++  return {
++    available: true,
++    netSales: Number(snapshot.net_sales),
++    foodGpPct: Math.round((100 - Number(snapshot.food_cost_pct)) * 10) / 10,
++    foodGpTarget: site ? Math.round((100 - Number(site.food_cost_target)) * 10) / 10 : null,
++    labourPct: Number(snapshot.labour_pct),
++    labourTarget: site ? Number(site.labour_target) : null,
++    wasteCost: Number(snapshot.waste_cost),
++    stockCompleted: snapshot.food_cost_basis === "stock_adjusted",
++    reportSent: report ? ["submitted", "review_required", "approved", "shared"].includes(report.status) : false,
++  };
++}
++
++/** Actions agreed in a specific review, for the follow-up email and read view. */
++export async function getReviewActions(reviewId: string): Promise<ManagerAction[]> {
++  if (environment.isDemo) return [];
++  const supabase = await createServerSupabaseClient();
++  if (!supabase) return [];
++  const { data } = await supabase
++    .from("manager_actions")
++    .select("id, manager_id, priority, action, success_measure, owner, due_date, status, outcome, source_review_id")
++    .eq("source_review_id", reviewId)
++    .order("priority");
++  return (data ?? []).map((row) => ({
++    id: row.id, managerId: row.manager_id, priority: row.priority, action: row.action,
++    successMeasure: row.success_measure, owner: row.owner, dueDate: row.due_date,
++    status: row.status, outcome: row.outcome, sourceReviewId: row.source_review_id,
++  }));
++}
+diff --git a/src/lib/performance/scoring.ts b/src/lib/performance/scoring.ts
+new file mode 100644
+index 0000000..6db8926
+--- /dev/null
++++ b/src/lib/performance/scoring.ts
+@@ -0,0 +1,179 @@
++// Every performance calculation lives here so the UI, server actions and
++// exports can never disagree about a score.
++
++export type Rag = "green" | "amber" | "red" | "neutral";
++
++export const SCORE_AREAS = [
++  "leadership",
++  "communication",
++  "organisation",
++  "kitchen_standards",
++  "product_quality",
++  "commercial_awareness",
++  "problem_solving",
++  "ownership",
++] as const;
++
++export type ScoreArea = (typeof SCORE_AREAS)[number];
++export type ScoreMap = Partial<Record<ScoreArea, number | null | undefined>>;
++
++const round1 = (value: number) => Math.round(value * 10) / 10;
++
++export const scoreRag = (score: number | null | undefined): Rag => {
++  if (score === null || score === undefined) return "neutral";
++  if (score >= 4) return "green";
++  if (score >= 3) return "amber";
++  return "red";
++};
++
++const averageOf = (values: Array<number | null | undefined>): number | null => {
++  const present = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
++  if (!present.length) return null;
++  return round1(present.reduce((sum, value) => sum + value, 0) / present.length);
++};
++
++/** Mean of the completed scores only; empty scores are ignored, never zero. */
++export const overallScore = (scores: ScoreMap): number | null =>
++  averageOf(SCORE_AREAS.map((area) => scores[area]));
++
++/** The five headline dashboard categories plus overall. */
++export const dashboardCategories = (scores: ScoreMap) => ({
++  leadership: averageOf([scores.leadership]),
++  standards: averageOf([scores.communication, scores.organisation, scores.kitchen_standards]),
++  commercial: averageOf([scores.commercial_awareness]),
++  product: averageOf([scores.product_quality]),
++  ownership: averageOf([scores.problem_solving, scores.ownership]),
++  overall: overallScore(scores),
++});
++
++export type KpiDirection = "higher" | "lower";
++export type KpiUnit = "currency" | "percentage_points" | "percentage";
++
++export type KpiResult = {
++  variance: number | null;
++  rag: Rag;
++};
++
++/**
++ * Variance and RAG for a numeric KPI.
++ * Percentage KPIs (GP, labour, audit) compare in percentage points;
++ * currency KPIs (sales, waste) use a proportional band of the target.
++ */
++export const kpiResult = (
++  actual: number | null | undefined,
++  target: number | null | undefined,
++  direction: KpiDirection,
++  unit: KpiUnit,
++  bands: { amber: number },
++): KpiResult => {
++  if (actual === null || actual === undefined || target === null || target === undefined) {
++    return { variance: null, rag: "neutral" };
++  }
++  const variance = round1(actual - target);
++  const adverse = direction === "higher" ? target - actual : actual - target;
++  if (adverse <= 0) return { variance, rag: "green" };
++
++  if (unit === "percentage_points") {
++    return { variance, rag: adverse <= bands.amber ? "amber" : "red" };
++  }
++  // Proportional band; a zero target cannot divide, so any adverse movement is red.
++  if (target === 0) return { variance, rag: "red" };
++  const adverseRatio = adverse / Math.abs(target);
++  return { variance, rag: adverseRatio <= bands.amber ? "amber" : "red" };
++};
++
++export const salesKpi = (actual?: number | null, target?: number | null) =>
++  kpiResult(actual, target, "higher", "currency", { amber: 0.05 });
++
++export const foodGpKpi = (actual?: number | null, target?: number | null) =>
++  kpiResult(actual, target, "higher", "percentage_points", { amber: 2 });
++
++export const labourKpi = (actual?: number | null, target?: number | null) =>
++  kpiResult(actual, target, "lower", "percentage_points", { amber: 2 });
++
++export const wasteKpi = (actual?: number | null, target?: number | null) =>
++  kpiResult(actual, target, "lower", "currency", { amber: 0.1 });
++
++export const auditKpi = (actual?: number | null, target?: number | null) =>
++  kpiResult(actual, target, "higher", "percentage_points", { amber: 5 });
++
++export const booleanKpi = (value: boolean | null | undefined): Rag =>
++  value === null || value === undefined ? "neutral" : value ? "green" : "red";
++
++export type ProbationStage = "first_30" | "days_31_60" | "days_61_90" | "ongoing";
++
++export const probationStage = (startDate: string, onDate: string): ProbationStage => {
++  const start = new Date(`${startDate}T12:00:00Z`).valueOf();
++  const current = new Date(`${onDate}T12:00:00Z`).valueOf();
++  const daysEmployed = Math.floor((current - start) / 86_400_000) + 1;
++  if (daysEmployed <= 30) return "first_30";
++  if (daysEmployed <= 60) return "days_31_60";
++  if (daysEmployed <= 90) return "days_61_90";
++  return "ongoing";
++};
++
++export const probationStageLabel: Record<ProbationStage, string> = {
++  first_30: "First 30 days",
++  days_31_60: "Days 31–60",
++  days_61_90: "Days 61–90",
++  ongoing: "Ongoing",
++};
++
++/** Role-specific weighted probation score; weights must sum to 1. */
++export const weightedProbationScore = (
++  entries: Array<{ score: number | null | undefined; weight: number }>,
++): number | null => {
++  const present = entries.filter(
++    (entry): entry is { score: number; weight: number } =>
++      typeof entry.score === "number" && Number.isFinite(entry.score),
++  );
++  if (!present.length) return null;
++  const weightSum = present.reduce((sum, entry) => sum + entry.weight, 0);
++  if (weightSum === 0) return null;
++  return round1(present.reduce((sum, entry) => sum + entry.score * entry.weight, 0) / weightSum);
++};
++
++export const isActionOverdue = (
++  dueDate: string | null | undefined,
++  status: string,
++  today: string,
++): boolean => Boolean(dueDate) && String(dueDate) < today && !["complete", "cancelled"].includes(status);
++
++export type EmailInput = {
++  firstName: string;
++  weekCommencing: string;
++  positives: string[];
++  developmentAreas: string[];
++  actions: Array<{ action: string; dueDate: string | null }>;
++  support: string;
++  nextReviewDate: string | null;
++};
++
++/** Plain-text 1-1 follow-up, ready to copy into any email client. */
++export const buildFollowUpEmail = (input: EmailInput) => {
++  const bullets = (items: string[]) => items.filter(Boolean).map((item) => `• ${item}`).join("\n");
++  const priorities = input.actions
++    .filter((item) => item.action.trim())
++    .slice(0, 5)
++    .map((item, index) => `${index + 1}. ${item.action}${item.dueDate ? ` — due ${item.dueDate}` : ""}`)
++    .join("\n");
++  return {
++    subject: `Weekly 1-1 Summary – ${input.weekCommencing}`,
++    body: [
++      `Hi ${input.firstName},`,
++      "",
++      "Thanks for today's 1-1.",
++      input.positives.some(Boolean) ? `\nKey positives\n\n${bullets(input.positives)}` : "",
++      input.developmentAreas.some(Boolean) ? `\nDevelopment areas\n\n${bullets(input.developmentAreas)}` : "",
++      priorities ? `\nAgreed priorities for next week\n\n${priorities}` : "",
++      input.support.trim() ? `\nSupport agreed\n\n• ${input.support.trim()}` : "",
++      input.nextReviewDate ? `\nWe'll review progress at next week's 1-1 on ${input.nextReviewDate}.` : "\nWe'll review progress at next week's 1-1.",
++      "",
++      "Thanks,",
++      "",
++      "Chris",
++    ]
++      .filter((line) => line !== "")
++      .join("\n"),
++  };
++};
