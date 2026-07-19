@@ -1,3 +1,4 @@
+# Netlify UAT uses the maintained Next.js adapter and staging Supabase environment.
 [build]
   command = "npm run build"
   publish = ".next"
