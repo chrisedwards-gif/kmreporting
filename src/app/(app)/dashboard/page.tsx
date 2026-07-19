@@ -3,13 +3,21 @@ import { ArrowRight, CalendarDays } from "lucide-react";
 import { CostChart } from "@/components/dashboard/cost-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
+import { Workbench } from "@/components/dashboard/workbench";
+import { requireSessionProfile } from "@/lib/auth/dal";
 import { getReportingBundle } from "@/lib/data/reporting";
+import { getWorkbench } from "@/lib/data/workbench";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Group overview" };
 
 export default async function DashboardPage() {
-  const { sites, reports, week, expectedSiteCount } = await getReportingBundle();
+  const [profile, bundle] = await Promise.all([
+    requireSessionProfile(),
+    getReportingBundle(),
+  ]);
+  const { sites, reports, week, expectedSiteCount } = bundle;
+  const workbench = await getWorkbench(profile.role, bundle);
   const totals = sites.reduce(
     (sum, site) => ({
       netSales: sum.netSales + site.netSales,
@@ -31,8 +39,6 @@ export default async function DashboardPage() {
     })),
   );
   const allStockAdjusted = sites.length > 0 && sites.every((site) => site.foodCostBasis === "stock_adjusted");
-  // Group targets are each kitchen's own target weighted by its share of sales,
-  // so one small site with a loose target cannot mask a large site running hot.
   const weightedTarget = (selectTarget: (site: (typeof sites)[number]) => number) =>
     totals.netSales ? sites.reduce((sum, site) => sum + selectTarget(site) * site.netSales, 0) / totals.netSales : 0;
   const foodTarget = weightedTarget((site) => site.foodCostTarget);
@@ -54,6 +60,8 @@ export default async function DashboardPage() {
           Start a report <ArrowRight aria-hidden="true" size={16} />
         </Link>
       </header>
+
+      <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
 
       <section aria-label="Group metrics" className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchens`} trend="up" value={formatCurrency(totals.netSales)} />
