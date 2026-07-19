@@ -139,7 +139,7 @@ export type ReportDraftInput = {
   weekEnd: string;
   stocktakeCompleted: boolean;
   manualPurchases: ManualPurchase[];
-  salesInsights: SalesInsightsInput;
+  salesInsights?: SalesInsightsInput;
   values: {
     netSales: number;
     openingStock: number;
