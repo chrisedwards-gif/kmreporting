@@ -1,0 +1,43 @@
+name: Apply UAT 007 one-to-one patch
+
+on:
+  push:
+    branches:
+      - agent/uat-003-source-imports
+    paths:
+      - .github/workflows/apply-uat007.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uat-003-source-imports
+          fetch-depth: 0
+      - name: Assemble patch
+        shell: bash
+        run: cat .github/patches/uat007.part{1,2,3,4,5,6,7} > /tmp/uat007.patch
+      - name: Validate patch mailbox
+        shell: bash
+        run: git mailinfo /tmp/message /tmp/extracted.patch < /tmp/uat007.patch && git apply --check --3way /tmp/extracted.patch
+      - name: Apply patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git am --3way /tmp/uat007.patch
+      - name: Remove staging files
+        shell: bash
+        run: |
+          git rm -f .github/patches/uat007.part{1,2,3,4,5,6,7}
+          git rm -f .github/workflows/apply-uat007.yml
+          git commit -m "Remove UAT 007 patch staging files"
+      - name: Push applied patch
+        shell: bash
+        run: git push origin HEAD:agent/uat-003-source-imports
