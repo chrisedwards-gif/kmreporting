@@ -1,0 +1,65 @@
+.table-scroll {
+  overflow-x: auto;
+}
+
+.privacy-callout--spaced {
+  margin-top: 1rem;
+}
+
+.manager-card__identity {
+  align-items: center;
+  color: var(--ink-600);
+  display: flex;
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.68rem;
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+}
+
+.manager-chip--primary {
+  align-items: center;
+  background: rgb(31 122 90 / 8%);
+  border-color: rgb(31 122 90 / 24%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: 0.9rem;
+}
+
+.manager-chip--primary > svg {
+  color: var(--sage);
+}
+
+.manager-history {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  margin: 0.25rem 0 1rem;
+  padding: 0.75rem 0;
+}
+
+.manager-history summary {
+  align-items: center;
+  color: var(--ink-600);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  gap: 0.4rem;
+}
+
+.manager-history[open] summary {
+  margin-bottom: 0.65rem;
+}
+
+@media (max-width: 720px) {
+  .manager-card__stats {
+    flex-wrap: wrap;
+  }
+
+  .manager-chip--primary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .manager-chip--primary > svg {
+    display: none;
+  }
+}
