@@ -322,6 +322,10 @@ create policy one_to_one_action_links_read on public.one_to_one_action_links for
     select 1 from public.one_to_one_reviews r where r.id = review_id
   ));
 
+grant select on public.manager_details to authenticated;
+grant select on public.site_manager_assignments to authenticated;
+grant select on public.one_to_one_action_links to authenticated;
+
 -- Admin-only primary manager replacement. The prior assignment is ended on the
 -- Saturday before the new assignment begins; its reviews remain untouched.
 create or replace function public.assign_primary_site_manager(
@@ -379,10 +383,20 @@ begin
   end if;
 
   if current_assignment.id is not null then
-    update public.site_manager_assignments
-       set ends_on = effective_from - 1,
-           updated_at = now()
-     where id = current_assignment.id;
+    if current_assignment.starts_on = effective_from then
+      if exists (
+        select 1 from public.one_to_one_reviews r
+        where r.assignment_id = current_assignment.id
+      ) then
+        raise exception 'That assignment already has a review. Choose the next Sunday as the replacement date.';
+      end if;
+      delete from public.site_manager_assignments where id = current_assignment.id;
+    else
+      update public.site_manager_assignments
+         set ends_on = effective_from - 1,
+             updated_at = now()
+       where id = current_assignment.id;
+    end if;
   end if;
 
   insert into public.site_manager_assignments (
@@ -540,6 +554,7 @@ begin
   for action_item in
     select value from jsonb_array_elements(coalesce(payload->'actions', '[]'::jsonb))
   loop
+    action_id := null;
     action_position := action_position + 1;
     if action_position > 7 then
       raise exception 'A weekly 1-1 can contain at most seven agreed actions.';
