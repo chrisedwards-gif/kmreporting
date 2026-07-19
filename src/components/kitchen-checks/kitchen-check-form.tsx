@@ -136,14 +136,14 @@ export function KitchenCheckForm({ detail }: { detail: KitchenCheckDetail }) {
                       </div>
                       <label className="field check-item__notes">
                         <span className="field__label">Notes / evidence{isIssue ? " (required)" : ""}</span>
-                        <textarea className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { notes: event.target.value })} required={isIssue} rows={2} value={response.notes} />
+                        <textarea className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { notes: event.target.value })} rows={2} value={response.notes} />
                       </label>
                       {isIssue ? (
                         <div className="check-action-fields">
                           <div className="check-action-fields__title"><AlertTriangle aria-hidden="true" size={15} /> This finding must become an owned action</div>
-                          <label className="field"><span className="field__label">Action required</span><input className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { actionText: event.target.value })} required value={response.actionText} /></label>
-                          <label className="field"><span className="field__label">Owner</span><select className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { ownerProfileId: event.target.value })} required value={response.ownerProfileId}><option value="">Choose manager</option>{detail.owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}</select></label>
-                          <label className="field"><span className="field__label">Deadline</span><input className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { dueDate: event.target.value })} required type="date" value={response.dueDate} /></label>
+                          <label className="field"><span className="field__label">Action required</span><input className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { actionText: event.target.value })} value={response.actionText} /></label>
+                          <label className="field"><span className="field__label">Owner</span><select className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { ownerProfileId: event.target.value })} value={response.ownerProfileId}><option value="">Choose manager</option>{detail.owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}</select></label>
+                          <label className="field"><span className="field__label">Deadline</span><input className="field__input" disabled={!editable} onChange={(event) => updateResponse(item.id, { dueDate: event.target.value })} type="date" value={response.dueDate} /></label>
                         </div>
                       ) : null}
                     </article>
