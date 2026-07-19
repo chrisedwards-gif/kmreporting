@@ -1,0 +1,109 @@
+name: Apply UAT 012 cross-link
+
+on:
+  push:
+    branches: [agent/uat-012-workbench-navigation]
+    paths: [.github/workflows/apply-uat012-crosslink.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/uat-012-workbench-navigation
+      - name: Patch KPI source link
+        shell: python
+        run: |
+          from pathlib import Path
+
+          data_path = Path('src/lib/data/one-to-ones.ts')
+          data = data_path.read_text()
+          replacements = [
+            (
+              '  reportSent: boolean | null;\n};',
+              '  reportSent: boolean | null;\n  reportId: string | null;\n};',
+            ),
+            (
+              '    labourPct: null, labourTarget: null, wasteCost: null, stockCompleted: null, reportSent: null,\n',
+              '    labourPct: null, labourTarget: null, wasteCost: null, stockCompleted: null, reportSent: null, reportId: null,\n',
+            ),
+            (
+              '''    supabase
+                  .from("weekly_reports")
+                  .select("status")
+                  .eq("period_id", period.id)
+                  .eq("site_id", siteId)
+                  .maybeSingle(),
+              ]);
+              if (!snapshot) return empty;
+              return {''',
+              '''    supabase
+                  .from("weekly_reports")
+                  .select("id, status")
+                  .eq("period_id", period.id)
+                  .eq("site_id", siteId)
+                  .maybeSingle(),
+              ]);
+              const reportSent = report ? ["submitted", "review_required", "approved", "shared"].includes(report.status) : false;
+              if (!snapshot) return { ...empty, reportId: report?.id ?? null, reportSent };
+              return {''',
+            ),
+            (
+              '    reportSent: report ? ["submitted", "review_required", "approved", "shared"].includes(report.status) : false,\n',
+              '    reportSent,\n    reportId: report?.id ?? null,\n',
+            ),
+            (
+              '    reportSent: booleanOrNull(snapshot.reportSent),\n',
+              '    reportSent: booleanOrNull(snapshot.reportSent),\n    reportId: typeof snapshot.reportId === "string" ? snapshot.reportId : null,\n',
+            ),
+          ]
+          for old, new in replacements:
+            if old not in data:
+              raise SystemExit(f'one-to-ones pattern missing: {old[:80]!r}')
+            data = data.replace(old, new, 1)
+          data_path.write_text(data)
+
+          form_path = Path('src/components/one-to-ones/one-to-one-form.tsx')
+          form = form_path.read_text()
+          replacements = [
+            (
+              'import { useActionState, useEffect, useMemo, useState } from "react";\nimport { useRouter } from "next/navigation";',
+              'import { useActionState, useEffect, useMemo, useState } from "react";\nimport Link from "next/link";\nimport { useRouter } from "next/navigation";',
+            ),
+            (
+              'import { CheckCircle2, Copy, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";',
+              'import { ArrowUpRight, CheckCircle2, Copy, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";',
+            ),
+            (
+              '''        <div className="form-section__heading">
+                  <div><p className="form-section__step">Section 2</p><h2 className="form-section__title">KPI dashboard</h2></div>
+                  <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Auto from assigned kitchen</span>
+                </div>''',
+              '''        <div className="form-section__heading">
+                  <div><p className="form-section__step">Section 2</p><h2 className="form-section__title">KPI dashboard</h2></div>
+                  <div className="form-section__heading-actions">
+                    {kpis.reportId ? <Link className="button button--secondary button--compact" href={`/reports/${kpis.reportId}`}>Open weekly report <ArrowUpRight aria-hidden="true" size={14} /></Link> : null}
+                    <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Auto from assigned kitchen</span>
+                  </div>
+                </div>''',
+            ),
+          ]
+          for old, new in replacements:
+            if old not in form:
+              raise SystemExit(f'one-to-one form pattern missing: {old[:80]!r}')
+            form = form.replace(old, new, 1)
+          form_path.write_text(form)
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-uat012-crosslink.yml
+          git add src/lib/data/one-to-ones.ts src/components/one-to-ones/one-to-one-form.tsx
+          git commit -m "Link 1-1 KPIs to weekly reports"
+          git push origin HEAD:agent/uat-012-workbench-navigation
