@@ -1,29 +1,23 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, MessageSquareText } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, MessageSquareText, Siren } from "lucide-react";
 import { CostChart } from "@/components/dashboard/cost-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { Workbench } from "@/components/dashboard/workbench";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { getVisibleManagerMessages } from "@/lib/data/manager-home";
-import { getReportingBundle } from "@/lib/data/reporting";
+import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
 import { getWorkbench } from "@/lib/data/workbench";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Group overview" };
 
 export default async function DashboardPage() {
-  const [profile, rawBundle] = await Promise.all([requireSessionProfile(), getReportingBundle()]);
-  const bundle = profile.previewSiteId ? {
-    ...rawBundle,
-    sites: rawBundle.sites.filter((site) => site.id === profile.previewSiteId),
-    reports: rawBundle.reports.filter((report) => report.siteId === profile.previewSiteId),
-    expectedSites: rawBundle.expectedSites.filter((site) => site.id === profile.previewSiteId),
-    expectedSiteCount: rawBundle.expectedSites.some((site) => site.id === profile.previewSiteId) ? 1 : 0,
-  } : rawBundle;
+  const profile = await requireSessionProfile();
+  const bundle = await getScopedReportingBundle(profile);
   const { sites, reports, week, expectedSiteCount } = bundle;
   const [workbench, messages] = await Promise.all([
-    getWorkbench(profile.navigationRole, bundle, { siteId: profile.previewSiteId, managerId: profile.previewManagerId }),
+    getWorkbench(profile.navigationRole, bundle, { siteIds: profile.siteScopeIds, managerId: profile.scopeManagerId }),
     getVisibleManagerMessages(profile),
   ]);
   const totals = sites.reduce((sum, site) => ({ netSales: sum.netSales + site.netSales, cogs: sum.cogs + site.cogs, staffCost: sum.staffCost + site.staffCost, wasteCost: sum.wasteCost + (site.wastePct / 100) * site.netSales }), { netSales: 0, cogs: 0, staffCost: 0, wasteCost: 0 });
@@ -42,7 +36,7 @@ export default async function DashboardPage() {
   const isManagerHome = profile.navigationRole === "kitchen_manager";
   const managerName = profile.isAccessPreview ? profile.previewManagerName : profile.fullName;
   const firstName = managerName?.trim().split(/\s+/)[0] ?? "there";
-  const siteContext = sites.length === 1 ? sites[0]?.name : sites.length > 1 ? `${sites.length} kitchens` : "your kitchens";
+  const siteContext = sites.length === 1 ? sites[0]?.name : sites.length > 1 ? `${sites.length} kitchens` : profile.previewSiteName ?? "your kitchens";
 
   return (
     <>
@@ -55,14 +49,17 @@ export default async function DashboardPage() {
         {canCreateReport ? <Link className="button button--primary" href="/reports/new">Start a report <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
 
-      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>You are seeing the same kitchen workspace and navigation as {profile.previewManagerName ?? "the assigned manager"}. Your Admin capabilities remain active so you can complete work with them.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>You are seeing only {profile.previewSiteName} records, using the same workspace as {profile.previewManagerName ?? "the assigned manager"}. Your Admin capabilities remain active so you can complete work with them.</div> : null}
 
       {isManagerHome ? <div className="section-kicker">Today’s actions</div> : null}
       <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
 
-      {messages.length ? <section aria-label="Messages from management" className="manager-message-stack">{messages.map((message) => <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><MessageSquareText aria-hidden="true" size={18} /><div><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><h2>{message.title}</h2><p>{message.body}</p></div></article>)}</section> : null}
+      {messages.length ? <section aria-label="Messages from management" className="manager-message-stack">{messages.map((message) => {
+        const PriorityIcon = message.priority === "urgent" ? Siren : message.priority === "important" ? AlertTriangle : MessageSquareText;
+        return <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><div className="manager-home-message__icon"><PriorityIcon aria-hidden="true" size={20} /></div><div className="manager-home-message__content"><div className="manager-home-message__top"><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><span className={`manager-home-message__priority manager-home-message__priority--${message.priority}`}>{message.priority}</span></div><h2>{message.title}</h2><p>{message.body}</p></div></article>;
+      })}</section> : null}
 
-      <section aria-label="Group metrics" className="metric-grid">
+      <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />
         <MetricCard accent="#eb6b4f" label={allStockAdjusted ? "Food cost" : "Food cost / spend"} note={`${formatCurrency(totals.cogs)} · target ≤ ${formatPercentage(foodTarget)}${allStockAdjusted ? "" : " · mixed basis"}`} overTarget={hasSales && foodCostPct > foodTarget} value={formatPercentage(foodCostPct)} />
         <MetricCard accent="#2d7a62" label="Staff cost" note={`${formatCurrency(totals.staffCost)} · target ≤ ${formatPercentage(labourTarget)}`} overTarget={hasSales && labourPct > labourTarget} value={formatPercentage(labourPct)} />
