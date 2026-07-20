@@ -4,7 +4,7 @@ import { environment } from "@/lib/env";
 
 export default async function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireSessionProfile();
-  const previewSites = profile.actualRole === "admin" ? await getAdminPreviewSites() : [];
+  const previewSites = profile.capabilities.admin ? await getAdminPreviewSites() : [];
   return (
     <AppShell
       isDemo={environment.isDemo}
@@ -14,6 +14,8 @@ export default async function ApplicationLayout({ children }: { children: React.
         fullName: profile.fullName,
         role: profile.role,
         actualRole: profile.actualRole,
+        navigationRole: profile.navigationRole,
+        capabilities: profile.capabilities,
         isAccessPreview: profile.isAccessPreview,
         previewSiteId: profile.previewSiteId,
         previewSiteName: profile.previewSiteName,

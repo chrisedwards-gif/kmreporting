@@ -12,7 +12,7 @@ export default async function KitchenCheckDetailPage({ params }: { params: Promi
   const [detail, profile] = await Promise.all([getKitchenCheckRun(runId), getSessionProfile()]);
   if (!detail || !profile) notFound();
   if (profile.previewSiteId && detail.siteId !== profile.previewSiteId) notFound();
-  const canReview = ["admin", "group_manager"].includes(profile.actualRole);
+  const canReview = profile.capabilities.manageGroup;
 
   return (
     <>

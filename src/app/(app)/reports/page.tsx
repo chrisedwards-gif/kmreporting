@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { PeriodSelector } from "@/components/reports/period-selector";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
@@ -17,13 +17,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
   const bundle = await getReportingBundle(selectedPeriod);
   const reports = profile.previewSiteId ? bundle.reports.filter((report) => report.siteId === profile.previewSiteId) : bundle.reports;
-  const canCreateReport = ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview;
+  const canCreateReport = profile.capabilities.editReports;
 
   return (
     <>
       <header className="page-header">
         <div>
-          <p className="page-header__eyebrow">{profile.isAccessPreview ? `${profile.previewSiteName ?? "Kitchen"} · read-only preview` : "All kitchens"}</p>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? `${profile.previewSiteName ?? "Kitchen"} · Kitchen Manager view` : "All kitchens"}</p>
           <h1 className="page-header__title">Weekly reports.</h1>
           <p className="page-header__copy">One submission per kitchen, rolled into one controlled group view.</p>
         </div>
@@ -32,7 +32,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           {canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> New report</Link> : null}
         </div>
       </header>
-      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Read-only Kitchen Manager reporting preview. Drafts can be inspected but not edited from this mode.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Full reporting controls are retained; this list is scoped to {profile.previewSiteName} and mirrors the Kitchen Manager workspace.</div> : null}
       <div className="report-list">
         {reports.map((report) => {
           const canContinueDraft = report.status === "draft" && canCreateReport;

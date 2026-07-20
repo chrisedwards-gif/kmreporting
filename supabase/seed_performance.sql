@@ -1,6 +1,5 @@
 -- Optional UAT seed for performance focus areas and initial actions.
--- Run after migrations 011 and 012 and after the real manager login/profile has
--- been assigned as the site's primary manager in Sites & access.
+-- Launch order: invite managers -> assign kitchens -> run this seed.
 --
 -- This script never creates a second Scott/Warren identity. profiles.id is the
 -- canonical person UUID and site_manager_assignments supplies the kitchen.
@@ -110,3 +109,25 @@ where not exists (
   where existing.manager_profile_id = c.profile_id
     and lower(trim(existing.action)) = lower(trim(t.action))
 );
+
+-- A fresh database can apply this seed successfully while creating nothing if
+-- the canonical manager profiles and assignments do not exist yet. Report the
+-- result loudly so launch setup cannot silently produce an empty workspace.
+do $$
+declare
+  manager_count integer;
+  assignment_count integer;
+  action_count integer;
+begin
+  select count(*) into manager_count from public.profiles where role = 'kitchen_manager';
+  select count(*) into assignment_count from public.site_manager_assignments where ends_on is null;
+  select count(*) into action_count from public.manager_actions;
+
+  raise notice 'seed_performance: % kitchen manager profile(s), % open assignment(s), % focus action(s).',
+    manager_count, assignment_count, action_count;
+
+  if assignment_count = 0 then
+    raise warning 'seed_performance: no manager assignments exist, so no focus actions were seeded. Invite Scott and Warren from People & access, assign their kitchens, then re-run this seed.';
+  end if;
+end;
+$$;
