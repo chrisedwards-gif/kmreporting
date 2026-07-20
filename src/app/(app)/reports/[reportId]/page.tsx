@@ -6,7 +6,7 @@ import { SalesInsightUpload } from "@/components/reports/sales-insight-upload";
 import { SalesInsightsPanel } from "@/components/reports/sales-insights-panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getSessionProfile } from "@/lib/auth/dal";
-import { getReportingBundle, roleCanApprove } from "@/lib/data/reporting";
+import { getReportingBundle } from "@/lib/data/reporting";
 import { getReportSalesInsights } from "@/lib/data/sales-insights";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
@@ -33,9 +33,9 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
   if (profile?.previewSiteId && report.siteId !== profile.previewSiteId) notFound();
   const salesInsights = await getReportSalesInsights({ reportId: report.id, siteId: report.siteId, weekStart: report.weekStart });
   const actionableFlags = report.costs.flags.filter((flag) => flag.severity !== "info");
-  const canEditDraft = Boolean(profile && ["admin", "group_manager", "kitchen_manager"].includes(profile.actualRole));
+  const canEditDraft = Boolean(profile?.capabilities.editReports);
   const canUploadSales = Boolean(canEditDraft && ["draft", "submitted", "review_required"].includes(report.status));
-  const canApprove = Boolean(profile && roleCanApprove(profile.actualRole));
+  const canApprove = Boolean(profile?.capabilities.approveReports);
 
   const narrative = [
     ["Wins & guest feedback", report.wins],
@@ -54,7 +54,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ r
         <div className="page-header__actions"><Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> Reports</Link>{report.status === "draft" && canEditDraft ? <Link className="button button--primary" href={`/reports/new?report=${report.id}`}><Pencil aria-hidden="true" size={16} /> Continue draft</Link> : null}</div>
       </header>
 
-      {profile?.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode for {profile.previewSiteName}. You retain full report editing and approval controls.</div> : null}
+      {profile?.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Kitchen Manager view for {profile.previewSiteName}. Full report editing and approval capabilities remain active.</div> : null}
 
       <section className="sales-report-section">
         <div className="sales-report-section__heading"><div><p className="page-header__eyebrow">Commercial performance</p><h2>Sales insight.</h2><p>Daily trade, transaction value, covers and menu mix for the reporting week.</p></div></div>
