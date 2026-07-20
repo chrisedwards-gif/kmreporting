@@ -82,6 +82,33 @@
   min-height: 4.6rem;
 }
 
+.sales-bridge-status {
+  align-items: center;
+  background: rgb(31 122 90 / 9%);
+  border: 1px solid rgb(31 122 90 / 24%);
+  border-radius: 16px;
+  display: grid;
+  gap: .7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: -1rem;
+  padding: .85rem 1rem;
+}
+
+.sales-bridge-status > svg {
+  color: var(--sage);
+}
+
+.sales-bridge-status div {
+  display: grid;
+  gap: .15rem;
+}
+
+.sales-bridge-status span {
+  color: var(--ink-500);
+  font-size: .75rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 1050px) {
   .access-preview--active {
     align-items: flex-start;
@@ -96,6 +123,15 @@
 
 @media (max-width: 760px) {
   .access-preview {
+    display: none;
+  }
+
+  .sales-bridge-status {
+    grid-template-columns: auto minmax(0, 1fr);
+    margin-top: -.5rem;
+  }
+
+  .sales-bridge-status > svg:last-child {
     display: none;
   }
 }

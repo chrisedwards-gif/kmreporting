@@ -8,6 +8,7 @@ import {
   BellRing,
   Beaker,
   BookOpenCheck,
+  CalendarDays,
   ChefHat,
   ClipboardCheck,
   ClipboardList,
@@ -17,6 +18,7 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
+  MessageSquareText,
   Scale,
   Settings2,
   ShieldCheck,
@@ -42,13 +44,14 @@ const navSections: Array<{ heading: string; items: NavItem[] }> = [
       { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
       { href: "/checks", label: "Kitchen checks", icon: ClipboardCheck, roles: kitchenOperationalRoles },
       { href: "/sops", label: "SOPs & systems", icon: BookOpenCheck, roles: kitchenOperationalRoles },
+      { href: "/calendar", label: "Kitchen calendar", icon: CalendarDays, roles: kitchenOperationalRoles },
     ],
   },
   {
     heading: "Perform",
     items: [
-      { href: "/one-to-ones", label: "Manager 1-1s", icon: UsersRound, roles: kitchenOperationalRoles },
-      { href: "/performance/actions", label: "Action log", icon: ListChecks, roles: kitchenOperationalRoles },
+      { href: "/one-to-ones", label: "My 1-1s", icon: UsersRound, roles: kitchenOperationalRoles },
+      { href: "/performance/actions", label: "Today’s actions", icon: ListChecks, roles: kitchenOperationalRoles },
       { href: "/training", label: "Team training", icon: GraduationCap, roles: kitchenOperationalRoles },
       { href: "/performance/probation", label: "Probation", icon: Scale, roles: ["admin", "group_manager"] },
       { href: "/product-development", label: "Product development", icon: Beaker, roles: kitchenOperationalRoles },
@@ -64,6 +67,7 @@ const navSections: Array<{ heading: string; items: NavItem[] }> = [
   {
     heading: "Admin",
     items: [
+      { href: "/messages", label: "Team messages", icon: MessageSquareText, roles: ["admin", "group_manager"] },
       { href: "/performance/managers", label: "Manager admin", icon: UserRoundCog, roles: ["admin"] },
       { href: "/settings/sites", label: "Sites & access", icon: Settings2, roles: ["admin"] },
       { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },
@@ -73,13 +77,7 @@ const navSections: Array<{ heading: string; items: NavItem[] }> = [
 
 const roleLabel = (role: AppRole) => role === "viewer" ? "reporting viewer" : role.replaceAll("_", " ");
 
-export function AppShell({
-  children,
-  isDemo,
-  isPreview,
-  previewSites,
-  user,
-}: {
+export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
   children: React.ReactNode;
   isDemo: boolean;
   isPreview: boolean;
@@ -96,7 +94,6 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  const previewAllowedPaths = new Set(["/dashboard", "/reports"]);
 
   return (
     <div className={classNames("app-shell", user.isAccessPreview && "app-shell--access-preview")}>
@@ -105,10 +102,7 @@ export function AppShell({
         <div className="app-shell__brand"><div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div><div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div></div>
         <nav aria-label="Main navigation" className="app-shell__nav">
           {navSections.map((section) => {
-            const visibleItems = section.items.filter((item) => {
-              if (user.isAccessPreview && !previewAllowedPaths.has(item.href)) return false;
-              return !item.roles || item.roles.includes(user.role);
-            });
+            const visibleItems = section.items.filter((item) => !item.roles || item.roles.includes(user.role));
             if (!visibleItems.length) return null;
             return <div className="app-shell__nav-section" key={section.heading}><div className="app-shell__nav-heading">{section.heading}</div>{visibleItems.map(({ href, icon: Icon, label }) => { const active = pathname === href || pathname.startsWith(`${href}/`); return <Link className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")} href={href} key={href} onClick={() => setNavOpen(false)}><Icon aria-hidden="true" size={18} />{label}</Link>; })}</div>;
           })}
