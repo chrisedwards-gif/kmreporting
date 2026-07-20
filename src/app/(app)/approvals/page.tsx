@@ -2,18 +2,19 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock3, Share2, ShieldAlert } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PeriodSelector } from "@/components/reports/period-selector";
-import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
+import { getReportingPeriods } from "@/lib/data/reporting";
+import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
 import { formatPercentage } from "@/lib/utils";
 import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Approvals" };
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  await requireGroupWorkspaceRole(["admin", "group_manager"]);
+  const profile = await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, expectedSites } = await getReportingBundle(selectedPeriod);
+  const { reports, expectedSites } = await getScopedReportingBundle(profile, selectedPeriod);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
   const approvedOrShared = reports.filter((report) => ["approved", "shared"].includes(report.status));
   const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
@@ -79,7 +80,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                     : <span className="status-badge status-badge--draft">Not started</span>}
                 </div>
               ))}
-              {!outstanding.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}
+              {!outstanding.length ? <div className="empty-inline empty-inline--compact">Every active reporting kitchen has submitted a report.</div> : null}
             </div>
           </section>
           <section className="panel">
