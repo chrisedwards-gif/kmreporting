@@ -10,12 +10,39 @@ import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Management summary" };
 
-const percentagePointVariance = (actual: number, target: number) => {
-  const variance = actual - target;
-  return `${variance > 0 ? "+" : ""}${variance.toFixed(1)}pp vs target`;
+const emptyNarrativePattern = /^(?:n\/?a|none|nil|no|not applicable|-+)$/i;
+
+const cleanNarrative = (value: string) => {
+  const trimmed = value.trim();
+  return !trimmed || emptyNarrativePattern.test(trimmed) ? "" : trimmed;
 };
 
-const narrativeOrFallback = (value: string, fallback: string) => value.trim() || fallback;
+const narrativeOrFallback = (value: string, fallback: string) => cleanNarrative(value) || fallback;
+
+const metricTone = (actual: number, target: number) => {
+  if (actual <= target) return "good";
+  if (actual <= target + 2) return "watch";
+  return "bad";
+};
+
+const varianceLabel = (actual: number, target: number) => {
+  const variance = actual - target;
+  if (Math.abs(variance) < 0.05) return "On target";
+  return `${Math.abs(variance).toFixed(1)}pp ${variance < 0 ? "below" : "over"} target`;
+};
+
+const coverageLabel = (status?: string) => {
+  if (status === "shared") return "Included";
+  if (status === "approved") return "Approved";
+  if (status === "submitted" || status === "review_required") return "Awaiting approval";
+  return "Not started";
+};
+
+const coverageTone = (status?: string) => {
+  if (status === "shared" || status === "approved") return "good";
+  if (status === "submitted" || status === "review_required") return "watch";
+  return "muted";
+};
 
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const profile = await requireGroupWorkspaceRole(["admin", "group_manager", "finance", "viewer"]);
@@ -61,6 +88,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const foodTarget = weightedTarget((report) => report.costs.foodCostTarget);
   const labourTarget = weightedTarget((report) => report.costs.labourTarget);
   const wasteTarget = weightedTarget((report) => report.costs.wasteTarget);
+  const primeTarget = foodTarget + labourTarget;
   const allStockAdjusted = approvedReports.length > 0 && approvedReports.every((report) => report.costs.foodCostBasis === "stock_adjusted");
   const actionableFlagCount = approvedReports.reduce((count, report) => count + report.costs.flags.filter((flag) => flag.severity !== "info").length, 0);
   const releaseLabel = released ? "Released weekly management pack" : ready ? "Approved and ready to release" : "Internal partial management pack";
@@ -69,30 +97,37 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
     : ready
       ? "Every active reporting kitchen has named approval. The pack can now be released."
       : `${approvedReports.length} of ${expectedSites.length} active reporting kitchens are approved and included.`;
-  const wins = approvedReports.filter((report) => report.wins.trim()).map((report) => ({ site: report.siteName, text: report.wins }));
+  const wins = approvedReports
+    .map((report) => ({ site: report.siteName, text: cleanNarrative(report.wins) }))
+    .filter((item) => item.text);
   const risks = approvedReports.flatMap((report) => [
-    { site: report.siteName, label: "Operational", text: report.operationalIssues },
-    { site: report.siteName, label: "Staffing", text: report.staffingIssues },
-    { site: report.siteName, label: "Compliance", text: report.complianceIssues },
-    { site: report.siteName, label: "Equipment", text: report.equipmentIssues },
-  ].filter((item) => item.text.trim()));
-  const groupActions = approvedReports.filter((report) => report.actionsUnderway.trim()).map((report) => ({ site: report.siteName, text: report.actionsUnderway }));
-  const supportRequests = approvedReports.filter((report) => report.supportNeeded.trim()).map((report) => ({ site: report.siteName, text: report.supportNeeded }));
+    { site: report.siteName, label: "Operational", text: cleanNarrative(report.operationalIssues) },
+    { site: report.siteName, label: "Staffing", text: cleanNarrative(report.staffingIssues) },
+    { site: report.siteName, label: "Compliance", text: cleanNarrative(report.complianceIssues) },
+    { site: report.siteName, label: "Equipment", text: cleanNarrative(report.equipmentIssues) },
+  ].filter((item) => item.text));
+  const groupActions = approvedReports
+    .map((report) => ({ site: report.siteName, text: cleanNarrative(report.actionsUnderway) }))
+    .filter((item) => item.text);
+  const supportRequests = approvedReports
+    .map((report) => ({ site: report.siteName, text: cleanNarrative(report.supportNeeded) }))
+    .filter((item) => item.text);
+  const visibleWins = wins.slice(0, 3);
+  const visibleRisks = risks.slice(0, 4);
+  const visibleSupport = supportRequests.slice(0, 3);
 
   return (
-    <div className={`management-summary management-pack ${released ? "management-summary--released" : "management-summary--partial"}`}>
-      {!ready ? <div className="print-partial-message">INTERNAL PARTIAL MANAGEMENT PACK - approved kitchen reports only. Outstanding kitchens and approvals are listed in reporting coverage.</div> : null}
-
-      <section className={`summary-release-state summary-release-state--${released ? "released" : ready ? "ready" : "pending"}`} aria-label="Weekly pack release status">
+    <div className={`management-summary management-report ${released ? "management-summary--released" : "management-summary--partial"}`}>
+      <section className={`summary-release-state management-report__screen-status summary-release-state--${released ? "released" : ready ? "ready" : "pending"}`} aria-label="Weekly pack release status">
         <div><span>Week ending {formatDate(week.end)}</span><strong>{releaseLabel}</strong><small>{releaseDetail}</small></div>
         <StatusBadge status={released ? "shared" : ready ? "approved" : "review_required"} />
       </section>
 
-      <header className="page-header management-pack__header">
+      <header className="page-header management-report__screen-header">
         <div>
-          <p className="page-header__eyebrow">House of Social · weekly management report</p>
-          <h1 className="page-header__title">Kitchen performance pack.</h1>
-          <p className="page-header__copy">Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)} · group overview followed by a full report for each approved kitchen.</p>
+          <p className="page-header__eyebrow">Reporting</p>
+          <h1 className="page-header__title">Weekly management pack.</h1>
+          <p className="page-header__copy">A clear group readout followed by one management page for every approved kitchen.</p>
         </div>
         <div className="page-header__actions">
           <PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} />
@@ -102,111 +137,167 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
       </header>
 
       {!ready ? (
-        <div className="privacy-callout management-pack__screen-note">
+        <div className="privacy-callout management-report__screen-note">
           <LockKeyhole aria-hidden="true" className="privacy-callout__icon" size={15} />
-          This export will be clearly marked as partial. {missingReports.length ? `${missingReports.map((site) => site.name).join(", ")} ${missingReports.length === 1 ? "has" : "have"} not submitted.` : "All active kitchens have submitted."} {awaitingApproval.length ? `${awaitingApproval.map((site) => site.name).join(", ")} ${awaitingApproval.length === 1 ? "is" : "are"} awaiting approval.` : ""}
+          The export will be marked as partial. {missingReports.length ? `${missingReports.map((site) => site.name).join(", ")} ${missingReports.length === 1 ? "has" : "have"} not submitted.` : "All active kitchens have submitted."} {awaitingApproval.length ? `${awaitingApproval.map((site) => site.name).join(", ")} ${awaitingApproval.length === 1 ? "is" : "are"} awaiting approval.` : ""}
         </div>
       ) : null}
 
-      <section className="panel management-summary__pack management-pack__group-overview">
-        <div className="panel__header">
-          <div><h2 className="panel__title">Group overview</h2><p className="panel__subtitle">Approved kitchen totals · weighted percentages against net sales</p></div>
-          <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{approvedReports.length} of {expectedSites.length} included</span>
-        </div>
-        <div className="panel__body stack">
-          <section aria-label="Group commercial metrics" className="management-pack__metric-grid">
-            <article className="management-pack__metric"><span>Net sales</span><strong>{formatCurrency(totals.sales)}</strong><small>{approvedReports.length} approved kitchen{approvedReports.length === 1 ? "" : "s"}</small></article>
-            <article className="management-pack__metric"><span>{allStockAdjusted ? "Food cost" : "Food cost / spend"}</span><strong>{formatPercentage(foodPct)}</strong><small>{formatCurrency(totals.food)} · target {formatPercentage(foodTarget)}</small></article>
-            <article className="management-pack__metric"><span>Labour</span><strong>{formatPercentage(labourPct)}</strong><small>{formatCurrency(totals.labour)} · target {formatPercentage(labourTarget)}</small></article>
-            <article className="management-pack__metric"><span>Waste</span><strong>{formatPercentage(wastePct)}</strong><small>{formatCurrency(totals.waste)} · target {formatPercentage(wasteTarget)}</small></article>
-            <article className="management-pack__metric"><span>Prime cost</span><strong>{formatPercentage(primeCostPct)}</strong><small>{formatCurrency(primeCost)}</small></article>
-            <article className="management-pack__metric"><span>Controls outstanding</span><strong>{actionableFlagCount}</strong><small>{formatCurrency(totals.pendingCredits)} pending credits · {formatCurrency(totals.awaitingInvoice)} awaiting invoice</small></article>
+      <main className="management-report__document">
+        <section className="management-report__page management-report__page--group">
+          <div className="management-report__brand-bar" aria-hidden="true" />
+          {!ready ? <div className="management-report__partial-banner">Internal partial management pack - approved kitchen reports only</div> : null}
+
+          <header className="management-report__hero">
+            <div>
+              <p className="management-report__eyebrow">House of Social · weekly management report</p>
+              <h1>Kitchen performance</h1>
+              <p>Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)} · prepared for Jake Atkinson</p>
+            </div>
+            <div className="management-report__hero-status">
+              <span>Week ending {formatDate(week.end)}</span>
+              <strong className={`management-report__badge management-report__badge--${released ? "good" : ready ? "good" : "watch"}`}>{released ? "Released" : ready ? "Ready to release" : "Internal partial · review required"}</strong>
+              <small>{approvedReports.length} of {expectedSites.length} active kitchen{expectedSites.length === 1 ? "" : "s"} included</small>
+            </div>
+          </header>
+
+          <section className="management-report__section">
+            <div className="management-report__section-title"><h2>Group at a glance</h2><p>Approved reports only</p></div>
+            <div className="management-report__kpis">
+              <article className="management-report__kpi management-report__kpi--primary"><span>Net sales</span><strong>{formatCurrency(totals.sales)}</strong><small>{approvedReports.length} approved kitchen{approvedReports.length === 1 ? "" : "s"}</small></article>
+              <article className="management-report__kpi"><span>Prime cost</span><strong>{formatPercentage(primeCostPct)}</strong><small>{formatCurrency(primeCost)} · target {formatPercentage(primeTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(primeCostPct, primeTarget)}`}>{varianceLabel(primeCostPct, primeTarget)}</em></article>
+              <article className="management-report__kpi"><span>{allStockAdjusted ? "Food cost" : "Food spend"}</span><strong>{formatPercentage(foodPct)}</strong><small>{formatCurrency(totals.food)} · target {formatPercentage(foodTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(foodPct, foodTarget)}`}>{varianceLabel(foodPct, foodTarget)}</em></article>
+              <article className="management-report__kpi"><span>Labour</span><strong>{formatPercentage(labourPct)}</strong><small>{formatCurrency(totals.labour)} · target {formatPercentage(labourTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(labourPct, labourTarget)}`}>{varianceLabel(labourPct, labourTarget)}</em></article>
+            </div>
+            <div className="management-report__summary-strip" aria-label="Group reporting controls">
+              <div><span>Waste</span><strong>{formatPercentage(wastePct)} · {formatCurrency(totals.waste)}</strong><small>{varianceLabel(wastePct, wasteTarget)}</small></div>
+              <div><span>Open controls</span><strong>{actionableFlagCount}</strong><small>Warning or critical checks</small></div>
+              <div><span>Pending credits</span><strong>{formatCurrency(totals.pendingCredits)}</strong></div>
+              <div><span>Awaiting invoice</span><strong>{formatCurrency(totals.awaitingInvoice)}</strong></div>
+              <div><span>Manual purchases</span><strong>{formatCurrency(totals.manualPurchases)}</strong></div>
+            </div>
           </section>
 
-          <section className="management-pack__section">
-            <div className="management-pack__section-heading"><div><span>Reporting coverage</span><h2>Active kitchens and approval state</h2></div></div>
-            <div className="management-pack__coverage">
+          <section className="management-report__section">
+            <div className="management-report__section-title"><h2>Reporting status</h2><p>Only active reporting kitchens are expected</p></div>
+            <div className="management-report__coverage">
               {expectedSites.map((site) => {
                 const report = reportBySite.get(site.id);
-                return <div className="management-pack__coverage-row" key={site.id}><div><strong>{site.name}</strong><span>{site.code}</span></div>{report ? <StatusBadge status={report.status} /> : <span className="status-badge status-badge--draft">Not started</span>}</div>;
+                return (
+                  <article className="management-report__coverage-card" key={site.id}>
+                    <div><strong>{site.name}</strong><small>{site.code}{report?.manager ? ` · ${report.manager}` : ""}</small></div>
+                    <span className={`management-report__badge management-report__badge--${coverageTone(report?.status)}`}>{coverageLabel(report?.status)}</span>
+                  </article>
+                );
               })}
               {!expectedSites.length ? <div className="empty-inline empty-inline--compact">No active reporting kitchens are configured for this week.</div> : null}
             </div>
           </section>
 
-          <section className="management-pack__section">
-            <div className="management-pack__section-heading"><div><span>Kitchen comparison</span><h2>Commercial performance by site</h2></div></div>
-            <div className="table-scroll management-pack__table-wrap">
-              <table className="data-table management-pack__table">
-                <thead><tr><th>Kitchen</th><th>Net sales</th><th>Food</th><th>Labour</th><th>Waste</th><th>Prime cost</th><th>Checks</th></tr></thead>
+          <section className="management-report__section">
+            <div className="management-report__section-title"><h2>Management readout</h2><p>The points that need attention this week</p></div>
+            <div className="management-report__readout">
+              <article className="management-report__read-card management-report__read-card--good">
+                <h3>What went well</h3>
+                {visibleWins.length ? <ul>{visibleWins.map((item) => <li key={`${item.site}-${item.text}`}><strong>{item.site}:</strong> {item.text}</li>)}</ul> : <p>No material wins were recorded.</p>}
+                {wins.length > visibleWins.length ? <small>+ {wins.length - visibleWins.length} more in the kitchen pages</small> : null}
+              </article>
+              <article className="management-report__read-card management-report__read-card--watch">
+                <h3>Needs attention</h3>
+                {visibleRisks.length || actionableFlagCount ? <ul>{visibleRisks.map((item) => <li key={`${item.site}-${item.label}-${item.text}`}><strong>{item.site} · {item.label}:</strong> {item.text}</li>)}{actionableFlagCount ? <li><strong>Controls:</strong> {actionableFlagCount} management check{actionableFlagCount === 1 ? "" : "s"} remain open.</li> : null}</ul> : <p>No material risks or control exceptions were recorded.</p>}
+                {risks.length > visibleRisks.length ? <small>+ {risks.length - visibleRisks.length} more in the kitchen pages</small> : null}
+              </article>
+              <article className="management-report__read-card management-report__read-card--action">
+                <h3>Decision / support</h3>
+                {visibleSupport.length ? <ul>{visibleSupport.map((item) => <li key={`${item.site}-${item.text}`}><strong>{item.site}:</strong> {item.text}</li>)}</ul> : <p>No group support was requested.</p>}
+                {!released && actionableFlagCount ? <p><strong>Before release:</strong> resolve the open management controls and complete remaining approvals.</p> : null}
+                {supportRequests.length > visibleSupport.length ? <small>+ {supportRequests.length - visibleSupport.length} more in the kitchen pages</small> : null}
+              </article>
+            </div>
+          </section>
+
+          <section className="management-report__section">
+            <div className="management-report__section-title"><h2>Kitchen comparison</h2><p>Performance against agreed targets</p></div>
+            <div className="management-report__table-wrap">
+              <table className="management-report__table">
+                <thead><tr><th>Kitchen</th><th>Sales</th><th>Food</th><th>Labour</th><th>Waste</th><th>Prime</th><th>Controls</th></tr></thead>
                 <tbody>
-                  {approvedReports.map((report) => <tr key={report.id}><td><strong>{report.siteName}</strong><span>{report.manager}</span></td><td>{formatCurrency(report.costs.netSales)}</td><td>{formatPercentage(report.costs.foodCostPct)}<span>{percentagePointVariance(report.costs.foodCostPct, report.costs.foodCostTarget)}</span></td><td>{formatPercentage(report.costs.labourPct)}<span>{percentagePointVariance(report.costs.labourPct, report.costs.labourTarget)}</span></td><td>{formatPercentage(report.costs.wastePct)}<span>{percentagePointVariance(report.costs.wastePct, report.costs.wasteTarget)}</span></td><td>{formatPercentage(report.costs.primeCostPct)}<span>{formatCurrency(report.costs.primeCost)}</span></td><td>{report.costs.flags.filter((flag) => flag.severity !== "info").length}</td></tr>)}
+                  {approvedReports.map((report) => {
+                    const controls = report.costs.flags.filter((flag) => flag.severity !== "info").length;
+                    return <tr key={report.id}><td><strong>{report.siteName}</strong><small>{report.manager}</small></td><td>{formatCurrency(report.costs.netSales)}</td><td><strong>{formatPercentage(report.costs.foodCostPct)}</strong><small>{varianceLabel(report.costs.foodCostPct, report.costs.foodCostTarget)}</small></td><td><strong>{formatPercentage(report.costs.labourPct)}</strong><small>{varianceLabel(report.costs.labourPct, report.costs.labourTarget)}</small></td><td><strong>{formatPercentage(report.costs.wastePct)}</strong><small>{varianceLabel(report.costs.wastePct, report.costs.wasteTarget)}</small></td><td><strong>{formatPercentage(report.costs.primeCostPct)}</strong><small>{formatCurrency(report.costs.primeCost)}</small></td><td><span className={`management-report__variance management-report__variance--${controls ? "watch" : "good"}`}>{controls ? `${controls} open` : "Clear"}</span></td></tr>;
+                  })}
                   {!approvedReports.length ? <tr><td colSpan={7}>No approved kitchen figures are available.</td></tr> : null}
                 </tbody>
               </table>
             </div>
           </section>
 
-          <section className="management-pack__group-narrative">
-            <article><h3>Key wins</h3>{wins.length ? <ul>{wins.map((item) => <li key={`${item.site}-${item.text}`}><strong>{item.site}:</strong> {item.text}</li>)}</ul> : <p>No material wins were recorded.</p>}</article>
-            <article><h3>Risks and issues</h3>{risks.length ? <ul>{risks.map((item) => <li key={`${item.site}-${item.label}-${item.text}`}><strong>{item.site} · {item.label}:</strong> {item.text}</li>)}</ul> : <p>No material operational, staffing, compliance or equipment issues were recorded.</p>}</article>
-            <article><h3>Actions underway</h3>{groupActions.length ? <ul>{groupActions.map((item) => <li key={`${item.site}-${item.text}`}><strong>{item.site}:</strong> {item.text}</li>)}</ul> : <p>No follow-up actions were recorded.</p>}</article>
-            <article><h3>Group support required</h3>{supportRequests.length ? <ul>{supportRequests.map((item) => <li key={`${item.site}-${item.text}`}><strong>{item.site}:</strong> {item.text}</li>)}</ul> : <p>No group support requests were recorded.</p>}</article>
-          </section>
-        </div>
-      </section>
+          <footer className="management-report__page-footer"><span>House of Social · Internal management information</span><span>Weekly pack · {formatDate(week.end)}</span></footer>
+        </section>
 
-      <div className="management-pack__site-list">
         {approvedReports.map((report, index) => {
           const wasteCost = report.costs.netSales * report.costs.wastePct / 100;
           const manualPurchases = report.manualPurchases ?? [];
           const manualPurchaseTotal = manualPurchases.reduce((total, item) => total + item.amount, 0);
           const actionableFlags = report.costs.flags.filter((flag) => flag.severity !== "info");
+          const operationalPriorities = [
+            { label: "Operational", text: cleanNarrative(report.operationalIssues) },
+            { label: "Staffing", text: cleanNarrative(report.staffingIssues) },
+            { label: "Compliance", text: cleanNarrative(report.complianceIssues) },
+            { label: "Equipment", text: cleanNarrative(report.equipmentIssues) },
+          ].filter((item) => item.text);
+          const onTrack = !actionableFlags.length
+            && report.costs.foodCostPct <= report.costs.foodCostTarget
+            && report.costs.labourPct <= report.costs.labourTarget
+            && report.costs.wastePct <= report.costs.wasteTarget;
+
           return (
-            <section className="panel management-pack__site" key={report.id}>
-              <div className="panel__header management-pack__site-header">
-                <div><p className="management-pack__site-number">Kitchen {index + 1} of {approvedReports.length} · {report.costs.code}</p><h2 className="panel__title">{report.siteName}</h2><p className="panel__subtitle">{report.manager} · week ending {formatDate(report.weekEnd)}</p></div>
-                <StatusBadge status={report.status} />
-              </div>
-              <div className="panel__body stack">
-                <section className="management-pack__metric-grid management-pack__metric-grid--site" aria-label={`${report.siteName} metrics`}>
-                  <article className="management-pack__metric"><span>Net sales</span><strong>{formatCurrency(report.costs.netSales)}</strong><small>Approved weekly total</small></article>
-                  <article className="management-pack__metric"><span>{report.costs.foodCostBasis === "stock_adjusted" ? "Food cost" : "Food spend"}</span><strong>{formatPercentage(report.costs.foodCostPct)}</strong><small>{formatCurrency(report.costs.cogs)} · {percentagePointVariance(report.costs.foodCostPct, report.costs.foodCostTarget)}</small></article>
-                  <article className="management-pack__metric"><span>Labour</span><strong>{formatPercentage(report.costs.labourPct)}</strong><small>{formatCurrency(report.costs.staffCost)} · {percentagePointVariance(report.costs.labourPct, report.costs.labourTarget)}</small></article>
-                  <article className="management-pack__metric"><span>Waste</span><strong>{formatPercentage(report.costs.wastePct)}</strong><small>{formatCurrency(wasteCost)} · {percentagePointVariance(report.costs.wastePct, report.costs.wasteTarget)}</small></article>
-                  <article className="management-pack__metric"><span>Prime cost</span><strong>{formatPercentage(report.costs.primeCostPct)}</strong><small>{formatCurrency(report.costs.primeCost)}</small></article>
-                  <article className="management-pack__metric"><span>Open checks</span><strong>{actionableFlags.length}</strong><small>{actionableFlags.length ? actionableFlags.map((flag) => flag.label).join(" · ") : "No automated exceptions"}</small></article>
-                </section>
+            <section className="management-report__page management-report__page--site" key={report.id}>
+              <div className="management-report__brand-bar" aria-hidden="true" />
+              <header className="management-report__site-hero">
+                <div><p className="management-report__eyebrow">Kitchen {index + 1} of {approvedReports.length} · {report.costs.code}</p><h1>{report.siteName}</h1><p>{report.manager} · week ending {formatDate(report.weekEnd)}</p></div>
+                <div className="management-report__hero-status"><strong className={`management-report__badge management-report__badge--${onTrack ? "good" : "watch"}`}>{onTrack ? "On track" : "Review required"}</strong><small>{report.status === "shared" ? "Shared report" : "Approved report"}</small></div>
+              </header>
 
-                <section className="management-pack__control-strip" aria-label={`${report.siteName} reporting controls`}>
-                  <div><span>Stocktake</span><strong>{report.sources?.stocktakeCompleted ? "Completed" : "Not completed"}</strong></div>
-                  <div><span>Pending credits</span><strong>{formatCurrency(report.sources?.pendingCredits ?? 0)}</strong></div>
-                  <div><span>Awaiting invoice</span><strong>{formatCurrency(report.sources?.awaitingInvoice ?? 0)}</strong></div>
-                  <div><span>Manual purchases</span><strong>{formatCurrency(manualPurchaseTotal)}</strong><small>{manualPurchases.length} item{manualPurchases.length === 1 ? "" : "s"}</small></div>
-                </section>
+              <section className="management-report__site-kpis" aria-label={`${report.siteName} commercial metrics`}>
+                <article className="management-report__site-kpi"><span>Net sales</span><strong>{formatCurrency(report.costs.netSales)}</strong><small>Approved weekly total</small></article>
+                <article className="management-report__site-kpi"><span>Prime cost</span><strong>{formatPercentage(report.costs.primeCostPct)}</strong><small>{formatCurrency(report.costs.primeCost)} · target {formatPercentage(report.costs.foodCostTarget + report.costs.labourTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(report.costs.primeCostPct, report.costs.foodCostTarget + report.costs.labourTarget)}`}>{varianceLabel(report.costs.primeCostPct, report.costs.foodCostTarget + report.costs.labourTarget)}</em></article>
+                <article className="management-report__site-kpi"><span>{report.costs.foodCostBasis === "stock_adjusted" ? "Food cost" : "Food spend"}</span><strong>{formatPercentage(report.costs.foodCostPct)}</strong><small>{formatCurrency(report.costs.cogs)} · target {formatPercentage(report.costs.foodCostTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(report.costs.foodCostPct, report.costs.foodCostTarget)}`}>{varianceLabel(report.costs.foodCostPct, report.costs.foodCostTarget)}</em></article>
+                <article className="management-report__site-kpi"><span>Labour</span><strong>{formatPercentage(report.costs.labourPct)}</strong><small>{formatCurrency(report.costs.staffCost)} · target {formatPercentage(report.costs.labourTarget)}</small><em className={`management-report__variance management-report__variance--${metricTone(report.costs.labourPct, report.costs.labourTarget)}`}>{varianceLabel(report.costs.labourPct, report.costs.labourTarget)}</em></article>
+              </section>
 
-                {actionableFlags.length ? <section className="management-pack__exceptions"><AlertTriangle aria-hidden="true" size={18} /><div><h3>Management checks</h3>{actionableFlags.map((flag) => <p key={flag.code}><strong>{flag.label}:</strong> {flag.detail}</p>)}</div></section> : <section className="management-pack__exceptions management-pack__exceptions--clear"><CheckCircle2 aria-hidden="true" size={18} /><div><h3>No automated exceptions</h3><p>This report has no warning or critical review flags.</p></div></section>}
+              <section className="management-report__controls" aria-label={`${report.siteName} financial controls`}>
+                <div><span>Waste</span><strong>{formatPercentage(report.costs.wastePct)} · {formatCurrency(wasteCost)}</strong><small>{varianceLabel(report.costs.wastePct, report.costs.wasteTarget)}</small></div>
+                <div><span>Stocktake</span><strong>{report.sources?.stocktakeCompleted ? "Completed" : "Not completed"}</strong></div>
+                <div><span>Pending credits</span><strong>{formatCurrency(report.sources?.pendingCredits ?? 0)}</strong></div>
+                <div><span>Awaiting invoice</span><strong>{formatCurrency(report.sources?.awaitingInvoice ?? 0)}</strong></div>
+                <div><span>Manual purchases</span><strong>{formatCurrency(manualPurchaseTotal)}</strong><small>{manualPurchases.length} item{manualPurchases.length === 1 ? "" : "s"}</small></div>
+              </section>
 
-                <section className="management-pack__narrative-grid">
-                  <article><h3>Wins</h3><p>{narrativeOrFallback(report.wins, "No material win recorded.")}</p></article>
-                  <article><h3>Operational issues</h3><p>{narrativeOrFallback(report.operationalIssues, "No operational issue recorded.")}</p></article>
-                  <article><h3>Staffing</h3><p>{narrativeOrFallback(report.staffingIssues, "No staffing issue recorded.")}</p></article>
-                  <article><h3>Compliance</h3><p>{narrativeOrFallback(report.complianceIssues, "No compliance issue recorded.")}</p></article>
-                  <article><h3>Equipment</h3><p>{narrativeOrFallback(report.equipmentIssues, "No equipment issue recorded.")}</p></article>
-                  <article><h3>Actions underway</h3><p>{narrativeOrFallback(report.actionsUnderway, "No follow-up action recorded.")}</p></article>
-                  <article className="management-pack__narrative-wide"><h3>Support required from group</h3><p>{narrativeOrFallback(report.supportNeeded, "No group support requested.")}</p></article>
-                </section>
-              </div>
+              {actionableFlags.length ? (
+                <section className="management-report__alert management-report__alert--watch"><AlertTriangle aria-hidden="true" size={18} /><div><h2>Management controls to resolve</h2>{actionableFlags.map((flag) => <p key={flag.code}><strong>{flag.label}:</strong> {flag.detail}</p>)}</div></section>
+              ) : (
+                <section className="management-report__alert management-report__alert--good"><CheckCircle2 aria-hidden="true" size={18} /><div><h2>Management controls clear</h2><p>No warning or critical review checks remain open.</p></div></section>
+              )}
+
+              <section className="management-report__narrative-grid">
+                <article className="management-report__narrative management-report__narrative--good"><h2>What went well</h2><p>{narrativeOrFallback(report.wins, "No material win was recorded.")}</p></article>
+                <article className="management-report__narrative management-report__narrative--watch"><h2>Operational priorities</h2>{operationalPriorities.length ? <ul>{operationalPriorities.map((item) => <li key={`${item.label}-${item.text}`}><strong>{item.label}:</strong> {item.text}</li>)}</ul> : <p>No operational, staffing, compliance or equipment issue was reported.</p>}</article>
+                <article className="management-report__narrative"><h2>Actions underway</h2><p>{narrativeOrFallback(report.actionsUnderway, "No follow-up action was recorded. An owner and deadline should be agreed before the next weekly pack.")}</p></article>
+                <article className="management-report__narrative"><h2>Support required from group</h2><p>{narrativeOrFallback(report.supportNeeded, "No group support was requested.")}</p></article>
+              </section>
+
+              <footer className="management-report__page-footer"><span>House of Social · {report.siteName}</span><span>Weekly management report · {formatDate(report.weekEnd)}</span></footer>
             </section>
           );
         })}
-      </div>
+      </main>
 
       {!approvedReports.length ? <section className="panel empty-state"><h2>No approved reports are available.</h2><p>Approve at least one active kitchen report before exporting the management pack.</p></section> : null}
 
-      <div className="privacy-callout management-pack__footer-note">
+      <div className="privacy-callout management-report__screen-footer">
         <CheckCircle2 aria-hidden="true" className="privacy-callout__icon" size={15} />
-        This pack contains approved site-level totals only. Individual salaries, hourly rates and employee time entries are excluded by design. Manual purchases, pending credits and invoices are shown where reported.
+        The pack contains approved site-level totals only. Individual salaries, hourly rates and employee time entries are excluded. Manual purchases, credits and invoices are shown where reported.
       </div>
     </div>
   );
