@@ -24,14 +24,14 @@ export function AccessPreviewControls({
         <div className="access-preview__copy">
           <Eye aria-hidden="true" size={15} />
           <span>
-            <strong>Admin site mode</strong>
+            <strong>Viewing Kitchen Manager workspace</strong>
             {previewSiteName ? ` · ${previewSiteName}` : ""}
             {previewManagerName ? ` · ${previewManagerName}` : " · no primary manager assigned"}
           </span>
-          <small>Site-scoped view with full Admin controls.</small>
+          <small>The navigation and data match the manager view; your Admin write powers remain available.</small>
         </div>
         <form action={startAccessPreview} className="access-preview__switcher">
-          <label className="sr-only" htmlFor="preview-site-switch">Switch kitchen context</label>
+          <label className="sr-only" htmlFor="preview-site-switch">View another kitchen</label>
           <select defaultValue={previewSiteId} id="preview-site-switch" name="siteId">
             {sites.map((site) => <option key={site.id} value={site.id}>{site.name}{site.active ? "" : " · inactive"}</option>)}
           </select>
@@ -47,9 +47,9 @@ export function AccessPreviewControls({
   return (
     <form action={startAccessPreview} className="access-preview access-preview--idle">
       <Eye aria-hidden="true" size={15} />
-      <label className="sr-only" htmlFor="preview-site">Open a kitchen in Admin site mode</label>
+      <label className="sr-only" htmlFor="preview-site">View a Kitchen Manager workspace</label>
       <select defaultValue="" id="preview-site" name="siteId" required>
-        <option disabled value="">Open kitchen…</option>
+        <option disabled value="">View as Kitchen Manager…</option>
         {sites.map((site) => <option key={site.id} value={site.id}>{site.name}{site.active ? "" : " · inactive"}</option>)}
       </select>
       <button className="access-preview__button" type="submit">View</button>
