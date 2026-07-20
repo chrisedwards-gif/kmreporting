@@ -68,7 +68,7 @@ const navSections: Array<{ heading: string; items: NavItem[] }> = [
     heading: "Admin",
     items: [
       { href: "/messages", label: "Team messages", icon: MessageSquareText, roles: ["admin", "group_manager"] },
-      { href: "/performance/managers", label: "Manager admin", icon: UserRoundCog, roles: ["admin"] },
+      { href: "/performance/managers", label: "People & access", icon: UserRoundCog, roles: ["admin"] },
       { href: "/settings/sites", label: "Sites & access", icon: Settings2, roles: ["admin"] },
       { href: "/notifications", label: "Notifications", icon: BellRing, roles: ["admin", "group_manager"] },
     ],
@@ -102,12 +102,12 @@ export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
         <div className="app-shell__brand"><div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div><div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div></div>
         <nav aria-label="Main navigation" className="app-shell__nav">
           {navSections.map((section) => {
-            const visibleItems = section.items.filter((item) => !item.roles || item.roles.includes(user.role));
+            const visibleItems = section.items.filter((item) => !item.roles || item.roles.includes(user.actualRole));
             if (!visibleItems.length) return null;
             return <div className="app-shell__nav-section" key={section.heading}><div className="app-shell__nav-heading">{section.heading}</div>{visibleItems.map(({ href, icon: Icon, label }) => { const active = pathname === href || pathname.startsWith(`${href}/`); return <Link className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")} href={href} key={href} onClick={() => setNavOpen(false)}><Icon aria-hidden="true" size={18} />{label}</Link>; })}</div>;
           })}
         </nav>
-        <div className="app-shell__profile"><div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.isAccessPreview ? `Kitchen manager preview · actual ${roleLabel(user.actualRole)}` : `${roleLabel(user.role)} · Scoped access`}</div></div><form action={signOut}><button aria-label="Sign out" className="app-shell__signout" title="Sign out" type="submit"><LogOut aria-hidden="true" size={16} /></button></form></div></div>
+        <div className="app-shell__profile"><div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.isAccessPreview ? `Admin site mode · ${user.previewSiteName ?? "selected kitchen"}` : `${roleLabel(user.actualRole)} · Scoped access`}</div></div><form action={signOut}><button aria-label="Sign out" className="app-shell__signout" title="Sign out" type="submit"><LogOut aria-hidden="true" size={16} /></button></form></div></div>
       </aside>
       <div className="app-shell__main">
         <header className="app-shell__topbar">
