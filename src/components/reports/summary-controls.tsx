@@ -29,13 +29,7 @@ export function SummaryControls({
     if (state.status === "success" && state.intent !== "partial") router.refresh();
   }, [router, state.intent, state.status]);
 
-  const exportPdf = () => {
-    const previousTitle = document.title;
-    document.title = `HOS Weekly Management Pack - Week Ending ${weekEnd}`;
-    window.addEventListener("afterprint", () => { document.title = previousTitle; }, { once: true });
-    window.print();
-  };
-
+  const exportHref = periodId ? `/api/management-pack?period=${encodeURIComponent(periodId)}` : "";
   const releaseControl = !canRelease || released || !hasApprovedReports
     ? null
     : ready
@@ -55,7 +49,11 @@ export function SummaryControls({
 
   return (
     <div className="summary-actions">
-      <button className="button button--primary" disabled={!hasApprovedReports} onClick={exportPdf} type="button"><Download aria-hidden="true" size={16} /> Export PDF</button>
+      {hasApprovedReports && exportHref ? (
+        <a className="button button--primary" href={exportHref} title={`Download the native A4 pack for week ending ${weekEnd}`}><Download aria-hidden="true" size={16} /> Download A4 PDF</a>
+      ) : (
+        <button className="button button--primary" disabled type="button"><Download aria-hidden="true" size={16} /> Download A4 PDF</button>
+      )}
       {releaseControl}
       {state.status === "success" ? <span className="form-message form-message--success" role="status">{state.message}</span> : null}
       {state.status === "error" ? <span className="form-message form-message--error" role="alert">{state.message}</span> : null}
