@@ -7,7 +7,7 @@ export const metadata = { title: "Kitchen calendar" };
 
 export default async function CalendarPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
-  const canConfigure = ["admin", "group_manager"].includes(profile.actualRole);
+  const canConfigure = profile.capabilities.manageGroup;
   const [visibleLinks, adminData] = await Promise.all([
     getTeamupCalendarLinks(profile),
     canConfigure ? getTeamupCalendarAdminData() : Promise.resolve({ links: [], sites: [] }),
