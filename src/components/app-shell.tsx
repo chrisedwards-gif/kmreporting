@@ -21,7 +21,6 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { clearAccessPreview } from "@/app/actions/access-preview";
 import { signOut } from "@/app/actions/auth";
 import { AccessPreviewControls, type AccessPreviewSite } from "@/components/access-preview-controls";
 import { LiveReportingStatus } from "@/components/live-reporting-status";
