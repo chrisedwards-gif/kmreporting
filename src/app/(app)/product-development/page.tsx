@@ -1,7 +1,7 @@
 import { Beaker, Rocket, Sparkles } from "lucide-react";
 import { ProductDevelopmentBoard } from "@/components/product-development/product-development-board";
 import { requireRole } from "@/lib/auth/dal";
-import { scopeContainsSite } from "@/lib/auth/site-scope";
+import { scopeContainsSite, siteIsInScope } from "@/lib/auth/site-scope";
 import { getProductDevelopmentItems, getProductDevelopmentOptions } from "@/lib/data/product-development";
 
 export const metadata = { title: "Product development" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Product development" };
 export default async function ProductDevelopmentPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
   const [allItems, allOptions] = await Promise.all([getProductDevelopmentItems(), getProductDevelopmentOptions()]);
-  const items = allItems.filter((item) => scopeContainsSite(profile.siteScopeIds, item.siteId));
+  const items = allItems.filter((item) => siteIsInScope(profile.siteScopeIds, item.siteId));
   const options = {
     sites: allOptions.sites.filter((item) => scopeContainsSite(profile.siteScopeIds, item.id)),
     owners: profile.scopeManagerId ? allOptions.owners.filter((item) => item.id === profile.scopeManagerId) : allOptions.owners,
