@@ -25,6 +25,15 @@ export type SessionProfile = {
   previewSiteName: string | null;
   previewManagerId: string | null;
   previewManagerName: string | null;
+  /**
+   * Null means group scope. A populated array is the complete operational site
+   * boundary for this request. Admin kitchen mode and Kitchen Manager accounts
+   * both use this same boundary, so cross-kitchen data cannot leak through a
+   * page that forgot to inspect previewSiteId.
+   */
+  siteScopeIds: string[] | null;
+  /** The manager identity whose personal workspace is being shown. */
+  scopeManagerId: string | null;
   /** Centralised write powers derived from actualRole only. */
   capabilities: Capabilities;
 };
@@ -46,6 +55,8 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
       previewSiteName: null,
       previewManagerId: null,
       previewManagerName: null,
+      siteScopeIds: null,
+      scopeManagerId: null,
       capabilities: capabilitiesFor(actualRole),
     };
   }
@@ -89,6 +100,8 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
           .select("manager_profile_id")
           .eq("site_id", site.id)
           .is("ends_on", null)
+          .order("starts_on", { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (assignment?.manager_profile_id) {
           previewManagerId = assignment.manager_profile_id;
@@ -104,6 +117,19 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
   }
 
   const isAccessPreview = Boolean(previewSiteId);
+  let siteScopeIds: string[] | null = null;
+  if (previewSiteId) {
+    siteScopeIds = [previewSiteId];
+  } else if (actualRole === "kitchen_manager") {
+    const { data: memberships } = await supabase
+      .from("site_memberships")
+      .select("site_id")
+      .eq("user_id", profile.id);
+    siteScopeIds = [...new Set((memberships ?? []).map((membership) => membership.site_id))];
+  }
+
+  const scopeManagerId = previewManagerId ?? (actualRole === "kitchen_manager" ? profile.id : null);
+
   return {
     id: profile.id,
     organisationId: profile.organisation_id,
@@ -116,6 +142,8 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
     previewSiteName,
     previewManagerId,
     previewManagerName,
+    siteScopeIds,
+    scopeManagerId,
     capabilities: capabilitiesFor(actualRole),
   };
 });
