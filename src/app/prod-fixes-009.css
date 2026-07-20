@@ -1,0 +1,349 @@
+/* Production reporting pack redesign.
+ * The pack is an executive document first and an application screen second.
+ */
+
+.management-report__page {
+  background: #fff;
+  border-color: #d7ddd9;
+  box-shadow: 0 22px 64px rgb(18 32 25 / 10%);
+}
+
+.management-report__hero,
+.management-report__site-hero {
+  border-bottom-color: #cad4cf;
+}
+
+.management-report__hero h1,
+.management-report__site-hero h1 {
+  color: #10271e;
+  font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -.055em;
+}
+
+.management-report__section-title h2 {
+  color: #10271e;
+  font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+.management-report__kpi,
+.management-report__site-kpi,
+.management-report__coverage-card,
+.management-report__read-card,
+.management-report__narrative,
+.management-report__table-wrap {
+  border-color: #d6dfda;
+  box-shadow: 0 3px 12px rgb(18 32 25 / 4%);
+}
+
+.management-report__kpi--primary {
+  background: linear-gradient(145deg, #0d3023, #174c39);
+}
+
+.management-report__kpi > strong,
+.management-report__site-kpi > strong {
+  color: #10271e;
+  font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+.management-report__kpi--primary > strong {
+  color: #fff;
+}
+
+.management-report__read-card,
+.management-report__narrative {
+  border-left: 4px solid #cbd5d0;
+}
+
+.management-report__read-card--good,
+.management-report__narrative--good {
+  border-left-color: #2d7a62;
+}
+
+.management-report__read-card--watch,
+.management-report__narrative--watch {
+  border-left-color: #c78324;
+}
+
+.management-report__read-card--action {
+  border-left-color: #eb6b4f;
+}
+
+.management-report__table th {
+  background: #102d23;
+  color: #fff;
+}
+
+.management-report__table tbody tr:nth-child(even) {
+  background: #f7f9f8;
+}
+
+.management-report__table td:first-child strong {
+  color: #10271e;
+}
+
+.management-report__page-footer {
+  color: #64736c;
+  font-family: "Spline Sans Mono", ui-monospace, monospace;
+}
+
+@media print {
+  @page {
+    margin: 7mm 8mm 8mm;
+    size: A4 portrait;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .management-report {
+    font-family: "Archivo", Arial, sans-serif;
+    font-size: 7.4pt;
+  }
+
+  .management-report__page {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .management-report__page--group {
+    font-size: 7pt;
+  }
+
+  .management-report__brand-bar {
+    height: 3.2mm;
+    margin: -7mm -8mm 4mm;
+  }
+
+  .management-report__partial-banner {
+    font-size: 6.2pt;
+    margin-bottom: 2.5mm;
+    padding: 1.3mm 2mm;
+  }
+
+  .management-report__hero,
+  .management-report__site-hero {
+    gap: 5mm;
+    padding-bottom: 2.5mm;
+  }
+
+  .management-report__hero h1,
+  .management-report__site-hero h1 {
+    font-size: 19pt;
+    margin-bottom: 1mm;
+  }
+
+  .management-report__eyebrow,
+  .management-report__hero-status > span,
+  .management-report__hero-status small {
+    font-size: 5.9pt;
+  }
+
+  .management-report__hero p,
+  .management-report__site-hero p {
+    font-size: 7pt;
+  }
+
+  .management-report__hero-status {
+    gap: 1.2mm;
+  }
+
+  .management-report__badge {
+    font-size: 5.7pt;
+    padding: 1.4mm 2mm;
+  }
+
+  .management-report__variance {
+    font-size: 5.4pt;
+    margin-top: .4mm;
+    padding: .65mm 1.1mm;
+  }
+
+  .management-report__section {
+    break-inside: auto;
+    margin-top: 2.7mm;
+  }
+
+  .management-report__section-title {
+    margin-bottom: 1.2mm;
+  }
+
+  .management-report__section-title h2 {
+    font-size: 10.5pt;
+  }
+
+  .management-report__section-title p {
+    font-size: 5.8pt;
+  }
+
+  .management-report__kpis,
+  .management-report__site-kpis {
+    gap: 1.5mm;
+  }
+
+  .management-report__site-kpis {
+    margin-top: 2.8mm;
+  }
+
+  .management-report__kpi,
+  .management-report__site-kpi {
+    border-radius: 1.8mm;
+    gap: .45mm;
+    padding: 1.8mm 2mm;
+  }
+
+  .management-report__kpi > span,
+  .management-report__site-kpi > span,
+  .management-report__summary-strip span,
+  .management-report__controls span {
+    font-size: 5.35pt;
+  }
+
+  .management-report__kpi > strong,
+  .management-report__site-kpi > strong {
+    font-size: 13pt;
+  }
+
+  .management-report__kpi small,
+  .management-report__site-kpi small,
+  .management-report__summary-strip small,
+  .management-report__controls small {
+    font-size: 5.45pt;
+    line-height: 1.2;
+  }
+
+  .management-report__summary-strip,
+  .management-report__controls {
+    border-radius: 1.8mm;
+    margin-top: 1.4mm;
+  }
+
+  .management-report__summary-strip > div,
+  .management-report__controls > div {
+    gap: .45mm;
+    padding: 1.35mm 1.6mm;
+  }
+
+  .management-report__summary-strip strong,
+  .management-report__controls strong {
+    font-size: 6.6pt;
+  }
+
+  .management-report__coverage {
+    gap: 1.2mm;
+  }
+
+  .management-report__coverage-card {
+    border-radius: 1.8mm;
+    padding: 1.5mm 2mm;
+  }
+
+  .management-report__coverage-card strong {
+    font-size: 6.7pt;
+  }
+
+  .management-report__coverage-card small {
+    font-size: 5.3pt;
+  }
+
+  .management-report__readout,
+  .management-report__narrative-grid {
+    gap: 1.4mm;
+  }
+
+  .management-report__read-card,
+  .management-report__narrative {
+    border-left-width: 2px;
+    border-radius: 1.8mm;
+    break-inside: avoid;
+    padding: 1.8mm 2mm;
+  }
+
+  .management-report__read-card h3,
+  .management-report__narrative h2,
+  .management-report__alert h2 {
+    font-size: 5.35pt;
+    margin-bottom: .7mm;
+  }
+
+  .management-report__read-card p,
+  .management-report__read-card ul,
+  .management-report__narrative p,
+  .management-report__narrative ul,
+  .management-report__alert p {
+    font-size: 6.1pt;
+    line-height: 1.25;
+  }
+
+  .management-report__read-card ul,
+  .management-report__narrative ul {
+    gap: .6mm;
+    padding-left: 3mm;
+  }
+
+  .management-report__read-card small {
+    font-size: 5.1pt;
+    margin-top: .6mm;
+  }
+
+  .management-report__table-wrap {
+    border-radius: 1.8mm;
+    break-inside: avoid;
+  }
+
+  .management-report__table {
+    font-size: 5.9pt;
+  }
+
+  .management-report__table th {
+    font-size: 5.1pt;
+    padding: 1.2mm 1.4mm;
+  }
+
+  .management-report__table td {
+    padding: 1.25mm 1.4mm;
+  }
+
+  .management-report__table td small {
+    font-size: 5.1pt;
+    line-height: 1.18;
+  }
+
+  .management-report__alert {
+    border-left-width: 3px;
+    border-radius: 1.8mm;
+    gap: 1.5mm;
+    margin-top: 2.5mm;
+    padding: 1.8mm 2mm;
+  }
+
+  .management-report__narrative-grid {
+    margin-top: 2.5mm;
+  }
+
+  .management-report__page-footer {
+    font-size: 5.2pt;
+    margin-top: 2.2mm;
+    padding-top: .8mm;
+  }
+
+  .management-report__page--group .management-report__section,
+  .management-report__page--site .management-report__site-kpis,
+  .management-report__page--site .management-report__controls,
+  .management-report__page--site .management-report__alert {
+    break-inside: avoid;
+  }
+
+  /* Avoid producing a mostly empty overflow page when one narrative card is long. */
+  .management-report__page--group .management-report__readout,
+  .management-report__page--group .management-report__table-wrap {
+    break-inside: auto;
+  }
+}
