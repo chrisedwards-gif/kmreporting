@@ -7,7 +7,7 @@ export const metadata = { title: "Kitchen calendar" };
 
 export default async function CalendarPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
-  const canConfigure = ["admin", "group_manager"].includes(profile.actualRole) && !profile.isAccessPreview;
+  const canConfigure = ["admin", "group_manager"].includes(profile.actualRole);
   const [visibleLinks, adminData] = await Promise.all([
     getTeamupCalendarLinks(profile),
     canConfigure ? getTeamupCalendarAdminData() : Promise.resolve({ links: [], sites: [] }),
@@ -40,7 +40,7 @@ export default async function CalendarPage() {
           <div className="panel__body dashboard-grid dashboard-grid--balanced">
             <form action={saveTeamupCalendarLink} className="report-form">
               <label className="field"><span className="field__label">Display title</span><input className="field__input" name="title" placeholder="House of Social operations" required /></label>
-              <label className="field"><span className="field__label">Kitchen</span><select className="field__input" defaultValue="" name="siteId"><option value="">Group-wide calendar</option>{adminData.sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+              <label className="field"><span className="field__label">Kitchen</span><select className="field__input" defaultValue={profile.previewSiteId ?? ""} name="siteId"><option value="">Group-wide calendar</option>{adminData.sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
               <label className="field"><span className="field__label">Teamup share link</span><input className="field__input" name="calendarUrl" placeholder="https://teamup.com/ks…" required type="url" /><span className="field__hint">Create the link in Teamup with only the sub-calendars and permissions this audience should receive.</span></label>
               <button className="button button--primary" type="submit">Save calendar link</button>
             </form>

@@ -38,9 +38,9 @@ export default async function DashboardPage() {
   const labourTarget = weightedTarget((site) => site.labourTarget);
   const wasteTarget = weightedTarget((site) => site.wasteTarget);
   const hasSales = totals.netSales > 0;
-  const canCreateReport = ["admin", "group_manager", "kitchen_manager"].includes(profile.role) && !profile.isAccessPreview;
-  const isManagerHome = profile.role === "kitchen_manager";
-  const managerName = profile.isAccessPreview ? profile.previewManagerName : profile.fullName;
+  const canCreateReport = ["admin", "group_manager", "kitchen_manager"].includes(profile.role);
+  const isManagerHome = profile.actualRole === "kitchen_manager";
+  const managerName = isManagerHome ? profile.fullName : profile.previewManagerName;
   const firstName = managerName?.trim().split(/\s+/)[0] ?? "there";
   const siteContext = sites.length === 1 ? sites[0]?.name : sites.length > 1 ? `${sites.length} kitchens` : "your kitchens";
 
@@ -48,14 +48,14 @@ export default async function DashboardPage() {
     <>
       <header className="page-header page-header--personal">
         <div>
-          <p className="page-header__eyebrow">{profile.isAccessPreview ? "Kitchen Manager access preview" : isManagerHome ? `${siteContext} · today` : "Weekly management summary"}</p>
-          <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "The group at a glance."}</h1>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · today` : "Weekly management summary"}</p>
+          <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : profile.isAccessPreview ? `${profile.previewSiteName} at a glance.` : "The group at a glance."}</h1>
           <p className="page-header__copy">{isManagerHome ? `Here’s what needs your attention today. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} checks need attention.`}</p>
         </div>
         {canCreateReport ? <Link className="button button--primary" href="/reports/new">Start a report <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
 
-      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Read-only simulation of {profile.previewManagerName ?? "the primary manager"} at {profile.previewSiteName}. Your Admin account and permissions have not changed.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>You are working inside {profile.previewSiteName} with full Admin permissions. Data views are scoped to this kitchen until you return to the group view.</div> : null}
 
       {messages.length ? <section aria-label="Messages from management" className="manager-message-stack">{messages.map((message) => <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><MessageSquareText aria-hidden="true" size={18} /><div><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><h2>{message.title}</h2><p>{message.body}</p></div></article>)}</section> : null}
 

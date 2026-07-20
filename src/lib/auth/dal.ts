@@ -13,10 +13,11 @@ export type SessionProfile = {
   id: string;
   organisationId: string;
   fullName: string;
-  /** Effective role used by the application UI and page guards. */
+  /** Canonical role used for navigation, page guards and write permissions. */
   role: AppRole;
   /** Canonical database role attached to the authenticated profile. */
   actualRole: AppRole;
+  /** True when an Admin has selected a kitchen-scoped operating context. */
   isAccessPreview: boolean;
   previewSiteId: string | null;
   previewSiteName: string | null;
@@ -100,7 +101,7 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
     id: profile.id,
     organisationId: profile.organisation_id,
     fullName: profile.full_name,
-    role: isAccessPreview ? "kitchen_manager" : actualRole,
+    role: actualRole,
     actualRole,
     isAccessPreview,
     previewSiteId,
