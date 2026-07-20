@@ -11,7 +11,7 @@ permissions:
 jobs:
   persona-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,9 +19,23 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Run persona unit regressions
+        run: npm test 2>&1 | tee unit-test.log
       - name: Install isolated Playwright runner
         run: npm install --no-save --package-lock=false @playwright/test@1.55.0
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Walk Admin, Kitchen Manager and Viewer personas
-        run: npx playwright test
+        run: npx playwright test 2>&1 | tee persona-smoke.log
+      - name: Upload persona diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: persona-smoke-diagnostics
+          path: |
+            unit-test.log
+            persona-smoke.log
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
