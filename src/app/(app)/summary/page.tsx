@@ -1,10 +1,11 @@
 import { CheckCircle2, LockKeyhole } from "lucide-react";
-import { SummaryControls } from "@/components/reports/summary-controls";
 import { PeriodSelector } from "@/components/reports/period-selector";
+import { SummaryControls } from "@/components/reports/summary-controls";
+import { SummaryEmailTest } from "@/components/reports/summary-email-test";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { requireRole } from "@/lib/auth/dal";
 import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
-import { requireRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Management summary" };
 
@@ -42,8 +43,10 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
           <h1 className="page-header__title">Management summary.</h1>
           <p className="page-header__copy">Week ending {formatDate(week.end)} · Generated only from approved kitchen records.</p>
         </div>
-        <div className="page-header__actions"><PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} /><SummaryControls canRelease={["admin", "group_manager"].includes(profile.role)} hasApprovedReports={hasApprovedReports} periodId={selectedPeriod} ready={ready} released={released} /></div>
+        <div className="page-header__actions"><PeriodSelector basePath="/summary" periods={periods} selected={selectedPeriod} /><SummaryEmailTest enabled={profile.capabilities.manageGroup && hasApprovedReports} periodId={selectedPeriod} /><SummaryControls canRelease={profile.capabilities.approveReports} hasApprovedReports={hasApprovedReports} periodId={selectedPeriod} ready={ready} released={released} /></div>
       </header>
+
+      {profile.capabilities.manageGroup ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Email testing currently sends only to your own notification address. Jake does not yet have a production reporting account; add him through Administration → People & access after the format is approved.</div> : null}
 
       {!ready && (
         <div className="privacy-callout" style={{ marginBottom: "1rem" }}>
