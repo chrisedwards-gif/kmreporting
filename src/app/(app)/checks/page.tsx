@@ -17,12 +17,12 @@ export default async function KitchenChecksPage({ searchParams }: { searchParams
   const runs = profile.previewSiteId ? allRuns.filter((item) => item.siteId === profile.previewSiteId) : allRuns;
   const currentWeek = getCurrentReportingWeek();
   const today = londonDate();
-  const canManageTemplates = ["admin", "group_manager"].includes(profile.actualRole);
+  const canManageTemplates = profile.capabilities.manageGroup;
 
   return (
     <>
       <header className="page-header"><div><p className="page-header__eyebrow">Standards & compliance</p><h1 className="page-header__title">Kitchen checks.</h1><p className="page-header__copy">Daily close-down and weekly audit templates are unique to each kitchen. Amber and Red findings cannot disappear: they create owned actions with deadlines.</p></div>{canManageTemplates ? <div className="page-header__actions"><Link className="button button--secondary" href="/checks/templates"><Settings2 aria-hidden="true" size={15} /> Manage templates</Link></div> : null}</header>
-      {profile.isAccessPreview ? <div className="privacy-callout">Admin site mode for {profile.previewSiteName}. You can start, complete, submit and review checks for this kitchen.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout">Kitchen Manager view for {profile.previewSiteName}. You can start, complete, submit and review checks with full Admin capabilities.</div> : null}
       {error ? <div className="form-message form-message--error" role="alert">{error}</div> : null}
       <section className="check-template-grid">
         {templates.map((template) => {
