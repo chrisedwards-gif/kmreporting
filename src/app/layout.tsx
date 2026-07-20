@@ -12,6 +12,7 @@ import "./uat013.css";
 import "./prod-fixes.css";
 import "./prod-fixes-004.css";
 import "./prod-fixes-005.css";
+import "./prod-fixes-008.css";
 
 export const metadata: Metadata = {
   title: { default: "HOS Kitchen Reports", template: "%s · HOS Kitchen Reports" },
