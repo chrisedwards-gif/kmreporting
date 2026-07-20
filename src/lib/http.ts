@@ -20,10 +20,15 @@ const asOrigin = (value: string | null | undefined) => {
   }
 };
 
-// Uses request headers first, then Vercel's deployment host variables. Server
-// Actions do not consistently expose a Host header in every proxy/runtime, so
-// relying on that header alone can generate a null auth-email redirect.
+/**
+ * Auth emails must always use the configured canonical URL in deployed
+ * environments. Request headers remain a local-development fallback only, so
+ * legacy Netlify aliases cannot leak into invitations or password-reset links.
+ */
 export async function getRequestOrigin() {
+  const configuredOrigin = asOrigin(process.env.NEXT_PUBLIC_APP_URL);
+  if (configuredOrigin) return configuredOrigin;
+
   const requestHeaders = await headers();
   const forwardedProtocol = requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
   const forwardedHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim();
@@ -33,7 +38,6 @@ export async function getRequestOrigin() {
 
   return forwardedOrigin
     ?? asOrigin(requestHeaders.get("host"))
-    ?? asOrigin(process.env.NEXT_PUBLIC_APP_URL)
     ?? asOrigin(process.env.VERCEL_BRANCH_URL)
     ?? asOrigin(process.env.VERCEL_URL);
 }
