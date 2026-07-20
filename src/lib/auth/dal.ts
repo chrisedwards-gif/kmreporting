@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { capabilitiesFor, navigationRoleFor, type Capabilities } from "@/lib/auth/capabilities";
 import { environment } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
@@ -13,33 +14,39 @@ export type SessionProfile = {
   id: string;
   organisationId: string;
   fullName: string;
-  /** Canonical role used for navigation, page guards and write permissions. */
+  /** Canonical database role used by route guards and server actions. */
   role: AppRole;
-  /** Canonical database role attached to the authenticated profile. */
   actualRole: AppRole;
-  /** True when an Admin has selected a kitchen-scoped operating context. */
+  /** Workspace role used only for navigation and view-specific presentation. */
+  navigationRole: AppRole;
+  /** True when an Admin is inspecting a kitchen-scoped manager workspace. */
   isAccessPreview: boolean;
   previewSiteId: string | null;
   previewSiteName: string | null;
   previewManagerId: string | null;
   previewManagerName: string | null;
+  /** Centralised write powers derived from actualRole only. */
+  capabilities: Capabilities;
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const getSessionProfile = cache(async (): Promise<SessionProfile | null> => {
   if (environment.isDemo) {
+    const actualRole: AppRole = "group_manager";
     return {
       id: "demo-user",
       organisationId: "demo-org",
       fullName: "Chris",
-      role: "group_manager",
-      actualRole: "group_manager",
+      role: actualRole,
+      actualRole,
+      navigationRole: actualRole,
       isAccessPreview: false,
       previewSiteId: null,
       previewSiteName: null,
       previewManagerId: null,
       previewManagerName: null,
+      capabilities: capabilitiesFor(actualRole),
     };
   }
 
@@ -103,11 +110,13 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
     fullName: profile.full_name,
     role: actualRole,
     actualRole,
+    navigationRole: navigationRoleFor(actualRole, isAccessPreview),
     isAccessPreview,
     previewSiteId,
     previewSiteName,
     previewManagerId,
     previewManagerName,
+    capabilities: capabilitiesFor(actualRole),
   };
 });
 
@@ -131,7 +140,7 @@ export async function requireActualRole(allowed: AppRole[]) {
 
 export async function getAdminPreviewSites(): Promise<Array<{ id: string; name: string; active: boolean }>> {
   const profile = await requireSessionProfile();
-  if (profile.actualRole !== "admin") return [];
+  if (!profile.capabilities.admin) return [];
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];
   const { data } = await supabase
