@@ -1,13 +1,13 @@
 import { BellRing, CalendarClock, MessageSquareText } from "lucide-react";
 import { createManagerMessage, setManagerMessageActive } from "@/app/actions/manager-home";
-import { requireActualRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getManagerMessageAdminData } from "@/lib/data/manager-home";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Team messages" };
 
 export default async function TeamMessagesPage() {
-  await requireActualRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const { messages, sites, managers } = await getManagerMessageAdminData();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -23,7 +23,7 @@ export default async function TeamMessagesPage() {
           <form action={createManagerMessage} className="panel__body report-form">
             <div className="form-grid form-grid--two">
               <label className="field"><span className="field__label">Title</span><input className="field__input" name="title" placeholder="Today’s focus" required /></label>
-              <label className="field"><span className="field__label">Priority</span><select className="field__input" defaultValue="info" name="priority"><option value="info">Information</option><option value="important">Important</option><option value="urgent">Urgent</option></select></label>
+              <label className="field"><span className="field__label">Priority</span><select className="field__input" defaultValue="info" name="priority"><option value="info">Information</option><option value="important">Important — amber callout</option><option value="urgent">Urgent — red alert</option></select></label>
             </div>
             <label className="field"><span className="field__label">Message</span><textarea className="field__input" name="body" placeholder="Service focus, delivery note, reminder or encouragement…" required rows={5} /></label>
             <div className="form-grid form-grid--two">
@@ -43,7 +43,7 @@ export default async function TeamMessagesPage() {
           <div className="panel__body stack">
             {messages.map((message) => (
               <article className={`manager-message manager-message--${message.priority}${message.active ? "" : " manager-message--inactive"}`} key={message.id}>
-                <div className="manager-message__head"><div><strong>{message.title}</strong><span>{message.recipientProfileId ? message.recipientName : message.siteName}</span></div><span className={`status-badge status-badge--${message.active ? "approved" : "draft"}`}>{message.active ? "Active" : "Off"}</span></div>
+                <div className="manager-message__head"><div><strong>{message.title}</strong><span>{message.recipientProfileId ? message.recipientName : message.siteName}</span></div><div className="manager-message__badges"><span className={`manager-home-message__priority manager-home-message__priority--${message.priority}`}>{message.priority}</span><span className={`status-badge status-badge--${message.active ? "approved" : "draft"}`}>{message.active ? "Active" : "Off"}</span></div></div>
                 <p>{message.body}</p>
                 <small>{formatDate(message.visibleFrom)}{message.visibleUntil ? ` – ${formatDate(message.visibleUntil)}` : " onward"}</small>
                 <form action={setManagerMessageActive}><input name="id" type="hidden" value={message.id} /><input name="active" type="hidden" value={message.active ? "false" : "true"} /><button className="button button--secondary button--compact" type="submit">{message.active ? "Switch off" : "Reactivate"}</button></form>

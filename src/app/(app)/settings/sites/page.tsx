@@ -1,5 +1,5 @@
 import { LockKeyhole, UserRoundCog } from "lucide-react";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getManagedSiteDirectory } from "@/lib/data/sites";
 import { CreateSiteForm } from "@/components/sites/create-site-form";
 import { ManageSiteForm } from "@/components/sites/manage-site-form";
@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Sites and access" };
 
 export default async function SitesPage() {
-  await requireRole(["admin"]);
+  await requireGroupWorkspaceRole(["admin"]);
   const sites = await getManagedSiteDirectory();
   const currentWeek = getCurrentReportingWeek();
   return (
