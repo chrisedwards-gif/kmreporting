@@ -8,6 +8,7 @@ import {
   getReportingBundle,
   type ReportingBundle,
 } from "@/lib/data/reporting";
+import { filterActiveExpectedSites } from "@/lib/reporting/eligibility";
 
 /**
  * Operational reporting data must cross this boundary before it reaches a
@@ -23,8 +24,7 @@ export async function getScopedReportingBundle(
     getReportingBundle(periodId, reportId),
     getAccessibleSites(),
   ]);
-  const activeSiteIds = new Set(activeSites.map((site) => site.id));
-  const expectedSites = bundle.expectedSites.filter((site) => activeSiteIds.has(site.id));
+  const expectedSites = filterActiveExpectedSites(bundle.expectedSites, activeSites);
 
   if (profile.siteScopeIds === null) {
     return {
