@@ -4,12 +4,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { PeriodSelector } from "@/components/reports/period-selector";
 import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatPercentage } from "@/lib/utils";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Approvals" };
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  await requireRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarClock, Scale } from "lucide-react";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getProbationSummaries } from "@/lib/data/performance";
 import { scoreRag } from "@/lib/performance/scoring";
 import { formatDate } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { formatDate } from "@/lib/utils";
 export const metadata = { title: "Manager probation" };
 
 export default async function ProbationPage() {
-  await requireRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const managers = await getProbationSummaries();
 
   return (

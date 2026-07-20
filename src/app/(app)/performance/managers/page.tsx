@@ -1,13 +1,13 @@
 import { CreateManagerForm, ManagerAdminCards } from "@/components/performance/manager-admin";
 import { ReportingAccessAdmin } from "@/components/performance/reporting-access-admin";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getManagerAdminRecords } from "@/lib/data/performance";
 import { getReportingViewerRecords } from "@/lib/data/reporting-access";
 
 export const metadata = { title: "Manager admin" };
 
 export default async function ManagerAdminPage() {
-  await requireRole(["admin"]);
+  await requireGroupWorkspaceRole(["admin"]);
   const [managers, viewers] = await Promise.all([getManagerAdminRecords(), getReportingViewerRecords()]);
   return (
     <>

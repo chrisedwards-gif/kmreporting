@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { SessionProfile } from "@/lib/auth/dal";
+import { siteIsInScope } from "@/lib/auth/site-scope";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type ManagerMessage = {
@@ -42,12 +43,12 @@ export async function getVisibleManagerMessages(profile: SessionProfile): Promis
     .order("visible_from", { ascending: false });
   if (error || !data?.length) return [];
 
-  const scoped = profile.isAccessPreview
-    ? data.filter((row) => (
-      (row.recipient_profile_id && row.recipient_profile_id === profile.previewManagerId)
-      || (!row.recipient_profile_id && (!row.site_id || row.site_id === profile.previewSiteId))
-    ))
-    : data;
+  const scoped = profile.siteScopeIds === null
+    ? data
+    : data.filter((row) => {
+      if (!siteIsInScope(profile.siteScopeIds, row.site_id)) return false;
+      return row.recipient_profile_id ? row.recipient_profile_id === profile.scopeManagerId : true;
+    });
   const siteIds = [...new Set(scoped.flatMap((row) => row.site_id ? [row.site_id] : []))];
   const profileIds = [...new Set(scoped.flatMap((row) => row.recipient_profile_id ? [row.recipient_profile_id] : []))];
   const [{ data: sites }, { data: profiles }] = await Promise.all([
@@ -114,9 +115,9 @@ export async function getTeamupCalendarLinks(profile: SessionProfile): Promise<T
     .eq("active", true)
     .order("site_id", { ascending: true, nullsFirst: true });
   if (error || !data?.length) return [];
-  const scoped = profile.isAccessPreview
-    ? data.filter((row) => !row.site_id || row.site_id === profile.previewSiteId)
-    : data;
+  const scoped = profile.siteScopeIds === null
+    ? data
+    : data.filter((row) => siteIsInScope(profile.siteScopeIds, row.site_id));
   const siteIds = [...new Set(scoped.flatMap((row) => row.site_id ? [row.site_id] : []))];
   const { data: sites } = siteIds.length
     ? await supabase.from("sites").select("id, name").in("id", siteIds)

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, ListChecks, Scale, UsersRound } from "lucide-react";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "People & performance" };
 
 export default async function PeoplePerformancePage() {
-  await requireRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const tools = [
     { href: "/one-to-ones", title: "Manager 1-1s", description: "Open drafts, review history, KPI evidence and agreed actions.", icon: UsersRound },
     { href: "/performance/actions", title: "Master action log", description: "Track every open, overdue and completed management action.", icon: ListChecks },

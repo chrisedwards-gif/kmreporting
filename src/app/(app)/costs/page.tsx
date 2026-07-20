@@ -2,12 +2,12 @@ import { DatabaseZap, EyeOff, LockKeyhole } from "lucide-react";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { RefreshDataButton } from "@/components/ui/refresh-data-button";
 import { getReportingBundle } from "@/lib/data/reporting";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Cost control" };
 
 export default async function CostsPage() {
-  await requireRole(["admin", "group_manager", "finance"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager", "finance"]);
   const { sites } = await getReportingBundle();
   return (
     <>

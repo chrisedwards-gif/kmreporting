@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BellRing, CheckCircle2, CircleDashed, ExternalLink, TriangleAlert } from "lucide-react";
 import { TestNotificationForm } from "@/components/notifications/test-notification-form";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { environment } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
@@ -25,7 +25,7 @@ type NotificationRow = {
 };
 
 export default async function NotificationsPage() {
-  await requireRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const supabase = await createServerSupabaseClient();
   let notifications: NotificationRow[] = [];
   let loadError = "";

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { reviewKitchenCheck } from "@/app/actions/kitchen-checks";
 import { KitchenCheckForm } from "@/components/kitchen-checks/kitchen-check-form";
 import { getSessionProfile } from "@/lib/auth/dal";
+import { scopeContainsSite } from "@/lib/auth/site-scope";
 import { getKitchenCheckRun } from "@/lib/data/kitchen-checks";
 import { formatDate } from "@/lib/utils";
 
@@ -10,8 +11,7 @@ export const metadata = { title: "Kitchen check" };
 export default async function KitchenCheckDetailPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
   const [detail, profile] = await Promise.all([getKitchenCheckRun(runId), getSessionProfile()]);
-  if (!detail || !profile) notFound();
-  if (profile.previewSiteId && detail.siteId !== profile.previewSiteId) notFound();
+  if (!detail || !profile || !scopeContainsSite(profile.siteScopeIds, detail.siteId)) notFound();
   const canReview = profile.capabilities.manageGroup;
 
   return (

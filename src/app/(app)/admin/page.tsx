@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, BellRing, MessageSquareText, Settings2, UserRoundCog } from "lucide-react";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Administration" };
 
 export default async function AdministrationPage() {
-  const profile = await requireRole(["admin", "group_manager"]);
+  const profile = await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const tools = [
     { href: "/messages", title: "Team messages", description: "Write immediate or scheduled messages for kitchens and named managers.", icon: MessageSquareText, visible: true },
     { href: "/notifications", title: "Email & notifications", description: "Test delivery, inspect failures and confirm the live email configuration.", icon: BellRing, visible: true },
