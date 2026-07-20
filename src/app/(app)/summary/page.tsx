@@ -106,9 +106,6 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
     { site: report.siteName, label: "Compliance", text: cleanNarrative(report.complianceIssues) },
     { site: report.siteName, label: "Equipment", text: cleanNarrative(report.equipmentIssues) },
   ].filter((item) => item.text));
-  const groupActions = approvedReports
-    .map((report) => ({ site: report.siteName, text: cleanNarrative(report.actionsUnderway) }))
-    .filter((item) => item.text);
   const supportRequests = approvedReports
     .map((report) => ({ site: report.siteName, text: cleanNarrative(report.supportNeeded) }))
     .filter((item) => item.text);
