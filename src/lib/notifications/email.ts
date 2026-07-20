@@ -7,6 +7,7 @@ type EmailInput = {
   subject: string;
   text: string;
   idempotencyKey: string;
+  category?: string;
 };
 
 export type EmailDeliveryResult = {
@@ -51,7 +52,7 @@ export async function sendTransactionalEmail(input: EmailInput): Promise<EmailDe
         html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#17352d"><h1 style="font-size:24px">${escapeHtml(input.subject)}</h1>${textToHtml(input.text)}</div>`,
         ...(environment.resendReplyTo ? { reply_to: environment.resendReplyTo } : {}),
         tags: [
-          { name: "category", value: "manager_one_to_one" },
+          { name: "category", value: input.category ?? "transactional" },
           { name: "environment", value: environment.isProduction ? "production" : "uat" },
         ],
       }),
