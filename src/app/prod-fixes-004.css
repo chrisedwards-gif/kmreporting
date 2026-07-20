@@ -1,0 +1,240 @@
+.manager-message-stack {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+}
+
+.manager-home-message {
+  align-items: flex-start;
+  background: #f5f8f6;
+  border: 1px solid #d7e2dc;
+  border-left: 5px solid var(--sage);
+  border-radius: .9rem;
+  box-shadow: 0 10px 30px rgb(23 33 30 / 6%);
+  display: grid;
+  gap: .9rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 1rem 1.1rem;
+}
+
+.manager-home-message--important {
+  background: #fff8e8;
+  border-color: #efd39a;
+  border-left-color: var(--amber);
+  box-shadow: 0 12px 32px rgb(199 131 36 / 12%);
+}
+
+.manager-home-message--urgent {
+  background: #fff0ed;
+  border-color: #efb9ae;
+  border-left-color: var(--red);
+  box-shadow: 0 14px 34px rgb(185 63 53 / 15%);
+}
+
+.manager-home-message__icon {
+  align-items: center;
+  background: rgb(45 122 98 / 12%);
+  border-radius: 999px;
+  color: var(--sage);
+  display: flex;
+  height: 2.35rem;
+  justify-content: center;
+  width: 2.35rem;
+}
+
+.manager-home-message--important .manager-home-message__icon {
+  background: rgb(199 131 36 / 15%);
+  color: #8b5814;
+}
+
+.manager-home-message--urgent .manager-home-message__icon {
+  background: rgb(185 63 53 / 14%);
+  color: var(--red);
+}
+
+.manager-home-message__content {
+  min-width: 0;
+}
+
+.manager-home-message__top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  justify-content: space-between;
+}
+
+.manager-home-message__meta {
+  color: var(--ink-600);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.manager-home-message__priority {
+  border: 1px solid #c9ded5;
+  border-radius: 999px;
+  color: var(--sage);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  padding: .28rem .5rem;
+  text-transform: uppercase;
+}
+
+.manager-home-message__priority--important {
+  background: #fff0c9;
+  border-color: #e4bd65;
+  color: #78470b;
+}
+
+.manager-home-message__priority--urgent {
+  background: #ffe0da;
+  border-color: #de8c7d;
+  color: #8c2d25;
+}
+
+.manager-home-message h2 {
+  font-size: 1.05rem;
+  margin: .45rem 0 .3rem;
+}
+
+.manager-home-message p {
+  color: var(--ink-800);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.summary-release-state {
+  align-items: center;
+  background: #fff8e8;
+  border: 1px solid #e9cd93;
+  border-left: 6px solid var(--amber);
+  border-radius: .9rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.15rem;
+}
+
+.summary-release-state--released {
+  background: #edf6f2;
+  border-color: #bfdbcf;
+  border-left-color: var(--sage);
+}
+
+.summary-release-state--ready {
+  background: #f1f7f4;
+  border-color: #c9ded5;
+  border-left-color: var(--sage);
+}
+
+.summary-release-state span,
+.summary-release-state strong,
+.summary-release-state small {
+  display: block;
+}
+
+.summary-release-state span {
+  color: var(--ink-600);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.summary-release-state strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.45rem;
+  font-weight: 500;
+  margin-top: .2rem;
+}
+
+.summary-release-state small {
+  color: var(--ink-600);
+  font-size: .76rem;
+  margin-top: .25rem;
+}
+
+.management-summary__site {
+  break-inside: avoid;
+}
+
+@media (max-width: 640px) {
+  .summary-release-state {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: A4 portrait;
+  }
+
+  body {
+    color: #111;
+    font-family: Arial, sans-serif;
+  }
+
+  .management-summary {
+    font-size: 10pt;
+  }
+
+  .management-summary .page-header {
+    margin-bottom: 7mm;
+  }
+
+  .management-summary .page-header__title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 25pt;
+  }
+
+  .management-summary .privacy-callout,
+  .management-summary .page-header__actions {
+    display: none !important;
+  }
+
+  .summary-release-state {
+    background: #fff !important;
+    border: 1.5pt solid #222;
+    border-left-width: 5pt;
+    box-shadow: none;
+    margin-bottom: 7mm;
+    padding: 4mm;
+  }
+
+  .summary-release-state strong {
+    font-size: 16pt;
+  }
+
+  .management-summary__pack,
+  .management-summary .metric-card,
+  .management-summary__site {
+    box-shadow: none !important;
+  }
+
+  .management-summary .metric-grid {
+    gap: 3mm;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .management-summary .metric-card {
+    border: 1px solid #bbb;
+    min-height: auto;
+    padding: 3mm;
+  }
+
+  .management-summary .metric-card__value {
+    font-size: 15pt;
+  }
+
+  .management-summary__site {
+    border: 1px solid #bbb;
+    margin-bottom: 4mm;
+    page-break-inside: avoid;
+  }
+}

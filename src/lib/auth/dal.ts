@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/types";
 
 export const accessPreviewCookieName = "hos_access_preview_site";
+export const demoPersonaCookieName = "hos_demo_persona";
 
 export type SessionProfile = {
   id: string;
@@ -39,14 +40,20 @@ export type SessionProfile = {
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const demoKardiaId = "00000000-0000-4000-8000-000000000003";
 
 export const getSessionProfile = cache(async (): Promise<SessionProfile | null> => {
   if (environment.isDemo) {
-    const actualRole: AppRole = "group_manager";
+    const cookieStore = await cookies();
+    const requestedPersona = cookieStore.get(demoPersonaCookieName)?.value;
+    const actualRole: AppRole = requestedPersona === "kitchen_manager" || requestedPersona === "viewer" || requestedPersona === "admin"
+      ? requestedPersona
+      : "admin";
+    const isKitchenManager = actualRole === "kitchen_manager";
     return {
-      id: "demo-user",
+      id: isKitchenManager ? "demo-manager-kardia" : `demo-${actualRole}`,
       organisationId: "demo-org",
-      fullName: "Chris",
+      fullName: isKitchenManager ? "Scott Hutton" : actualRole === "viewer" ? "Jake Viewer" : "Chris Edwards",
       role: actualRole,
       actualRole,
       navigationRole: actualRole,
@@ -55,8 +62,8 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
       previewSiteName: null,
       previewManagerId: null,
       previewManagerName: null,
-      siteScopeIds: null,
-      scopeManagerId: null,
+      siteScopeIds: isKitchenManager ? [demoKardiaId] : null,
+      scopeManagerId: isKitchenManager ? "demo-manager-kardia" : null,
       capabilities: capabilitiesFor(actualRole),
     };
   }
@@ -163,6 +170,13 @@ export async function requireRole(allowed: AppRole[]) {
 export async function requireActualRole(allowed: AppRole[]) {
   const profile = await requireSessionProfile();
   if (!allowed.includes(profile.actualRole)) redirect("/dashboard");
+  return profile;
+}
+
+/** Group-only pages must not remain directly reachable during Admin kitchen mode. */
+export async function requireGroupWorkspaceRole(allowed: AppRole[]) {
+  const profile = await requireRole(allowed);
+  if (profile.isAccessPreview) redirect("/dashboard");
   return profile;
 }
 

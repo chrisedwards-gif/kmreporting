@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Beaker, BookOpenCheck, CalendarDays, ClipboardCheck, GraduationCap } from "lucide-react";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 
 export const metadata = { title: "Kitchen workspace" };
 
@@ -13,7 +13,7 @@ const tools = [
 ];
 
 export default async function KitchenWorkspacePage() {
-  await requireRole(["admin", "group_manager"]);
+  await requireGroupWorkspaceRole(["admin", "group_manager"]);
   return (
     <>
       <header className="page-header"><div><p className="page-header__eyebrow">Operate</p><h1 className="page-header__title">Kitchen workspace.</h1><p className="page-header__copy">Standards, checks, training, planning and product work in one place.</p></div></header>

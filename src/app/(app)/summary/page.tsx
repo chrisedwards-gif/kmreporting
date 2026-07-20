@@ -3,14 +3,14 @@ import { PeriodSelector } from "@/components/reports/period-selector";
 import { SummaryControls } from "@/components/reports/summary-controls";
 import { SummaryEmailTest } from "@/components/reports/summary-email-test";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { requireRole } from "@/lib/auth/dal";
+import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getReportingBundle, getReportingPeriods } from "@/lib/data/reporting";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Management summary" };
 
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  const profile = await requireRole(["admin", "group_manager", "finance", "viewer"]);
+  const profile = await requireGroupWorkspaceRole(["admin", "group_manager", "finance", "viewer"]);
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
@@ -33,13 +33,25 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const foodPct = totals.sales ? totals.cogs / totals.sales * 100 : 0;
   const labourPct = totals.sales ? totals.labour / totals.sales * 100 : 0;
   const allStockAdjusted = approvedSites.length > 0 && approvedSites.every((site) => site.foodCostBasis === "stock_adjusted");
+  const releaseLabel = released ? "Released weekly pack" : ready ? "Approved — ready to release" : "Internal partial — not released";
+  const releaseDetail = released
+    ? `Released with ${approvedReports.length} of ${expectedSites.length} expected kitchens.`
+    : ready
+      ? "Every expected kitchen has named approval; the pack can now be released."
+      : `${approvedReports.length} of ${expectedSites.length} expected kitchens are approved.`;
 
   return (
     <div className={`management-summary ${released ? "management-summary--released" : "management-summary--partial"}`}>
       {!ready && <div className="print-partial-message">PARTIAL MANAGEMENT UPDATE — awaiting remaining kitchen reports or named approvals. Figures shown include approved kitchen reports only.</div>}
+
+      <section className={`summary-release-state summary-release-state--${released ? "released" : ready ? "ready" : "pending"}`} aria-label="Weekly pack release status">
+        <div><span>Weekly pack status · week ending {formatDate(week.end)}</span><strong>{releaseLabel}</strong><small>{releaseDetail}</small></div>
+        <StatusBadge status={released ? "shared" : ready ? "approved" : "review_required"} />
+      </section>
+
       <header className="page-header">
         <div>
-          <p className="page-header__eyebrow">Consistent group output</p>
+          <p className="page-header__eyebrow">House of Social weekly pack</p>
           <h1 className="page-header__title">Management summary.</h1>
           <p className="page-header__copy">Week ending {formatDate(week.end)} · Generated only from approved kitchen records.</p>
         </div>
@@ -56,7 +68,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      <section className="panel">
+      <section className="panel management-summary__pack">
         <div className="panel__header">
           <div><h2 className="panel__title">House of Social · Kitchen performance</h2><p className="panel__subtitle">Sunday {formatDate(week.start)} to Saturday {formatDate(week.end)} · {approvedReports.length} of {expectedSites.length} approved</p></div>
           <span className={`status-badge status-badge--${released ? "shared" : ready ? "approved" : "review_required"}`}>{released ? "Released" : ready ? "Approved to release" : "Internal partial"}</span>
@@ -72,7 +84,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
           <h2 className="summary-section-title">Approved kitchen updates</h2>
           <div className="stack">
             {approvedReports.map((report) => (
-              <article className="review-item review-item--info" key={report.id}>
+              <article className="review-item review-item--info management-summary__site" key={report.id}>
                 <div className="approval-card__top">
                   <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
                   <StatusBadge status={report.status} />
