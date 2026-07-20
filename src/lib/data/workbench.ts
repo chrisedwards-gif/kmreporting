@@ -1,3 +1,4 @@
+import { siteIsInScope } from "@/lib/auth/site-scope";
 import type { ReportingBundle } from "@/lib/data/reporting";
 import { getKitchenCheckDashboard } from "@/lib/data/kitchen-checks";
 import { getManagers, getOneToOnes } from "@/lib/data/one-to-ones";
@@ -56,7 +57,7 @@ export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope
     isGroup ? getManagers() : Promise.resolve([]),
     getOneToOnes(scope.managerId ?? undefined),
   ]);
-  const siteAllowed = (siteId: string) => scope.siteIds == null || scope.siteIds.includes(siteId);
+  const siteAllowed = (siteId: string | null) => siteIsInScope(scope.siteIds ?? null, siteId);
   const checkboard = {
     templates: rawCheckboard.templates.filter((item) => siteAllowed(item.siteId)),
     runs: rawCheckboard.runs.filter((item) => siteAllowed(item.siteId)),

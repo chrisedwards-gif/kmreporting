@@ -1,7 +1,7 @@
 import { ListChecks } from "lucide-react";
 import { ActionLogTable } from "@/components/performance/action-log-table";
 import { requireRole } from "@/lib/auth/dal";
-import { scopeContainsSite } from "@/lib/auth/site-scope";
+import { siteIsInScope } from "@/lib/auth/site-scope";
 import { getPerformanceActions } from "@/lib/data/performance";
 
 export const metadata = { title: "Manager action log" };
@@ -9,7 +9,7 @@ export const metadata = { title: "Manager action log" };
 export default async function PerformanceActionsPage() {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
   const rawActions = await getPerformanceActions();
-  const actions = rawActions.filter((item) => scopeContainsSite(profile.siteScopeIds, item.siteId) && (!profile.scopeManagerId || item.managerId === profile.scopeManagerId));
+  const actions = rawActions.filter((item) => siteIsInScope(profile.siteScopeIds, item.siteId) && (!profile.scopeManagerId || item.managerId === profile.scopeManagerId));
   const canUpdate = profile.capabilities.maintainTrackers;
   const openCount = actions.filter((item) => !["complete", "cancelled"].includes(item.status)).length;
   const overdueCount = actions.filter((item) => item.dueDate && item.dueDate < new Date().toISOString().slice(0, 10) && !["complete", "cancelled"].includes(item.status)).length;
