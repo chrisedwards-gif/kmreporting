@@ -1,0 +1,30 @@
+name: Package native PDF release
+
+on:
+  push:
+    branches:
+      - agent/package-native-pdf-release
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tested release
+        uses: actions/checkout@v4
+
+      - name: Remove repository metadata and temporary workflow
+        run: |
+          rm -rf .git
+          rm -f .github/workflows/package-native-pdf-release.yml
+
+      - name: Upload deployable source
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-pdf-release-source
+          path: .
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
