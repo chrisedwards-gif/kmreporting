@@ -33,7 +33,7 @@ test("Kitchen Manager sees only their kitchen persona and records", async ({ pag
 test("Viewer lands on reporting insight with no operational controls", async ({ page }) => {
   await switchPersona(page, "viewer");
   await expect(page.getByText("Management summary", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Management summary" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Management summary", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Kitchen checks" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await expect(page.getByText("No operational actions are assigned to this access role.")).toHaveCount(0);
