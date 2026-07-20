@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-const switchPersona = async (page: import("@playwright/test").Page, role: "admin" | "kitchen_manager" | "viewer") => {
+const switchPersona = async (page, role) => {
   await page.context().clearCookies();
-  await page.goto(`/test/persona/${role}`);
-  await page.waitForURL("**/dashboard");
+  await page.context().addCookies([{
+    name: "hos_demo_persona",
+    value: role,
+    url: "http://127.0.0.1:3000",
+    httpOnly: true,
+    sameSite: "Lax",
+  }]);
+  await page.goto("/dashboard");
 };
 
 test("Admin lands in the group workspace", async ({ page }) => {
