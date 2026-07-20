@@ -17,7 +17,7 @@ export type WorkbenchItem = {
 };
 
 type WorkbenchResult = { items: WorkbenchItem[]; allClear: boolean; clearMessage: string };
-type WorkbenchScope = { siteId?: string | null; managerId?: string | null };
+type WorkbenchScope = { siteIds?: readonly string[] | null; managerId?: string | null };
 
 const sundayFor = (dateText: string) => {
   const date = new Date(`${dateText}T00:00:00Z`);
@@ -29,7 +29,23 @@ const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
 export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope: WorkbenchScope = {}): Promise<WorkbenchResult> {
   const isGroup = role === "admin" || role === "group_manager";
   const isKitchenManager = role === "kitchen_manager";
-  if (!isGroup && !isKitchenManager) return { items: [], allClear: true, clearMessage: "No operational actions are assigned to this access role." };
+
+  if (!isGroup && !isKitchenManager) {
+    const reportedSiteIds = new Set(bundle.reports.map((report) => report.siteId));
+    const unreported = bundle.expectedSites.filter((site) => !reportedSiteIds.has(site.id));
+    const inApproval = bundle.reports.filter((report) => ["submitted", "review_required"].includes(report.status));
+    const readerItems: WorkbenchItem[] = [];
+    if (unreported.length) {
+      readerItems.push({ key: "reader-reported", tone: "warn", count: unreported.length, title: `${plural(unreported.length, "kitchen")} yet to report`, detail: `${unreported.map((site) => site.name).join(", ")} · w/c ${formatDate(bundle.week.start)}`, href: "/reports", cta: "View reports" });
+    } else {
+      readerItems.push({ key: "reader-reported", tone: "ok", count: bundle.reports.length, title: `${plural(bundle.reports.length, "kitchen has", "kitchens have")} reported`, detail: `All expected kitchens are in · w/c ${formatDate(bundle.week.start)}`, href: "/reports", cta: "View reports" });
+    }
+    if (inApproval.length) {
+      readerItems.push({ key: "reader-approval", tone: "warn", count: inApproval.length, title: `${plural(inApproval.length, "report")} awaiting release`, detail: inApproval.map((report) => report.siteName).join(", "), href: "/reports", cta: "See status" });
+    }
+    readerItems.push({ key: "reader-summary", tone: "ok", count: null, title: "Management summary", detail: "Open the released weekly pack or see its current release status", href: "/summary", cta: "Open summary" });
+    return { items: readerItems, allClear: false, clearMessage: "" };
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const currentSunday = sundayFor(today);
@@ -40,12 +56,13 @@ export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope
     isGroup ? getManagers() : Promise.resolve([]),
     getOneToOnes(scope.managerId ?? undefined),
   ]);
+  const siteAllowed = (siteId: string) => scope.siteIds == null || scope.siteIds.includes(siteId);
   const checkboard = {
-    templates: scope.siteId ? rawCheckboard.templates.filter((item) => item.siteId === scope.siteId) : rawCheckboard.templates,
-    runs: scope.siteId ? rawCheckboard.runs.filter((item) => item.siteId === scope.siteId) : rawCheckboard.runs,
+    templates: rawCheckboard.templates.filter((item) => siteAllowed(item.siteId)),
+    runs: rawCheckboard.runs.filter((item) => siteAllowed(item.siteId)),
   };
-  const actions = rawActions.filter((action) => (!scope.siteId || action.siteId === scope.siteId) && (!scope.managerId || action.managerId === scope.managerId));
-  const reviews = rawReviews.filter((review) => (!scope.siteId || review.siteId === scope.siteId) && (!scope.managerId || review.managerId === scope.managerId));
+  const actions = rawActions.filter((action) => siteAllowed(action.siteId) && (!scope.managerId || action.managerId === scope.managerId));
+  const reviews = rawReviews.filter((review) => siteAllowed(review.siteId) && (!scope.managerId || review.managerId === scope.managerId));
 
   const reportBySite = new Map(bundle.reports.map((report) => [report.siteId, report]));
   const reportsDue = bundle.expectedSites.filter((site) => {

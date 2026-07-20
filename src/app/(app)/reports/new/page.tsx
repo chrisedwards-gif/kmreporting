@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { ReportForm } from "@/components/reports/report-form";
 import { ReportSalesBridge } from "@/components/reports/report-sales-bridge";
-import { getAccessibleSites, getEditableDraft, getReportingWeek } from "@/lib/data/reporting";
 import { requireRole } from "@/lib/auth/dal";
+import { getReportingWeek } from "@/lib/data/reporting";
+import { getScopedAccessibleSites, getScopedEditableDraft } from "@/lib/data/scoped-reporting";
 import { getLatestCompletedReportingWeek } from "@/lib/reporting/periods";
 
 export const metadata = { title: "New weekly report" };
@@ -11,12 +12,11 @@ export const metadata = { title: "New weekly report" };
 export default async function NewReportPage({ searchParams }: { searchParams: Promise<{ period?: string; report?: string }> }) {
   const profile = await requireRole(["admin", "group_manager", "kitchen_manager"]);
   const { period: periodId, report: reportId } = await searchParams;
-  const [allSites, draft, requestedWeek] = await Promise.all([
-    getAccessibleSites(),
-    reportId ? getEditableDraft(reportId) : Promise.resolve(null),
+  const [sites, draft, requestedWeek] = await Promise.all([
+    getScopedAccessibleSites(profile),
+    reportId ? getScopedEditableDraft(profile, reportId) : Promise.resolve(null),
     periodId ? getReportingWeek(periodId) : Promise.resolve(null),
   ]);
-  const sites = profile.previewSiteId ? allSites.filter((site) => site.id === profile.previewSiteId) : allSites;
   const editableDraft = draft && sites.some((site) => site.id === draft.siteId) ? draft : null;
   const week = editableDraft
     ? { start: editableDraft.weekStart, end: editableDraft.weekEnd }
@@ -31,10 +31,10 @@ export default async function NewReportPage({ searchParams }: { searchParams: Pr
         </div>
         <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> All reports</Link>
       </header>
-      {profile.isAccessPreview ? <div className="privacy-callout">Admin site mode for {profile.previewSiteName}. Reports created here are scoped to this kitchen.</div> : null}
-      {reportId && !editableDraft ? <div className="form-message form-message--error" role="alert">That draft is unavailable, already submitted, inactive, or outside your site access.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout">Admin site mode for {profile.previewSiteName}. The kitchen selector and every saved draft are restricted to this site.</div> : null}
+      {reportId && !editableDraft ? <div className="form-message form-message--error" role="alert">That draft is unavailable, already submitted, inactive, or outside your current kitchen access.</div> : null}
       {sites.length ? <><ReportForm initial={editableDraft ?? undefined} sites={sites} week={week} /><ReportSalesBridge sites={sites} /></> : (
-        <section className="panel empty-state"><h2>No active kitchen is available.</h2><p>{profile.actualRole === "admin" ? "Create or activate a kitchen before starting its weekly report." : "Ask an administrator to assign you to an active kitchen."}</p>{profile.actualRole === "admin" ? <Link className="button button--primary" href="/settings/sites">Configure kitchens</Link> : null}</section>
+        <section className="panel empty-state"><h2>No active kitchen is available.</h2><p>{profile.actualRole === "admin" ? "Return to the group view or create and activate a kitchen before starting its weekly report." : "Ask an administrator to assign you to an active kitchen."}</p>{profile.actualRole === "admin" ? <Link className="button button--primary" href="/settings/sites">Configure kitchens</Link> : null}</section>
       )}
     </>
   );
