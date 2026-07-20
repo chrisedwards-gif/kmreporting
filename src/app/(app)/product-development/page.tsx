@@ -11,7 +11,7 @@ export default async function ProductDevelopmentPage() {
   const items = profile.previewSiteId ? allItems.filter((item) => item.siteId === profile.previewSiteId) : allItems;
   const options = profile.previewSiteId ? {
     sites: allOptions.sites.filter((item) => item.id === profile.previewSiteId),
-    owners: allOptions.owners.filter((item) => item.id === profile.previewManagerId),
+    owners: allOptions.owners,
   } : allOptions;
   const liveCount = items.filter((item) => item.status === "live").length;
   const trialCount = items.filter((item) => ["trial_planned", "trial_complete", "amendments_required"].includes(item.status)).length;
