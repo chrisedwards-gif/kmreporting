@@ -11,14 +11,14 @@ export default async function PerformanceActionsPage() {
   const actions = profile.previewSiteId
     ? rawActions.filter((item) => item.siteId === profile.previewSiteId)
     : rawActions;
-  const canUpdate = ["admin", "group_manager", "kitchen_manager"].includes(profile.actualRole);
+  const canUpdate = profile.capabilities.maintainTrackers;
   const openCount = actions.filter((item) => !["complete", "cancelled"].includes(item.status)).length;
   const overdueCount = actions.filter((item) => item.dueDate && item.dueDate < new Date().toISOString().slice(0, 10) && !["complete", "cancelled"].includes(item.status)).length;
 
   return (
     <>
-      <header className="page-header"><div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">{profile.actualRole === "kitchen_manager" ? "Today’s actions." : "Master action log."}</h1><p className="page-header__copy">One live record of every agreed action. Items remain visible until they are completed or cancelled.</p></div></header>
-      {profile.isAccessPreview ? <div className="privacy-callout">Admin site mode for {profile.previewSiteName}. You can update and complete any action assigned within this kitchen.</div> : null}
+      <header className="page-header"><div><p className="page-header__eyebrow">Performance</p><h1 className="page-header__title">{profile.navigationRole === "kitchen_manager" ? "Today’s actions." : "Master action log."}</h1><p className="page-header__copy">One live record of every agreed action. Items remain visible until they are completed or cancelled.</p></div></header>
+      {profile.isAccessPreview ? <div className="privacy-callout">Kitchen Manager view for {profile.previewSiteName}. You can update and complete any action assigned within this kitchen.</div> : null}
       <section className="metric-grid metric-grid--three" aria-label="Action summary"><article className="metric-card"><div className="metric-card__label">Open actions</div><div className="metric-card__value">{openCount}</div><div className="metric-card__note">Across visible kitchens</div></article><article className={`metric-card${overdueCount ? " metric-card--over-target" : ""}`}><div className="metric-card__label">Overdue</div><div className="metric-card__value">{overdueCount}</div><div className="metric-card__note">Needs a decision or revised date</div></article><article className="metric-card"><ListChecks aria-hidden="true" size={21} /><div className="metric-card__value metric-card__value--compact">Audit trail</div><div className="metric-card__note">Every status change is recorded</div></article></section>
       <section className="panel"><div className="panel__header"><div><h2 className="panel__title">Actions</h2><p className="panel__subtitle">Filter, update and export the current view</p></div></div><div className="panel__body"><ActionLogTable actions={actions} canUpdate={canUpdate} /></div></section>
     </>
