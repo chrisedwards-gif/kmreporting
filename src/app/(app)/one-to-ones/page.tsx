@@ -3,7 +3,7 @@ import { CalendarPlus, ClipboardCheck, Flame, Link2, ListChecks, Scale, UserRoun
 import { PerformanceTrendChart } from "@/components/performance/performance-trend-chart";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/dal";
-import { scopeContainsSite } from "@/lib/auth/site-scope";
+import { scopeContainsSite, siteIsInScope } from "@/lib/auth/site-scope";
 import { getManagers, getOneToOnes, getOpenActions } from "@/lib/data/one-to-ones";
 import { getPerformanceTrends } from "@/lib/data/performance";
 import { isActionOverdue, scoreRag } from "@/lib/performance/scoring";
@@ -39,7 +39,7 @@ export default async function OneToOnesPage({ searchParams }: { searchParams: Pr
         const managerReviews = reviews.filter((review) => review.managerId === managerRecord.id);
         const assignmentReviews = reviews.filter((review) => review.assignmentId === managerRecord.assignmentId);
         const latestScored = managerReviews.find((review) => review.overallScore !== null);
-        const openActions = (openActionsByManager.get(managerRecord.id) ?? []).filter((action) => scopeContainsSite(profile.siteScopeIds, action.siteId));
+        const openActions = (openActionsByManager.get(managerRecord.id) ?? []).filter((action) => siteIsInScope(profile.siteScopeIds, action.siteId));
         const overdue = openActions.filter((item) => isActionOverdue(item.dueDate, item.status, today)).length;
         const currentWeekReview = assignmentReviews.find((review) => review.weekCommencing === week.start);
         const assignedForWeek = managerRecord.assignmentStartsOn <= week.end && (!managerRecord.assignmentEndsOn || managerRecord.assignmentEndsOn >= week.start);
