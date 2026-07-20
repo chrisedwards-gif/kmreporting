@@ -104,6 +104,27 @@ create table public.report_source_values (
   updated_at timestamptz not null default now()
 );
 
+-- Provider-neutral daily facts from EPOS, purchasing and waste systems.
+create table public.daily_site_metrics (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references public.organisations(id) on delete cascade,
+  site_id uuid not null references public.sites(id) on delete cascade,
+  business_date date not null,
+  source_system text not null,
+  has_sales boolean not null default false,
+  has_purchasing boolean not null default false,
+  has_waste boolean not null default false,
+  gross_sales numeric(14,2) not null default 0 check (gross_sales >= 0),
+  net_sales numeric(14,2) not null default 0 check (net_sales >= 0),
+  covers integer not null default 0 check (covers >= 0),
+  food_purchases numeric(14,2) not null default 0 check (food_purchases >= 0),
+  credits numeric(14,2) not null default 0 check (credits >= 0),
+  waste_cost numeric(14,2) not null default 0 check (waste_cost >= 0),
+  source_reference text,
+  imported_at timestamptz not null default now(),
+  unique (site_id, business_date, source_system)
+);
+
 -- Employee references, hours and every pay-rate field remain outside the exposed API schema.
 create table payroll_private.pay_rates (
   id uuid primary key default gen_random_uuid(),
@@ -214,6 +235,7 @@ create index weekly_reports_org_period_idx on public.weekly_reports (organisatio
 create index weekly_reports_status_idx on public.weekly_reports (status, updated_at);
 create index memberships_site_idx on public.site_memberships (site_id, user_id);
 create index snapshots_period_idx on public.site_cost_snapshots (organisation_id, period_id);
+create index daily_metrics_site_date_idx on public.daily_site_metrics (site_id, business_date);
 create index time_entries_period_idx on payroll_private.time_entries (site_id, period_id);
 create index pay_rates_lookup_idx on payroll_private.pay_rates (site_id, employee_ref, valid_from, valid_to);
 
@@ -271,6 +293,61 @@ as $$
   )
 $$;
 
+create function app_private.rollup_daily_metrics(target_site_id uuid, target_start date, target_end date)
+returns table (
+  has_sales boolean,
+  has_purchasing boolean,
+  has_waste boolean,
+  net_sales numeric,
+  purchases numeric,
+  credits numeric,
+  waste_cost numeric
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select
+    exists (select 1 from public.daily_site_metrics where site_id = target_site_id and business_date between target_start and target_end and has_sales),
+    exists (select 1 from public.daily_site_metrics where site_id = target_site_id and business_date between target_start and target_end and has_purchasing),
+    exists (select 1 from public.daily_site_metrics where site_id = target_site_id and business_date between target_start and target_end and has_waste),
+    coalesce((
+      select sum(latest.net_sales) from (
+        select distinct on (business_date) net_sales
+        from public.daily_site_metrics
+        where site_id = target_site_id and business_date between target_start and target_end and has_sales
+        order by business_date, imported_at desc
+      ) latest
+    ), 0),
+    coalesce((
+      select sum(latest.food_purchases) from (
+        select distinct on (business_date) food_purchases
+        from public.daily_site_metrics
+        where site_id = target_site_id and business_date between target_start and target_end and has_purchasing
+        order by business_date, imported_at desc
+      ) latest
+    ), 0),
+    coalesce((
+      select sum(latest.credits) from (
+        select distinct on (business_date) credits
+        from public.daily_site_metrics
+        where site_id = target_site_id and business_date between target_start and target_end and has_purchasing
+        order by business_date, imported_at desc
+      ) latest
+    ), 0),
+    coalesce((
+      select sum(latest.waste_cost) from (
+        select distinct on (business_date) waste_cost
+        from public.daily_site_metrics
+        where site_id = target_site_id and business_date between target_start and target_end and has_waste
+        order by business_date, imported_at desc
+      ) latest
+    ), 0)
+$$;
+
+revoke all on function app_private.rollup_daily_metrics(uuid, date, date) from public, anon, authenticated;
+
 grant usage on schema app_private to authenticated;
 grant execute on function app_private.current_organisation_id() to authenticated;
 grant execute on function app_private.current_app_role() to authenticated;
@@ -284,6 +361,7 @@ alter table public.site_memberships enable row level security;
 alter table public.reporting_periods enable row level security;
 alter table public.weekly_reports enable row level security;
 alter table public.report_source_values enable row level security;
+alter table public.daily_site_metrics enable row level security;
 alter table public.site_cost_snapshots enable row level security;
 alter table public.report_review_resolutions enable row level security;
 alter table public.report_approvals enable row level security;
@@ -322,6 +400,9 @@ with check (organisation_id = app_private.current_organisation_id() and app_priv
 
 create policy source_values_read on public.report_source_values for select to authenticated
 using (exists (select 1 from public.weekly_reports r where r.id = report_id and app_private.can_access_site(r.site_id)));
+
+create policy daily_metrics_read on public.daily_site_metrics for select to authenticated
+using (organisation_id = app_private.current_organisation_id() and app_private.can_access_site(site_id));
 
 create policy snapshots_read on public.site_cost_snapshots for select to authenticated
 using (organisation_id = app_private.current_organisation_id() and app_private.can_access_site(site_id));
@@ -406,6 +487,20 @@ begin
     transfers_out = excluded.transfers_out, closing_stock = excluded.closing_stock,
     adjustments = excluded.adjustments, waste_cost = excluded.waste_cost,
     confirmed_by = auth.uid(), confirmed_at = now(), updated_at = now();
+
+  -- If live connectors have already supplied this week, their normalized totals
+  -- take precedence for only the domains they own. Stock values remain manager-confirmed.
+  with imported as (
+    select * from app_private.rollup_daily_metrics(target_site, target_start, target_end)
+  )
+  update public.report_source_values values_row set
+    net_sales = case when imported.has_sales then coalesce(imported.net_sales, 0) else values_row.net_sales end,
+    purchases = case when imported.has_purchasing then coalesce(imported.purchases, 0) else values_row.purchases end,
+    credits = case when imported.has_purchasing then coalesce(imported.credits, 0) else values_row.credits end,
+    waste_cost = case when imported.has_waste then coalesce(imported.waste_cost, 0) else values_row.waste_cost end,
+    updated_at = now()
+  from imported
+  where values_row.report_id = report;
 
   insert into public.audit_log (organisation_id, actor_id, action, entity_type, entity_id)
   values (organisation, auth.uid(), case when target_status = 'submitted' then 'report.submitted' else 'report.saved' end, 'weekly_report', report);
@@ -572,6 +667,81 @@ $$;
 revoke all on function public.import_private_cost_data(jsonb) from public, anon, authenticated;
 grant execute on function public.import_private_cost_data(jsonb) to service_role;
 
+-- Normalized adapter for EPOS, purchasing and waste APIs. Provider credentials
+-- stay in the connector/automation layer; this database accepts a stable shape.
+create function public.import_operating_metrics(payload jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  organisation uuid := (payload->>'organisationId')::uuid;
+  target_site uuid := (payload->>'siteId')::uuid;
+  source_name text := payload->>'sourceSystem';
+  domains jsonb := payload->'domains';
+  item jsonb;
+  report_row record;
+begin
+  if auth.role() <> 'service_role' then raise exception 'service role required'; end if;
+  if not exists (select 1 from public.sites where id = target_site and organisation_id = organisation) then raise exception 'site mismatch'; end if;
+
+  for item in select value from jsonb_array_elements(coalesce(payload->'metrics', '[]'::jsonb)) loop
+    insert into public.daily_site_metrics (
+      organisation_id, site_id, business_date, source_system, has_sales, has_purchasing,
+      has_waste, gross_sales, net_sales, covers, food_purchases, credits, waste_cost,
+      source_reference, imported_at
+    ) values (
+      organisation, target_site, (item->>'businessDate')::date, source_name,
+      domains ? 'sales', domains ? 'purchasing', domains ? 'waste',
+      coalesce((item->>'grossSales')::numeric, 0), coalesce((item->>'netSales')::numeric, 0),
+      coalesce((item->>'covers')::integer, 0), coalesce((item->>'foodPurchases')::numeric, 0),
+      coalesce((item->>'credits')::numeric, 0), coalesce((item->>'wasteCost')::numeric, 0),
+      item->>'sourceReference', now()
+    ) on conflict (site_id, business_date, source_system) do update set
+      has_sales = excluded.has_sales, has_purchasing = excluded.has_purchasing,
+      has_waste = excluded.has_waste, gross_sales = excluded.gross_sales,
+      net_sales = excluded.net_sales, covers = excluded.covers,
+      food_purchases = excluded.food_purchases, credits = excluded.credits,
+      waste_cost = excluded.waste_cost, source_reference = excluded.source_reference,
+      imported_at = now();
+  end loop;
+
+  for report_row in
+    select r.id, p.week_start, p.week_end
+    from public.weekly_reports r
+    join public.reporting_periods p on p.id = r.period_id
+    where r.site_id = target_site
+      and exists (
+        select 1 from jsonb_array_elements(payload->'metrics') metric
+        where (metric->>'businessDate')::date between p.week_start and p.week_end
+      )
+  loop
+    with imported as (
+      select * from app_private.rollup_daily_metrics(target_site, report_row.week_start, report_row.week_end)
+    )
+    update public.report_source_values values_row set
+      net_sales = case when imported.has_sales then coalesce(imported.net_sales, 0) else values_row.net_sales end,
+      purchases = case when imported.has_purchasing then coalesce(imported.purchases, 0) else values_row.purchases end,
+      credits = case when imported.has_purchasing then coalesce(imported.credits, 0) else values_row.credits end,
+      waste_cost = case when imported.has_waste then coalesce(imported.waste_cost, 0) else values_row.waste_cost end,
+      source_reference = source_name,
+      updated_at = now()
+    from imported
+    where values_row.report_id = report_row.id;
+  end loop;
+
+  insert into public.audit_log (organisation_id, actor_id, action, entity_type, entity_id, detail)
+  values (
+    organisation, null, 'operations.metrics_imported', 'site', target_site,
+    jsonb_build_object('source_system', source_name, 'domains', domains, 'row_count', jsonb_array_length(payload->'metrics'))
+  );
+end;
+$$;
+
+revoke all on function public.import_operating_metrics(jsonb) from public, anon, authenticated;
+grant execute on function public.import_operating_metrics(jsonb) to service_role;
+
 create function public.decide_report(target_report uuid, target_decision public.approval_decision, decision_notes text default '')
 returns void
 language plpgsql
@@ -654,3 +824,18 @@ grant execute on function public.mark_report_shared(uuid, text) to authenticated
 -- Explicitly keep private records unreachable from normal app sessions.
 revoke all on all tables in schema payroll_private from public, anon, authenticated;
 revoke all on all sequences in schema payroll_private from public, anon, authenticated;
+
+-- Realtime updates are still filtered by each signed-in user's RLS policies.
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'weekly_reports') then
+    alter publication supabase_realtime add table public.weekly_reports;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'site_cost_snapshots') then
+    alter publication supabase_realtime add table public.site_cost_snapshots;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'daily_site_metrics') then
+    alter publication supabase_realtime add table public.daily_site_metrics;
+  end if;
+end;
+$$;

@@ -1,0 +1,39 @@
+name: Fresh database validation
+
+on:
+  push:
+    branches:
+      - agent/uat-003-source-imports
+      - agent/uat-014-fresh-db-gate
+  pull_request:
+
+concurrency:
+  group: fresh-database-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: latest
+
+      - name: Start a fresh local Supabase database
+        run: supabase db start
+
+      - name: Rebuild from zero using all migrations and seeds
+        run: supabase db reset --local
+
+      - name: Run database smoke tests
+        run: supabase test db --local
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

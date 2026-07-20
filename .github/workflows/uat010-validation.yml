@@ -1,0 +1,25 @@
+name: UAT 010 validation
+
+on:
+  push:
+    branches: [agent/uat-010-platform-product]
+  pull_request:
+    branches: [agent/uat-003-source-imports]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

@@ -15,7 +15,7 @@ import type { SitePerformance } from "@/lib/types";
 export function CostChart({ sites }: { sites: SitePerformance[] }) {
   const data = sites.map((site) => ({
     name: site.name,
-    "Food cost": Number(site.foodCostPct.toFixed(1)),
+    "Food cost / spend": Number(site.foodCostPct.toFixed(1)),
     Labour: Number(site.labourPct.toFixed(1)),
   }));
 
@@ -33,7 +33,7 @@ export function CostChart({ sites }: { sites: SitePerformance[] }) {
             formatter={(value) => [`${Number(value).toFixed(1)}%`]}
           />
           <Legend iconType="circle" wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }} />
-          <Bar dataKey="Food cost" fill="#eb6b4f" radius={[5, 5, 0, 0]} />
+          <Bar dataKey="Food cost / spend" fill="#eb6b4f" radius={[5, 5, 0, 0]} />
           <Bar dataKey="Labour" fill="#2d7a62" radius={[5, 5, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

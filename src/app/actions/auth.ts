@@ -1,8 +1,14 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { environment } from "@/lib/env";
+import { getRequestOrigin } from "@/lib/http";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { safeInternalPath } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.email(),
@@ -15,12 +21,149 @@ export async function signIn(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   if (!supabase) redirect("/login?error=Supabase+is+not+configured");
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) redirect("/login?error=Sign-in+failed");
+  if (error) redirect("/login?error=Sign-in+failed.+Check+your+email+and+password.");
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function uatQuickLogin() {
+  if (
+    environment.isProduction ||
+    !environment.uatQuickLoginEnabled ||
+    !environment.uatQuickLoginEmail ||
+    !environment.uatQuickLoginPassword
+  ) {
+    redirect("/login?error=UAT+quick+login+is+not+enabled+for+this+deployment.");
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) redirect("/login?error=Supabase+is+not+configured");
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: environment.uatQuickLoginEmail,
+    password: environment.uatQuickLoginPassword,
+  });
+  if (error || !data.user) redirect("/login?error=The+UAT+test+account+could+not+be+signed+in.");
+
+  try {
+    const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("organisation_id")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profile) {
+      await admin.from("audit_log").insert({
+        organisation_id: profile.organisation_id,
+        actor_id: data.user.id,
+        action: "auth.uat_quick_login",
+        entity_type: "profile",
+        entity_id: data.user.id,
+        detail: { preview: true },
+      });
+    }
+  } catch {
+    // Authentication still succeeds if audit delivery is temporarily unavailable.
+  }
+
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
 export async function signOut() {
   const supabase = await createServerSupabaseClient();
-  if (supabase) await supabase.auth.signOut();
+  if (supabase) await supabase.auth.signOut({ scope: "local" });
+  revalidatePath("/", "layout");
   redirect("/login");
+}
+
+const resetSchema = z.object({ email: z.email() });
+
+export async function requestPasswordReset(formData: FormData) {
+  const parsed = resetSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/auth/forgot-password?error=Enter+a+valid+email+address");
+  if (environment.isDemo) redirect("/auth/forgot-password?error=Password+reset+is+unavailable+in+the+demo+workspace");
+
+  const supabase = await createServerSupabaseClient();
+  const origin = await getRequestOrigin();
+  if (supabase && origin) {
+    await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+      redirectTo: `${origin}/auth/set-password`,
+    });
+  }
+  redirect("/auth/forgot-password?sent=1");
+}
+
+const confirmOtpSchema = z.object({
+  email: z.email().transform((value) => value.toLowerCase()),
+  token: z.string().trim().regex(/^\d{6,10}$/, "Enter the numeric code from the email."),
+  type: z.enum(["email", "invite", "recovery"]),
+  next: z.string().max(200).optional(),
+});
+
+export async function confirmEmailOtp(formData: FormData) {
+  const parsed = confirmOtpSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? "Check your email address and code.";
+    redirect(`/auth/confirm?error=${encodeURIComponent(message)}`);
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) redirect("/login?error=The+database+connection+is+unavailable.");
+
+  const { error } = await supabase.auth.verifyOtp({
+    email: parsed.data.email,
+    token: parsed.data.token,
+    type: parsed.data.type as EmailOtpType,
+  });
+  if (error) {
+    const errorCode = "code" in error && typeof error.code === "string" ? error.code : "invalid_code";
+    console.error("auth.otp_confirmation_failed", { code: errorCode, type: parsed.data.type });
+    const next = safeInternalPath(parsed.data.next) ?? "/auth/set-password";
+    redirect(`/auth/confirm?type=${parsed.data.type}&email=${encodeURIComponent(parsed.data.email)}&next=${encodeURIComponent(next)}&error=That+code+is+invalid+or+has+expired.+Request+a+new+one.`);
+  }
+
+  revalidatePath("/", "layout");
+  redirect(safeInternalPath(parsed.data.next) ?? "/dashboard");
+}
+
+export type PasswordActionState = { status: "idle" | "error"; message: string };
+
+const passwordSchema = z
+  .object({
+    password: z.string().min(8, "Use at least 8 characters."),
+    confirmPassword: z.string(),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Both password fields must match.",
+    path: ["confirmPassword"],
+  });
+
+export async function updatePassword(
+  _previous: PasswordActionState,
+  formData: FormData,
+): Promise<PasswordActionState> {
+  const parsed = passwordSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the password fields." };
+  }
+  if (environment.isDemo) {
+    return { status: "error", message: "Passwords cannot be changed in the demo workspace." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return { status: "error", message: "The database connection is unavailable." };
+  const { data: authData } = await supabase.auth.getUser();
+  if (!authData.user) redirect("/login?error=Your+link+has+expired.+Request+a+new+one+below.");
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    return {
+      status: "error",
+      message: error.message.includes("different from the old")
+        ? "Choose a password you have not used before."
+        : "The password could not be saved. Try a longer, less common password.",
+    };
+  }
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
 }

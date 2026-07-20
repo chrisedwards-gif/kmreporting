@@ -1,0 +1,13 @@
+project_id = "kmreporting"
+
+[db.seed]
+enabled = true
+sql_paths = [
+  "./seed.sql",
+  "./seed_dough_religion_checks.sql",
+  "./seed_performance.sql",
+]
+
+[auth]
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000/**"]

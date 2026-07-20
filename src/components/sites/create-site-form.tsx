@@ -6,7 +6,7 @@ import { createSite, type SiteActionState } from "@/app/actions/sites";
 
 const initialState: SiteActionState = { status: "idle", message: "" };
 
-export function CreateSiteForm() {
+export function CreateSiteForm({ defaultReportingStartDate }: { defaultReportingStartDate: string }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createSite, initialState);
   const titleId = useId();
@@ -46,6 +46,7 @@ export function CreateSiteForm() {
                 <div className="form-grid">
                   <label className="field field--full"><span className="field__label">Kitchen name</span><input autoFocus className="field__input" name="name" required maxLength={120} placeholder="e.g. House of Social Manchester" /></label>
                   <label className="field field--full"><span className="field__label">Site code</span><input className="field__input field__input--code" name="code" required maxLength={24} placeholder="e.g. HOS-MCR" /><span className="field__hint">Capital letters, numbers and hyphens only.</span></label>
+                  <label className="field field--full"><span className="field__label">First reporting week starts</span><input className="field__input" defaultValue={defaultReportingStartDate} name="reportingStartDate" required type="date" /><span className="field__hint">Choose a Sunday. The kitchen will not block summaries before this date.</span></label>
                 </div>
                 <div className="form-divider"><span>Weekly control targets</span></div>
                 <div className="form-grid form-grid--three">

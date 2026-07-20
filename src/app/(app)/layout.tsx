@@ -1,8 +1,26 @@
 import { AppShell } from "@/components/app-shell";
-import { requireSessionProfile } from "@/lib/auth/dal";
+import { getAdminPreviewSites, requireSessionProfile } from "@/lib/auth/dal";
 import { environment } from "@/lib/env";
 
 export default async function ApplicationLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireSessionProfile();
-  return <AppShell isDemo={environment.isDemo} user={{ fullName: profile.fullName, role: profile.role }}>{children}</AppShell>;
+  const previewSites = profile.actualRole === "admin" ? await getAdminPreviewSites() : [];
+  return (
+    <AppShell
+      isDemo={environment.isDemo}
+      isPreview={environment.isPreview}
+      previewSites={previewSites}
+      user={{
+        fullName: profile.fullName,
+        role: profile.role,
+        actualRole: profile.actualRole,
+        isAccessPreview: profile.isAccessPreview,
+        previewSiteId: profile.previewSiteId,
+        previewSiteName: profile.previewSiteName,
+        previewManagerName: profile.previewManagerName,
+      }}
+    >
+      {children}
+    </AppShell>
+  );
 }

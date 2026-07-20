@@ -21,7 +21,7 @@ export function buildReviewFlags(
   if (costs.foodCostPct > targets.foodCostTarget) {
     flags.push({
       code: "FOOD_COST_OVER_TARGET",
-      label: "Food cost over target",
+      label: costs.foodCostBasis === "stock_adjusted" ? "Food cost over target" : "Food spend over target",
       detail: `${costs.foodCostPct.toFixed(1)}% vs ${targets.foodCostTarget.toFixed(1)}% target`,
       severity: costs.foodCostPct > targets.foodCostTarget + 3 ? "critical" : "warning",
     });

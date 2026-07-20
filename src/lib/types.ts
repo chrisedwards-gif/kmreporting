@@ -8,6 +8,40 @@ export type ReportStatus =
   | "shared";
 
 export type ReviewSeverity = "info" | "warning" | "critical";
+export type FoodCostBasis = "spend" | "stock_adjusted";
+
+export type ManualPurchase = {
+  description: string;
+  amount: number;
+  receiptReference: string;
+};
+
+export type SalesDayInput = {
+  businessDate: string;
+  grossSales: number;
+  netSales: number;
+  transactions: number;
+  covers: number;
+};
+
+export type SalesItemInput = {
+  itemName: string;
+  category: string;
+  quantity: number;
+  netSales: number;
+};
+
+export type SalesCategoryInput = {
+  category: string;
+  quantity: number;
+  netSales: number;
+};
+
+export type SalesInsightsInput = {
+  days: SalesDayInput[];
+  items: SalesItemInput[];
+  categories: SalesCategoryInput[];
+};
 
 export type ReviewFlag = {
   code: string;
@@ -30,6 +64,8 @@ export type CostInputs = {
   agencyCost: number;
   overtimePremium: number;
   wasteCost: number;
+  staffCostOverride?: number;
+  stocktakeCompleted?: boolean;
 };
 
 export type CostSnapshot = {
@@ -40,6 +76,7 @@ export type CostSnapshot = {
   wastePct: number;
   primeCost: number;
   primeCostPct: number;
+  foodCostBasis: FoodCostBasis;
 };
 
 export type SitePerformance = CostSnapshot & {
@@ -80,5 +117,56 @@ export type WeeklyReport = {
   equipmentIssues: string;
   actionsUnderway: string;
   supportNeeded: string;
+  manualPurchases?: ManualPurchase[];
   costs: SitePerformance;
+  sources?: {
+    sales: string;
+    purchasing: string;
+    labour: string;
+    salesReference?: string;
+    purchasingReference?: string;
+    labourReference?: string;
+    pendingCredits: number;
+    awaitingInvoice: number;
+    stocktakeCompleted: boolean;
+  };
+};
+
+export type ReportDraftInput = {
+  reportId: string;
+  siteId: string;
+  weekStart: string;
+  weekEnd: string;
+  stocktakeCompleted: boolean;
+  manualPurchases: ManualPurchase[];
+  salesInsights?: SalesInsightsInput;
+  values: {
+    netSales: number;
+    openingStock: number;
+    purchases: number;
+    credits: number;
+    transfersIn: number;
+    transfersOut: number;
+    closingStock: number;
+    adjustments: number;
+    wasteCost: number;
+    staffCost: number;
+    paidHours: number;
+    pendingCredits: number;
+    awaitingInvoice: number;
+  };
+  sources: {
+    sales: { mode: string; reference: string; confirmed: boolean };
+    purchasing: { mode: string; reference: string; confirmed: boolean };
+    labour: { mode: string; reference: string; confirmed: boolean };
+  };
+  narrative: {
+    wins: string;
+    operationalIssues: string;
+    staffingIssues: string;
+    complianceIssues: string;
+    equipmentIssues: string;
+    actionsUnderway: string;
+    supportNeeded: string;
+  };
 };

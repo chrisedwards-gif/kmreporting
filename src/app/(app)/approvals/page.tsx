@@ -13,10 +13,16 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const { period } = await searchParams;
   const periods = await getReportingPeriods();
   const selectedPeriod = periods.some((item) => item.id === period) ? period : periods[0]?.id;
-  const { reports, expectedSiteCount } = await getReportingBundle(selectedPeriod);
-  const missingReports = Math.max(expectedSiteCount - reports.length, 0);
+  const { reports, expectedSites } = await getReportingBundle(selectedPeriod);
   const pending = reports.filter((report) => ["submitted", "review_required"].includes(report.status));
-  const approved = reports.filter((report) => report.status === "approved");
+  const approvedOrShared = reports.filter((report) => ["approved", "shared"].includes(report.status));
+  const reportBySite = new Map(reports.map((report) => [report.siteId, report]));
+  const outstanding = expectedSites
+    .map((site) => ({ site, report: reportBySite.get(site.id) }))
+    .filter((item) => !item.report || item.report.status === "draft");
+  const draftCount = outstanding.filter((item) => item.report?.status === "draft").length;
+  const notStartedCount = outstanding.length - draftCount;
+
   return (
     <>
       <header className="page-header">
@@ -30,19 +36,19 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
 
       <div className="dashboard-grid">
         <section className="panel">
-          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} reports waiting · {missingReports} kitchens not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
+          <div className="panel__header"><div><h2 className="panel__title">Needs a decision</h2><p className="panel__subtitle">{pending.length} waiting for approval · {outstanding.length} not submitted</p></div><ShieldAlert aria-hidden="true" color="#c78324" size={19} /></div>
           <div className="panel__body">
             <div className="report-list">
               {pending.map((report) => (
                 <Link className="review-item" href={`/reports/${report.id}`} key={report.id}>
-                  <div style={{ alignItems: "center", display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+                  <div className="approval-card__top">
                     <div><div className="review-item__site">{report.costs.code}</div><div className="review-item__label">{report.siteName}</div></div>
                     <StatusBadge status={report.status} />
                   </div>
-                  <div className="review-item__detail" style={{ marginTop: ".6rem" }}>
-                    Food {formatPercentage(report.costs.foodCostPct)} · Labour {formatPercentage(report.costs.labourPct)} · {report.costs.flags.length} review checks
+                  <div className="review-item__detail approval-card__meta">
+                    {report.costs.foodCostBasis === "stock_adjusted" ? "Food" : "Spend"} {formatPercentage(report.costs.foodCostPct)} · Labour {formatPercentage(report.costs.labourPct)} · {report.costs.flags.filter((flag) => flag.severity !== "info").length} actionable checks
                   </div>
-                  <div style={{ alignItems: "center", display: "flex", fontSize: ".72rem", fontWeight: 750, gap: ".3rem", marginTop: ".65rem" }}>Open decision <ArrowRight aria-hidden="true" size={14} /></div>
+                  <div className="approval-card__cta">Open decision <ArrowRight aria-hidden="true" size={14} /></div>
                 </Link>
               ))}
               {!pending.length ? <div className="empty-inline empty-inline--compact">Nothing is waiting for approval.</div> : null}
@@ -58,15 +64,29 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
                 <div className="review-item review-item--info"><Clock3 aria-hidden="true" size={16} /><div className="review-item__label">1. Kitchen submits</div><div className="review-item__detail">Period and required source totals are validated.</div></div>
                 <div className="review-item"><ShieldAlert aria-hidden="true" size={16} /><div className="review-item__label">2. Manager reviews</div><div className="review-item__detail">Cost exceptions, compliance and support requests are resolved.</div></div>
                 <div className="review-item review-item--info"><CheckCircle2 aria-hidden="true" size={16} /><div className="review-item__label">3. Named approval</div><div className="review-item__detail">The decision, approver and timestamp enter the audit log.</div></div>
-                <div className="review-item review-item--info"><Share2 aria-hidden="true" size={16} /><div className="review-item__label">4. Controlled share</div><div className="review-item__detail">Only approved safe summaries can be sent outside the app.</div></div>
+                <div className="review-item review-item--info"><Share2 aria-hidden="true" size={16} /><div className="review-item__label">4. Controlled share</div><div className="review-item__detail">The app records the share decision. Email delivery is separate and only occurs when a delivery webhook is configured.</div></div>
               </div>
             </div>
           </section>
           <section className="panel">
-            <div className="panel__header"><div><h2 className="panel__title">Approved this week</h2><p className="panel__subtitle">Ready for controlled sharing</p></div></div>
+            <div className="panel__header"><div><h2 className="panel__title">Still outstanding</h2><p className="panel__subtitle">{notStartedCount} not started · {draftCount} saved as draft</p></div></div>
             <div className="panel__body">
-              {approved.map((report) => <div className="cost-summary__row" key={report.id}><span className="cost-summary__label">{report.siteName}</span><StatusBadge status={report.status} /></div>)}
-              {!approved.length ? <div className="empty-inline empty-inline--compact">No reports have been approved for this week yet.</div> : null}
+              {outstanding.map(({ site, report }) => (
+                <div className="cost-summary__row" key={site.id}>
+                  <span className="cost-summary__label">{site.name}</span>
+                  {report
+                    ? <Link aria-label={`Open ${site.name} draft`} href={`/reports/new?report=${report.id}`}><StatusBadge status="draft" /></Link>
+                    : <span className="status-badge status-badge--draft">Not started</span>}
+                </div>
+              ))}
+              {!outstanding.length ? <div className="empty-inline empty-inline--compact">Every expected kitchen has submitted a report.</div> : null}
+            </div>
+          </section>
+          <section className="panel">
+            <div className="panel__header"><div><h2 className="panel__title">Approved or shared this week</h2><p className="panel__subtitle">Approved reports remain visible after a share is recorded</p></div></div>
+            <div className="panel__body">
+              {approvedOrShared.map((report) => <div className="cost-summary__row" key={report.id}><span className="cost-summary__label">{report.siteName}</span><StatusBadge status={report.status} /></div>)}
+              {!approvedOrShared.length ? <div className="empty-inline empty-inline--compact">No reports have been approved for this week yet.</div> : null}
             </div>
           </section>
         </aside>

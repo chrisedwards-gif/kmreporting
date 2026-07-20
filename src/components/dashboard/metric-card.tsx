@@ -6,11 +6,12 @@ type MetricCardProps = {
   note: string;
   trend?: "up" | "down" | "neutral";
   accent?: string;
+  overTarget?: boolean;
 };
 
-export function MetricCard({ label, value, note, trend = "neutral", accent }: MetricCardProps) {
+export function MetricCard({ label, value, note, trend = "neutral", accent, overTarget = false }: MetricCardProps) {
   return (
-    <article className="metric-card" style={{ "--accent": accent } as React.CSSProperties}>
+    <article className={`metric-card${overTarget ? " metric-card--over-target" : ""}`} style={{ "--accent": accent } as React.CSSProperties}>
       <div className="metric-card__label">{label}</div>
       <div className="metric-card__value">{value}</div>
       <div className="metric-card__note">

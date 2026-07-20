@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { environment } from "@/lib/env";
+import { hasValidBearerSecret } from "@/lib/security/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const payRate = z.object({
@@ -38,7 +39,7 @@ const importSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (!environment.importSecret || request.headers.get("authorization") !== `Bearer ${environment.importSecret}`) {
+  if (!hasValidBearerSecret(request.headers.get("authorization"), environment.importSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
