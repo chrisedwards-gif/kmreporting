@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/package-native-pdf-release
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
