@@ -48,6 +48,34 @@ export function getCurrentReportingWeek(now = new Date()) {
   return { start: toIsoDate(start), end: toIsoDate(end), dueAt: londonNoonIso(toIsoDate(due)) };
 }
 
+type AssignmentWindow = {
+  assignmentStartsOn: string;
+  assignmentEndsOn: string | null;
+};
+
+const assignmentOverlapsWeek = (assignment: AssignmentWindow, week: { start: string; end: string }) =>
+  assignment.assignmentStartsOn <= week.end &&
+  (!assignment.assignmentEndsOn || assignment.assignmentEndsOn >= week.start);
+
+/**
+ * A 1-1 can always be held while the manager assignment is active. Prefer the
+ * latest completed week so KPI data is normally available; for a new manager,
+ * fall back to the current in-progress week and show KPI values as pending.
+ */
+export function getAvailableOneToOneWeek(assignment: AssignmentWindow, now = new Date()) {
+  const completedWeek = getLatestCompletedReportingWeek(now);
+  if (assignmentOverlapsWeek(assignment, completedWeek)) {
+    return { ...completedWeek, isComplete: true };
+  }
+
+  const currentWeek = getCurrentReportingWeek(now);
+  if (assignmentOverlapsWeek(assignment, currentWeek)) {
+    return { ...currentWeek, isComplete: false };
+  }
+
+  return null;
+}
+
 export function isSevenDayReportingPeriod(start: string, end: string) {
   const startDate = new Date(`${start}T00:00:00Z`);
   const endDate = new Date(`${end}T00:00:00Z`);
