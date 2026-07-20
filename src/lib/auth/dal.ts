@@ -1,6 +1,5 @@
 import "server-only";
 
-import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { capabilitiesFor, navigationRoleFor, type Capabilities } from "@/lib/auth/capabilities";
@@ -40,9 +39,13 @@ export type SessionProfile = {
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const demoKardiaId = "00000000-0000-4000-8000-000000000003";
+const demoKardiaId = "kardia";
 
-export const getSessionProfile = cache(async (): Promise<SessionProfile | null> => {
+/**
+ * Do not wrap session/auth state in React cache. The profile contains cookies,
+ * identity and data scope; it must be resolved fresh for every request.
+ */
+export const getSessionProfile = async (): Promise<SessionProfile | null> => {
   if (environment.isDemo) {
     const cookieStore = await cookies();
     const requestedPersona = cookieStore.get(demoPersonaCookieName)?.value;
@@ -153,13 +156,13 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
     scopeManagerId,
     capabilities: capabilitiesFor(actualRole),
   };
-});
+};
 
-export const requireSessionProfile = cache(async () => {
+export const requireSessionProfile = async () => {
   const profile = await getSessionProfile();
   if (!profile) redirect("/login");
   return profile;
-});
+};
 
 export async function requireRole(allowed: AppRole[]) {
   const profile = await requireSessionProfile();
