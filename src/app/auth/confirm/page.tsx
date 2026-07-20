@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ChefHat, KeyRound, ShieldCheck } from "lucide-react";
 import { confirmEmailOtp } from "@/app/actions/auth";
@@ -14,6 +15,24 @@ export default async function ConfirmAuthPage({
   searchParams: Promise<{ email?: string; type?: string; next?: string; error?: string }>;
 }) {
   const { email = "", type, next, error } = await searchParams;
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (configuredOrigin) {
+    const requestHeaders = await headers();
+    const currentHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim()
+      ?? requestHeaders.get("host")?.split(",")[0]?.trim();
+    const canonicalUrl = new URL(configuredOrigin);
+
+    if (currentHost && currentHost !== canonicalUrl.host) {
+      const target = new URL("/auth/confirm", canonicalUrl);
+      if (email) target.searchParams.set("email", email);
+      if (type) target.searchParams.set("type", type);
+      if (next) target.searchParams.set("next", next);
+      if (error) target.searchParams.set("error", error);
+      redirect(target.toString());
+    }
+  }
+
   if (!type || !allowedTypes.has(type)) {
     redirect("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.");
   }

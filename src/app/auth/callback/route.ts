@@ -1,6 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getRequestOrigin } from "@/lib/http";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { safeInternalPath } from "@/lib/utils";
 
@@ -14,9 +15,10 @@ export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const requestedType = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
   const next = safeInternalPath(request.nextUrl.searchParams.get("next")) ?? "/dashboard";
+  const canonicalOrigin = await getRequestOrigin() ?? request.nextUrl.origin;
 
   if (tokenHash && requestedType && allowedEmailOtpTypes.has(requestedType)) {
-    const confirmationUrl = new URL("/auth/confirm", request.url);
+    const confirmationUrl = new URL("/auth/confirm", canonicalOrigin);
     confirmationUrl.searchParams.set("token_hash", tokenHash);
     confirmationUrl.searchParams.set("type", requestedType);
     confirmationUrl.searchParams.set("next", next);
@@ -27,11 +29,11 @@ export async function GET(request: NextRequest) {
     const supabase = await createServerSupabaseClient();
     if (supabase) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (!error) return NextResponse.redirect(new URL(next, request.url));
+      if (!error) return NextResponse.redirect(new URL(next, canonicalOrigin));
     }
   }
 
   return NextResponse.redirect(
-    new URL("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.", request.url),
+    new URL("/login?error=That+link+is+invalid+or+has+expired.+Request+a+new+one.", canonicalOrigin),
   );
 }
