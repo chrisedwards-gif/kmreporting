@@ -25,7 +25,19 @@ jobs:
       - run: npm ci
 
       - name: Deploy exact source to production
-        run: >-
-          npx -y @netlify/mcp@latest
-          --site-id ad42ba1c-7fc2-4334-8b88-10fdcd569fda
-          --proxy-path "https://netlify-mcp.netlify.app//proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..pwqfIhxBffN-fPl5.NM2v-vv6lDPT_Yjtgj1Ws2cP60cHCINk48Djr5QxiatqgMZLuaJOZyKgFp_IX5zX4VgUCSlSw01yuKs_n1k8-A2cbhHPpkihxaXPi663fwwh42vQao_7QEO32PKEdUeQHHmWHgHGCc-UU18fYfochcWx1vgJ8JnJ8ViS_dxDLKWPtAKgNLBP92QXR-OUtHXs8_7gAcH49-1bmq8GCsXS0sEnFgL9JoLPeZelgCM7gb6n1Wn8nMZmJMAOsJo5mqH50twHGTCO6ik_ppBrhUsMjuIjMu4SL6jQiXUp02OdKasiq5Qk7m8e3A85wOeWDKgZYMNpGskcm5KCLSTk351vpd05dcXdINTmLcwnWmQyq_kVfBldJArA3RSI-iP-Dwej7g8qRd-2.Czt6atPRMaZKw23gNeBJcA"
+        id: production-deploy
+        shell: bash
+        run: |
+          set -o pipefail
+          npx -y @netlify/mcp@latest \
+            --site-id ad42ba1c-7fc2-4334-8b88-10fdcd569fda \
+            --proxy-path "https://netlify-mcp.netlify.app//proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..pwqfIhxBffN-fPl5.NM2v-vv6lDPT_Yjtgj1Ws2cP60cHCINk48Djr5QxiatqgMZLuaJOZyKgFp_IX5zX4VgUCSlSw01yuKs_n1k8-A2cbhHPpkihxaXPi663fwwh42vQao_7QEO32PKEdUeQHHmWHgHGCc-UU18fYfochcWx1vgJ8JnJ8ViS_dxDLKWPtAKgNLBP92QXR-OUtHXs8_7gAcH49-1bmq8GCsXS0sEnFgL9JoLPeZelgCM7gb6n1Wn8nMZmJMAOsJo5mqH50twHGTCO6ik_ppBrhUsMjuIjMu4SL6jQiXUp02OdKasiq5Qk7m8e3A85wOeWDKgZYMNpGskcm5KCLSTk351vpd05dcXdINTmLcwnWmQyq_kVfBldJArA3RSI-iP-Dwej7g8qRd-2.Czt6atPRMaZKw23gNeBJcA" \
+            2>&1 | tee netlify-deploy.log
+
+      - name: Upload deployment diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: netlify-production-deploy-log
+          path: netlify-deploy.log
+          retention-days: 1
