@@ -34,6 +34,24 @@ export type SalaryAllocation = {
   weeklyLoadedCost: number;
 };
 
+type DbSalaryAllocation = {
+  id: string;
+  site_id: string;
+  site_name: string;
+  profile_id: string | null;
+  staff_name: string;
+  role_title: string;
+  annual_salary: number | string;
+  oncost_rate: number | string;
+  allocation_pct: number | string;
+  valid_from: string;
+  valid_to: string | null;
+  active: boolean;
+  weekly_base_cost: number | string;
+  weekly_oncost: number | string;
+  weekly_loaded_cost: number | string;
+};
+
 export async function getSalaryWorkspace(): Promise<{
   sites: SalarySite[];
   profiles: SalaryProfile[];
@@ -59,7 +77,7 @@ export async function getSalaryWorkspace(): Promise<{
       fullName: profile.full_name,
       email: profile.notification_email ?? "",
     })),
-    allocations: (rawAllocations ?? []).map((allocation) => ({
+    allocations: ((rawAllocations ?? []) as DbSalaryAllocation[]).map((allocation) => ({
       id: allocation.id,
       siteId: allocation.site_id,
       siteName: allocation.site_name,
