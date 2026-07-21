@@ -2,10 +2,18 @@ import "server-only";
 
 import { environment } from "@/lib/env";
 
+export type EmailAttachment = {
+  filename: string;
+  content: Uint8Array | string;
+  contentType?: string;
+};
+
 type EmailInput = {
   to: string;
   subject: string;
   text: string;
+  html?: string;
+  attachments?: EmailAttachment[];
   idempotencyKey: string;
   category?: string;
 };
@@ -29,6 +37,14 @@ const textToHtml = (value: string) => escapeHtml(value)
   .map((paragraph) => `<p style="margin:0 0 16px;line-height:1.6">${paragraph.replaceAll("\n", "<br>")}</p>`)
   .join("");
 
+const encodeAttachment = (attachment: EmailAttachment) => ({
+  filename: attachment.filename,
+  content: typeof attachment.content === "string"
+    ? Buffer.from(attachment.content, "utf8").toString("base64")
+    : Buffer.from(attachment.content).toString("base64"),
+  ...(attachment.contentType ? { content_type: attachment.contentType } : {}),
+});
+
 export async function sendTransactionalEmail(input: EmailInput): Promise<EmailDeliveryResult> {
   if (!environment.resendApiKey || !environment.resendFromEmail) {
     return { configured: false, ok: false, providerReference: "", error: "Resend is not configured." };
@@ -49,7 +65,8 @@ export async function sendTransactionalEmail(input: EmailInput): Promise<EmailDe
         to: [recipient],
         subject: input.subject,
         text: input.text,
-        html: `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#17352d"><h1 style="font-size:24px">${escapeHtml(input.subject)}</h1>${textToHtml(input.text)}</div>`,
+        html: input.html ?? `<div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#17352d"><h1 style="font-size:24px">${escapeHtml(input.subject)}</h1>${textToHtml(input.text)}</div>`,
+        ...(input.attachments?.length ? { attachments: input.attachments.map(encodeAttachment) } : {}),
         ...(environment.resendReplyTo ? { reply_to: environment.resendReplyTo } : {}),
         tags: [
           { name: "category", value: input.category ?? "transactional" },
