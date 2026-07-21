@@ -20,6 +20,11 @@ export type SiteView = {
   netSales: number;
   cogs: number;
   staffCost: number;
+  hourlyStaffCost: number;
+  salaryStaffCost: number;
+  salaryOncostCost: number;
+  salariesIncluded: boolean;
+  wasteCost: number;
   foodCostPct: number;
   labourPct: number;
   wastePct: number;
@@ -102,6 +107,11 @@ export const toSiteView = (report: WeeklyReport): SiteView => {
     netSales: report.costs.netSales,
     cogs: report.costs.cogs,
     staffCost: report.costs.staffCost,
+    hourlyStaffCost: report.costs.hourlyStaffCost ?? report.costs.staffCost,
+    salaryStaffCost: report.costs.salaryStaffCost ?? 0,
+    salaryOncostCost: report.costs.salaryOncostCost ?? 0,
+    salariesIncluded: Boolean(report.costs.salariesIncluded),
+    wasteCost: report.costs.wasteCost ?? report.costs.netSales * report.costs.wastePct / 100,
     foodCostPct: report.costs.foodCostPct,
     labourPct: report.costs.labourPct,
     wastePct: report.costs.wastePct,
