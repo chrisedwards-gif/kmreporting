@@ -1,10 +1,10 @@
 import "server-only";
 
 import { buildManagementPackPdf } from "@/lib/pdf/management-pack";
+import { sendTransactionalEmail } from "@/lib/notifications/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ManualPurchase, ReportStatus, ReviewFlag, SitePerformance, WeeklyReport } from "@/lib/types";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
-import { sendTransactionalEmail } from "@/lib/notifications/email";
 
 export type ManagementDeliveryBundle = {
   week: { id: string; start: string; end: string; dueAt: string };
@@ -58,6 +58,8 @@ const usefulText = (value: string | undefined, fallback: string) => {
   return !text || /^(?:n\/?a|none|nil|-+)$/i.test(text) ? fallback : text;
 };
 
+const optionalCost = (value: number | undefined) => value ?? 0;
+
 export async function loadManagementDeliveryBundle(
   organisationId: string,
   periodId?: string,
@@ -75,41 +77,28 @@ export async function loadManagementDeliveryBundle(
   if (!period) return null;
 
   const [{ data: expectedSites = [] }, { data: rawReports, error: reportError }] = await Promise.all([
-    admin
-      .from("sites")
-      .select("id, name, code")
+    admin.from("sites").select("id, name, code")
       .eq("organisation_id", organisationId)
       .lte("reporting_start_date", period.week_end)
       .or(`reporting_end_date.is.null,reporting_end_date.gte.${period.week_start}`)
       .order("name"),
-    admin
-      .from("weekly_reports")
+    admin.from("weekly_reports")
       .select("id, site_id, manager_id, status, wins, operational_issues, staffing_issues, compliance_issues, equipment_issues, actions_underway, support_needed, submitted_at, updated_at")
       .eq("organisation_id", organisationId)
       .eq("period_id", period.id),
   ]);
   if (reportError) throw new Error("Unable to load weekly reports for delivery.");
+
   const reports = (rawReports ?? []) as DbReport[];
   const reportIds = reports.map((report) => report.id);
   const siteIds = [...new Set(reports.map((report) => report.site_id))];
   const managerIds = [...new Set(reports.map((report) => report.manager_id))];
-
   const [{ data: rawSites }, { data: rawProfiles }, { data: rawSnapshots }, { data: rawSources }, { data: rawPurchases }] = await Promise.all([
-    siteIds.length
-      ? admin.from("sites").select("id, code, name, food_cost_target, labour_target, waste_target").in("id", siteIds)
-      : Promise.resolve({ data: [] }),
-    managerIds.length
-      ? admin.from("profiles").select("id, full_name").in("id", managerIds)
-      : Promise.resolve({ data: [] }),
-    reportIds.length
-      ? admin.from("site_cost_snapshots").select("report_id, site_id, net_sales, cogs, food_cost_pct, staff_cost, hourly_staff_cost, salary_staff_cost, salary_oncost_cost, salaries_included, labour_pct, waste_cost, waste_pct, prime_cost, prime_cost_pct, food_cost_basis, review_flags").in("report_id", reportIds)
-      : Promise.resolve({ data: [] }),
-    reportIds.length
-      ? admin.from("report_source_values").select("report_id, sales_source, purchasing_source, labour_source, sales_source_reference, purchasing_source_reference, labour_source_reference, pending_credits, awaiting_invoice, stocktake_completed").in("report_id", reportIds)
-      : Promise.resolve({ data: [] }),
-    reportIds.length
-      ? admin.from("report_manual_purchases").select("report_id, description, amount, receipt_reference").in("report_id", reportIds).order("created_at")
-      : Promise.resolve({ data: [] }),
+    siteIds.length ? admin.from("sites").select("id, code, name, food_cost_target, labour_target, waste_target").in("id", siteIds) : Promise.resolve({ data: [] }),
+    managerIds.length ? admin.from("profiles").select("id, full_name").in("id", managerIds) : Promise.resolve({ data: [] }),
+    reportIds.length ? admin.from("site_cost_snapshots").select("report_id, site_id, net_sales, cogs, food_cost_pct, staff_cost, hourly_staff_cost, salary_staff_cost, salary_oncost_cost, salaries_included, labour_pct, waste_cost, waste_pct, prime_cost, prime_cost_pct, food_cost_basis, review_flags").in("report_id", reportIds) : Promise.resolve({ data: [] }),
+    reportIds.length ? admin.from("report_source_values").select("report_id, sales_source, purchasing_source, labour_source, sales_source_reference, purchasing_source_reference, labour_source_reference, pending_credits, awaiting_invoice, stocktake_completed").in("report_id", reportIds) : Promise.resolve({ data: [] }),
+    reportIds.length ? admin.from("report_manual_purchases").select("report_id, description, amount, receipt_reference").in("report_id", reportIds).order("created_at") : Promise.resolve({ data: [] }),
   ]);
 
   const sitesById = new Map((rawSites ?? []).map((site) => [site.id, site]));
@@ -123,7 +112,7 @@ export async function loadManagementDeliveryBundle(
     purchasesByReport.set(purchase.report_id, items);
   }
 
-  const weeklyReports = reports.flatMap((report) => {
+  const weeklyReports = reports.flatMap((report): WeeklyReport[] => {
     const site = sitesById.get(report.site_id);
     const snapshot = snapshotsByReport.get(report.id);
     if (!site || !snapshot) return [];
@@ -184,7 +173,7 @@ export async function loadManagementDeliveryBundle(
         awaitingInvoice: Number(source.awaiting_invoice ?? 0),
         stocktakeCompleted: Boolean(source.stocktake_completed),
       } : undefined,
-    } satisfies WeeklyReport];
+    }];
   });
 
   return {
@@ -203,10 +192,10 @@ export function buildManagementEmail(bundle: ManagementDeliveryBundle, recipient
     sales: sum.sales + report.costs.netSales,
     food: sum.food + report.costs.cogs,
     labour: sum.labour + report.costs.staffCost,
-    hourly: sum.hourly + report.costs.hourlyStaffCost,
-    salary: sum.salary + report.costs.salaryStaffCost,
-    oncost: sum.oncost + report.costs.salaryOncostCost,
-    waste: sum.waste + report.costs.wasteCost,
+    hourly: sum.hourly + optionalCost(report.costs.hourlyStaffCost),
+    salary: sum.salary + optionalCost(report.costs.salaryStaffCost),
+    oncost: sum.oncost + optionalCost(report.costs.salaryOncostCost),
+    waste: sum.waste + optionalCost(report.costs.wasteCost),
     pendingCredits: sum.pendingCredits + (report.sources?.pendingCredits ?? 0),
   }), { sales: 0, food: 0, labour: 0, hourly: 0, salary: 0, oncost: 0, waste: 0, pendingCredits: 0 });
   const foodPct = totals.sales ? totals.food / totals.sales * 100 : 0;
@@ -214,15 +203,16 @@ export function buildManagementEmail(bundle: ManagementDeliveryBundle, recipient
   const wastePct = totals.sales ? totals.waste / totals.sales * 100 : 0;
   const weightedFoodTarget = totals.sales ? approved.reduce((sum, report) => sum + report.costs.foodCostTarget * report.costs.netSales, 0) / totals.sales : 0;
   const weightedLabourTarget = totals.sales ? approved.reduce((sum, report) => sum + report.costs.labourTarget * report.costs.netSales, 0) / totals.sales : 0;
-  const strongest = approved.toSorted((a, b) => b.costs.netSales - a.costs.netSales)[0];
-  const foodConcern = approved.toSorted((a, b) => (b.costs.foodCostPct - b.costs.foodCostTarget) - (a.costs.foodCostPct - a.costs.foodCostTarget))[0];
-  const labourConcern = approved.toSorted((a, b) => (b.costs.labourPct - b.costs.labourTarget) - (a.costs.labourPct - a.costs.labourTarget))[0];
+  const strongest = [...approved].sort((a, b) => b.costs.netSales - a.costs.netSales)[0];
+  const foodConcern = [...approved].sort((a, b) => (b.costs.foodCostPct - b.costs.foodCostTarget) - (a.costs.foodCostPct - a.costs.foodCostTarget))[0];
+  const labourConcern = [...approved].sort((a, b) => (b.costs.labourPct - b.costs.labourTarget) - (a.costs.labourPct - a.costs.labourTarget))[0];
   const risks = approved.flatMap((report) => {
     const issues = [report.operationalIssues, report.staffingIssues, report.complianceIssues, report.equipmentIssues]
       .map((value) => value.trim())
       .filter((value) => value && !/^(?:n\/?a|none|nil|-+)$/i.test(value));
     return issues.length ? [`${report.siteName}: ${issues.join(" ")}`] : [];
   });
+
   const subject = `${partial ? "PARTIAL – " : ""}HOS Weekly Management Pack | Week ending ${formatDate(bundle.week.end)}`;
   const intro = `Attached is the weekly management pack for ${formatDate(bundle.week.start)} to ${formatDate(bundle.week.end)}.`;
   const summaryLines = [
@@ -255,11 +245,11 @@ export function buildManagementEmail(bundle: ManagementDeliveryBundle, recipient
     "Thanks,\nChris",
   ].join("\n\n");
 
-  const metric = (label: string, value: string, note: string) => `<td style="width:25%;padding:8px"><div style="border:1px solid #d8ddd9;border-radius:12px;padding:14px;background:#fff"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#617069">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:700;margin:6px 0;color:#10271f">${escapeHtml(value)}</div><div style="font-size:12px;color:#617069">${escapeHtml(note)}</div></div></td>`;
+  const metric = (label: string, value: string, note: string) => `<td style="width:25%;padding:6px"><div style="border:1px solid #d8ddd9;border-radius:12px;padding:13px;background:#fff"><div style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#617069">${escapeHtml(label)}</div><div style="font-size:22px;font-weight:700;margin:6px 0;color:#10271f">${escapeHtml(value)}</div><div style="font-size:11px;color:#617069">${escapeHtml(note)}</div></div></td>`;
   const html = `<div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;color:#17352d;background:#f5f6f2;padding:24px">
     <div style="background:#10271f;color:#fff;border-radius:16px;padding:24px;margin-bottom:18px"><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8fd0b7">HOS Kitchen Reports</div><h1 style="font-size:28px;margin:8px 0">${escapeHtml(subject)}</h1><p style="margin:0;color:#d1dfd8">${escapeHtml(intro)}</p></div>
     ${partial ? `<div style="background:#fff2d5;border:1px solid #e5c16e;border-radius:12px;padding:14px;margin-bottom:18px"><strong>Partial reporting pack:</strong> ${escapeHtml(outstanding.map((site) => site.name).join(", "))} ${outstanding.length === 1 ? "is" : "are"} still outstanding.</div>` : ""}
-    <table role="presentation" style="width:100%;border-collapse:collapse;margin:0 -8px 18px"><tr>${metric("Net sales", formatCurrency(totals.sales), `${approved.length} approved kitchens`)}${metric("Food", formatPercentage(foodPct), `Target ${formatPercentage(weightedFoodTarget)}`)}${metric("Labour", formatPercentage(labourPct), `Target ${formatPercentage(weightedLabourTarget)}`)}${metric("Waste", formatPercentage(wastePct), formatCurrency(totals.waste))}</tr></table>
+    <table role="presentation" style="width:100%;border-collapse:collapse;margin:0 -6px 18px"><tr>${metric("Net sales", formatCurrency(totals.sales), `${approved.length} approved kitchens`)}${metric("Food", formatPercentage(foodPct), `Target ${formatPercentage(weightedFoodTarget)}`)}${metric("Labour", formatPercentage(labourPct), `Target ${formatPercentage(weightedLabourTarget)}`)}${metric("Waste", formatPercentage(wastePct), formatCurrency(totals.waste))}</tr></table>
     <div style="background:#fff;border:1px solid #d8ddd9;border-radius:14px;padding:20px;margin-bottom:18px"><h2 style="font-size:18px;margin:0 0 12px">Management readout</h2><ul style="padding-left:20px;line-height:1.6;margin:0">${managementReadout.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul></div>
     ${approved.map((report) => `<div style="background:#fff;border:1px solid #d8ddd9;border-radius:14px;padding:18px;margin-bottom:12px"><h2 style="font-size:17px;margin:0 0 8px">${escapeHtml(report.siteName)}</h2><p style="margin:0 0 8px"><strong>${escapeHtml(formatCurrency(report.costs.netSales))}</strong> sales · ${escapeHtml(formatPercentage(report.costs.foodCostPct))} food · ${escapeHtml(formatPercentage(report.costs.labourPct))} labour · ${escapeHtml(formatPercentage(report.costs.wastePct))} waste</p><p style="margin:0 0 6px"><strong>Win:</strong> ${escapeHtml(usefulText(report.wins, "No material win recorded."))}</p><p style="margin:0"><strong>Action:</strong> ${escapeHtml(usefulText(report.actionsUnderway, "No follow-up action recorded."))}</p></div>`).join("")}
     <p style="font-size:12px;color:#617069;margin-top:20px">The full A4 management pack is attached as a PDF.</p>
@@ -275,6 +265,19 @@ export async function deliverManagementPackEmail(input: DeliveryInput): Promise<
   if (content.partial && !input.allowPartial) return { ok: false, skipped: true, partial: true, message: "The weekly pack is incomplete and partial delivery is disabled." };
 
   const admin = createAdminClient();
+  let auditActorId = input.actorId;
+  if (!auditActorId) {
+    const { data: actor } = await admin.from("profiles").select("id")
+      .eq("organisation_id", input.organisationId)
+      .eq("active", true)
+      .in("role", ["admin", "group_manager"])
+      .order("role")
+      .limit(1)
+      .maybeSingle();
+    auditActorId = actor?.id;
+  }
+  if (!auditActorId) return { ok: false, skipped: false, message: "No active management profile is available to own the delivery audit record." };
+
   const fixedDedupe = `management-pack:${input.organisationId}:${bundle.week.id}:${input.recipientEmail.toLowerCase()}`;
   const dedupeKey = input.deliveryKind === "scheduled" ? fixedDedupe : `${fixedDedupe}:${input.deliveryKind}:${crypto.randomUUID()}`;
   if (input.deliveryKind === "scheduled") {
@@ -282,15 +285,10 @@ export async function deliverManagementPackEmail(input: DeliveryInput): Promise<
     if (existing?.delivery_status === "sent") return { ok: true, skipped: true, partial: content.partial, message: "This reporting period has already been emailed." };
   }
 
-  const pdf = buildManagementPackPdf({
-    week: bundle.week,
-    reports: bundle.reports,
-    expectedSites: bundle.expectedSites,
-    preparedFor: input.recipientName,
-  });
+  const pdf = buildManagementPackPdf({ week: bundle.week, reports: bundle.reports, expectedSites: bundle.expectedSites, preparedFor: input.recipientName });
   const { data: log, error: logError } = await admin.from("notification_log").insert({
     organisation_id: input.organisationId,
-    recipient_id: input.actorId ?? null,
+    recipient_id: auditActorId,
     notification_type: input.deliveryKind === "scheduled" ? "scheduled_management_summary" : input.deliveryKind === "test" ? "test_management_summary" : "management_summary",
     dedupe_key: dedupeKey,
     delivery_status: "queued",
@@ -306,15 +304,10 @@ export async function deliverManagementPackEmail(input: DeliveryInput): Promise<
     subject: content.subject,
     text: content.text,
     html: content.html,
-    attachments: [{
-      filename: `HOS-Weekly-Management-Pack-${bundle.week.end}.pdf`,
-      content: pdf,
-      contentType: "application/pdf",
-    }],
+    attachments: [{ filename: `HOS-Weekly-Management-Pack-${bundle.week.end}.pdf`, content: pdf, contentType: "application/pdf" }],
     idempotencyKey: `management-pack-${log.id}`,
     category: input.deliveryKind === "scheduled" ? "scheduled_management_summary" : "management_summary",
   });
-
   await admin.from("notification_log").update({
     delivery_status: delivery.configured && delivery.ok ? "sent" : "failed",
     provider_reference: delivery.providerReference || null,
@@ -323,13 +316,8 @@ export async function deliverManagementPackEmail(input: DeliveryInput): Promise<
   }).eq("id", log.id);
 
   if (delivery.ok && input.deliveryKind !== "test") {
-    await admin.from("management_email_settings").update({
-      last_sent_period_id: bundle.week.id,
-      last_sent_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq("organisation_id", input.organisationId);
+    await admin.from("management_email_settings").update({ last_sent_period_id: bundle.week.id, last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("organisation_id", input.organisationId);
   }
-
   if (!delivery.configured) return { ok: false, skipped: false, partial: content.partial, message: "Resend is not configured on this deployment." };
   if (!delivery.ok) return { ok: false, skipped: false, partial: content.partial, message: delivery.error };
   return { ok: true, skipped: false, partial: content.partial, providerReference: delivery.providerReference, message: `Management pack emailed to ${input.recipientEmail}.` };
