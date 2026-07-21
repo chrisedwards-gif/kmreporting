@@ -19,18 +19,62 @@ export type AdditionalSiteManager = {
   canSubmit: boolean;
 };
 
+export type SiteUsageSummary = {
+  reports: number;
+  dailyRecords: number;
+  checks: number;
+  peopleRecords: number;
+  sops: number;
+  training: number;
+  products: number;
+  messages: number;
+  payrollRecords: number;
+  totalDependencies: number;
+};
+
 export type ManagedSiteDirectoryItem = {
   id: string;
   code: string;
   name: string;
   active: boolean;
+  reportingStartDate: string;
+  reportingEndDate: string | null;
   foodCostTarget: number;
   labourTarget: number;
   wasteTarget: number;
   primaryManager: SiteManagerSummary | null;
   managerHistory: SiteManagerSummary[];
   additionalManagers: AdditionalSiteManager[];
+  usage: SiteUsageSummary;
+  canDelete: boolean;
 };
+
+type UsageRow = {
+  site_id: string;
+  reports: number | string;
+  daily_records: number | string;
+  checks: number | string;
+  people_records: number | string;
+  sops: number | string;
+  training: number | string;
+  products: number | string;
+  messages: number | string;
+  payroll_records: number | string;
+  total_dependencies: number | string;
+};
+
+const emptyUsage = (): SiteUsageSummary => ({
+  reports: 0,
+  dailyRecords: 0,
+  checks: 0,
+  peopleRecords: 0,
+  sops: 0,
+  training: 0,
+  products: 0,
+  messages: 0,
+  payrollRecords: 0,
+  totalDependencies: 0,
+});
 
 export async function getManagedSiteDirectory(): Promise<ManagedSiteDirectoryItem[]> {
   if (environment.isDemo) {
@@ -40,6 +84,8 @@ export async function getManagedSiteDirectory(): Promise<ManagedSiteDirectoryIte
         code: "DR-MCR",
         name: "Dough Religion",
         active: true,
+        reportingStartDate: "2026-05-03",
+        reportingEndDate: null,
         foodCostTarget: 30,
         labourTarget: 32,
         wasteTarget: 1.2,
@@ -53,18 +99,24 @@ export async function getManagedSiteDirectory(): Promise<ManagedSiteDirectoryIte
         },
         managerHistory: [],
         additionalManagers: [],
+        usage: { ...emptyUsage(), reports: 12, dailyRecords: 84, peopleRecords: 1, totalDependencies: 97 },
+        canDelete: false,
       },
       {
         id: "00000000-0000-4000-8000-000000000002",
         code: "CW-MCR",
         name: "Choi Wan",
-        active: true,
+        active: false,
+        reportingStartDate: "2026-05-03",
+        reportingEndDate: "2026-07-12",
         foodCostTarget: 31,
         labourTarget: 32,
         wasteTarget: 1.2,
         primaryManager: null,
         managerHistory: [],
         additionalManagers: [],
+        usage: emptyUsage(),
+        canDelete: true,
       },
     ];
   }
@@ -73,33 +125,59 @@ export async function getManagedSiteDirectory(): Promise<ManagedSiteDirectoryIte
   if (!supabase) return [];
   const { data: sites, error: sitesError } = await supabase
     .from("sites")
-    .select("id, code, name, active, food_cost_target, labour_target, waste_target")
+    .select("id, code, name, active, reporting_start_date, reporting_end_date, food_cost_target, labour_target, waste_target")
+    .order("active", { ascending: false })
     .order("name");
   if (sitesError || !sites) return [];
 
   const siteIds = sites.map((site) => site.id);
-  const [{ data: assignments, error: assignmentError }, { data: memberships }] = await Promise.all([
+  const [{ data: assignments, error: assignmentError }, { data: memberships }, { data: usageRows, error: usageError }] = await Promise.all([
     siteIds.length
       ? supabase.from("site_manager_assignments").select("id, site_id, manager_profile_id, starts_on, ends_on").in("site_id", siteIds).order("starts_on", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     siteIds.length
       ? supabase.from("site_memberships").select("site_id, user_id, can_submit").in("site_id", siteIds)
       : Promise.resolve({ data: [] }),
+    supabase.rpc("get_site_usage_summary"),
   ]);
 
+  const usageBySite = new Map<string, SiteUsageSummary>();
+  for (const row of (usageRows ?? []) as UsageRow[]) {
+    const usage = {
+      reports: Number(row.reports),
+      dailyRecords: Number(row.daily_records),
+      checks: Number(row.checks),
+      peopleRecords: Number(row.people_records),
+      sops: Number(row.sops),
+      training: Number(row.training),
+      products: Number(row.products),
+      messages: Number(row.messages),
+      payrollRecords: Number(row.payroll_records),
+      totalDependencies: Number(row.total_dependencies),
+    };
+    usageBySite.set(row.site_id, usage);
+  }
+
   if (assignmentError) {
-    return sites.map((site) => ({
-      id: site.id,
-      code: site.code,
-      name: site.name,
-      active: site.active,
-      foodCostTarget: Number(site.food_cost_target),
-      labourTarget: Number(site.labour_target),
-      wasteTarget: Number(site.waste_target),
-      primaryManager: null,
-      managerHistory: [],
-      additionalManagers: [],
-    }));
+    return sites.map((site) => {
+      const usage = usageBySite.get(site.id) ?? emptyUsage();
+      return {
+        id: site.id,
+        code: site.code,
+        name: site.name,
+        active: site.active,
+        reportingStartDate: site.reporting_start_date,
+        reportingEndDate: site.reporting_end_date,
+        foodCostTarget: Number(site.food_cost_target),
+        labourTarget: Number(site.labour_target),
+        wasteTarget: Number(site.waste_target),
+        primaryManager: null,
+        managerHistory: [],
+        additionalManagers: [],
+        usage,
+        canDelete: !usageError && usage.totalDependencies === 0,
+      };
+    });
   }
 
   const profileIds = [...new Set([
@@ -143,17 +221,22 @@ export async function getManagedSiteDirectory(): Promise<ManagedSiteDirectoryIte
         }];
       })
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    const usage = usageBySite.get(site.id) ?? emptyUsage();
     return {
       id: site.id,
       code: site.code,
       name: site.name,
       active: site.active,
+      reportingStartDate: site.reporting_start_date,
+      reportingEndDate: site.reporting_end_date,
       foodCostTarget: Number(site.food_cost_target),
       labourTarget: Number(site.labour_target),
       wasteTarget: Number(site.waste_target),
       primaryManager,
       managerHistory: assignmentHistory.filter((item) => item.endsOn !== null).slice(0, 8),
       additionalManagers,
+      usage,
+      canDelete: !usageError && usage.totalDependencies === 0,
     };
   });
 }
