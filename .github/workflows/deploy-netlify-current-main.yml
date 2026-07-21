@@ -14,7 +14,11 @@ jobs:
     timeout-minutes: 25
     env:
       NETLIFY_SITE_ID: ad42ba1c-7fc2-4334-8b88-10fdcd569fda
-      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      TOKEN_AUTH: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      TOKEN_NETLIFY: ${{ secrets.NETLIFY_TOKEN }}
+      TOKEN_ACCESS: ${{ secrets.NETLIFY_ACCESS_TOKEN }}
+      TOKEN_PERSONAL: ${{ secrets.NETLIFY_PERSONAL_ACCESS_TOKEN }}
+      TOKEN_API: ${{ secrets.NETLIFY_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,13 +29,15 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Verify Netlify credential
+      - name: Resolve protected Netlify credential
         shell: bash
         run: |
-          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
-            echo "NETLIFY_AUTH_TOKEN is not configured in GitHub Actions."
+          token="${TOKEN_AUTH:-${TOKEN_NETLIFY:-${TOKEN_ACCESS:-${TOKEN_PERSONAL:-${TOKEN_API:-}}}}}"
+          if [ -z "$token" ]; then
+            echo "No recognised Netlify credential is configured in GitHub Actions."
             exit 1
           fi
+          echo "NETLIFY_AUTH_TOKEN=$token" >> "$GITHUB_ENV"
 
       - run: npm ci
 
@@ -50,7 +56,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: netlify-current-main-deploy-log-secret
+          name: netlify-current-main-deploy-log-legacy-secret
           path: netlify-deploy.log
           if-no-files-found: ignore
           retention-days: 1
