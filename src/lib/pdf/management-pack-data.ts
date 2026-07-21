@@ -1,3 +1,4 @@
+import { buildSalesInsights, type SalesInsights } from "@/lib/reporting/sales-insights";
 import type { ReportingWeek, WeeklyReport } from "@/lib/types";
 
 export type Tone = "good" | "watch" | "bad";
@@ -8,6 +9,7 @@ export type ManagementPackInput = {
   expectedSites: ExpectedSite[];
   reports: WeeklyReport[];
   preparedFor?: string;
+  salesInsightsByReport?: Record<string, SalesInsights>;
 };
 
 export type SiteView = {
@@ -44,9 +46,11 @@ export type SiteView = {
   priorities: string;
   actions: string;
   support: string;
+  salesInsights: SalesInsights;
 };
 
 const emptyNarrativePattern = /^(?:n\/?a|none|nil|no|not applicable|-+)$/i;
+const emptySalesInsights = () => buildSalesInsights({ days: [], items: [], categories: [] });
 
 export const cleanNarrative = (value: string | undefined, fallback = "") => {
   const trimmed = value?.trim() ?? "";
@@ -66,6 +70,12 @@ export const formatCurrency = (value: number) => new Intl.NumberFormat("en-GB", 
   minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
   maximumFractionDigits: 2,
 }).format(value);
+
+export const formatCompactCurrency = (value: number) => {
+  if (Math.abs(value) >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`;
+  if (Math.abs(value) >= 1_000) return `£${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
+  return formatCurrency(value);
+};
 
 export const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
@@ -95,7 +105,7 @@ const salaryBreakdown = (report: WeeklyReport) => {
   };
 };
 
-export const toSiteView = (report: WeeklyReport): SiteView => {
+export const toSiteView = (report: WeeklyReport, salesInsights?: SalesInsights): SiteView => {
   const priorities = [
     ["Operational", report.operationalIssues],
     ["Staffing", report.staffingIssues],
@@ -148,5 +158,6 @@ export const toSiteView = (report: WeeklyReport): SiteView => {
     priorities: priorities || "No operational, staffing, compliance or equipment issue was reported.",
     actions: cleanNarrative(report.actionsUnderway, "No follow-up action was recorded. An owner and deadline should be agreed before the next weekly pack."),
     support: cleanNarrative(report.supportNeeded, "No group support was requested."),
+    salesInsights: salesInsights ?? emptySalesInsights(),
   };
 };
