@@ -1,0 +1,33 @@
+name: Package Netlify production source
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/package-netlify-main.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Record source commit
+        run: printf '%s\n' "${GITHUB_SHA}" > PRODUCTION_SOURCE_COMMIT
+
+      - name: Upload deployable source
+        uses: actions/upload-artifact@v4
+        with:
+          name: hos-netlify-production-source
+          path: |
+            .
+            !.git/**
+            !node_modules/**
+            !.next/**
+          include-hidden-files: true
+          retention-days: 1
