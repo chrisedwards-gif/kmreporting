@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, LineChart, Plus } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PeriodSelector } from "@/components/reports/period-selector";
 import { requireSessionProfile } from "@/lib/auth/dal";
@@ -30,6 +30,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="page-header__actions">
           <PeriodSelector periods={periods} selected={selectedPeriod} />
+          <Link className="button button--secondary" href="/insights"><LineChart aria-hidden="true" size={16} /> Compare history</Link>
           {canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> New report</Link> : null}
         </div>
       </header>
