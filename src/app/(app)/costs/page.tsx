@@ -1,4 +1,5 @@
-import { DatabaseZap, EyeOff, LockKeyhole } from "lucide-react";
+import Link from "next/link";
+import { DatabaseZap, EyeOff, LineChart, LockKeyhole } from "lucide-react";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { RefreshDataButton } from "@/components/ui/refresh-data-button";
 import { getReportingBundle } from "@/lib/data/reporting";
@@ -17,7 +18,7 @@ export default async function CostsPage() {
           <h1 className="page-header__title">Current costs. Private pay.</h1>
           <p className="page-header__copy">Kitchen managers can confirm an aggregate RotaCloud total, while an optional private payroll integration remains available. Individual pay never appears in this app.</p>
         </div>
-        <RefreshDataButton />
+        <div className="page-header__actions"><Link className="button button--secondary" href="/insights"><LineChart aria-hidden="true" size={16} /> Compare history</Link><RefreshDataButton /></div>
       </header>
 
       <section aria-label="Privacy model" className="metric-grid metric-grid--three">
