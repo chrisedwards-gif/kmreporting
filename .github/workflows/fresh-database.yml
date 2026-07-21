@@ -35,7 +35,7 @@ jobs:
           : > supabase-start.log
           for attempt in 1 2 3; do
             echo "Starting local Supabase database (attempt ${attempt}/3)" | tee -a supabase-start.log
-            if supabase db start --debug 2>&1 | tee -a supabase-start.log; then
+            if supabase start --debug 2>&1 | tee -a supabase-start.log; then
               exit 0
             fi
             supabase stop --no-backup 2>&1 | tee -a supabase-start.log || true
