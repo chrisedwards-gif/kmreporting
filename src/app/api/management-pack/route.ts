@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
+import { getReportSalesInsights } from "@/lib/data/sales-insights";
 import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
 import { buildManagementPackPdf } from "@/lib/pdf/management-pack";
 
@@ -12,7 +13,17 @@ export async function GET(request: NextRequest) {
   const { week, reports, expectedSites } = await getScopedReportingBundle(profile, periodId);
 
   try {
-    const pdf = buildManagementPackPdf({ week, reports, expectedSites, preparedFor: "Jake Atkinson" });
+    const insightEntries = await Promise.all(reports.map(async (report) => [
+      report.id,
+      await getReportSalesInsights({ reportId: report.id, siteId: report.siteId, weekStart: report.weekStart }),
+    ] as const));
+    const pdf = buildManagementPackPdf({
+      week,
+      reports,
+      expectedSites,
+      preparedFor: "Jake Atkinson",
+      salesInsightsByReport: Object.fromEntries(insightEntries),
+    });
     return new Response(pdf, {
       headers: {
         "Cache-Control": "private, no-store",
