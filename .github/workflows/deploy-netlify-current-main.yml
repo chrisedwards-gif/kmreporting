@@ -11,7 +11,10 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      NETLIFY_SITE_ID: ad42ba1c-7fc2-4334-8b88-10fdcd569fda
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,19 +25,32 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Verify Netlify credential
+        shell: bash
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "NETLIFY_AUTH_TOKEN is not configured in GitHub Actions."
+            exit 1
+          fi
+
+      - run: npm ci
+
       - name: Deploy exact source to Netlify production
         shell: bash
         run: |
           set -o pipefail
-          npx -y @netlify/mcp@latest \
-            --site-id ad42ba1c-7fc2-4334-8b88-10fdcd569fda \
-            --proxy-path "https://netlify-mcp.netlify.app//proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..9d1yX02_CEMKw4mA.6fePF0-yqM3DRLuEtPamOHqxBygwbfMU_yVHgb1bYADMAD3-ILCilGn7D_EfQsmRrOwqIa9jlfnoNhLhfwkMVhiteJ7Y_PyencpApLUgs6RvVB8eCSdWbxk1XFjwVgZ3PRXbfYiRbjknyl-3FO3VzhuuiR8AhUSh1I0MYSvVgeMliUpjaKxtDGxL-yAy7erej-qab5_0XNmWx8sI-fJ5VWtHjGNQLgFaEg1Wy62xKwV3o_nTAn4uDXBWGnFZiTmM4y74pAotM0bHEmVwXAvGJZXEoEP67R_Ba5EoO8BrLlgFCJPjbZpFm2utc_S4GmGti4slNvAEXp5y9I9TuWYQogplS9AEhe56KpNYQgw0xbekbichTio7Mvcp7RXjNlAOnGhdgaWx.Pbaj4mbDyCIGeSYl7_aIMg" \
+          npx -y netlify-cli@latest deploy \
+            --build \
+            --prod \
+            --site "$NETLIFY_SITE_ID" \
+            --auth "$NETLIFY_AUTH_TOKEN" \
             2>&1 | tee netlify-deploy.log
 
       - name: Upload deployment log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: netlify-current-main-deploy-log
+          name: netlify-current-main-deploy-log-secret
           path: netlify-deploy.log
+          if-no-files-found: ignore
           retention-days: 1
