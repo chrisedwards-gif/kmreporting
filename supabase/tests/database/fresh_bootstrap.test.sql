@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(23);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -11,6 +11,9 @@ select has_table('public', 'kitchen_check_templates', 'Kitchen check templates e
 select has_table('public', 'sops', 'SOP register exists');
 select has_table('public', 'sop_versions', 'Immutable SOP versions exist');
 select has_table('public', 'training_records', 'Training tracker exists');
+select has_table('public', 'waste_log_entries', 'Daily waste log exists');
+select has_table('public', 'management_email_settings', 'Weekly management email settings exist');
+select has_table('payroll_private', 'salary_allocations', 'Private salary allocations exist');
 
 select ok(
   to_regprocedure('public.save_weekly_report_v2(jsonb)') is not null,
@@ -27,6 +30,30 @@ select ok(
 select ok(
   to_regprocedure('public.save_sop(jsonb)') is not null,
   'SOP save RPC exists'
+);
+select ok(
+  to_regprocedure('public.delete_unused_site(uuid,text)') is not null,
+  'Safe unused-kitchen deletion RPC exists'
+);
+select ok(
+  to_regprocedure('public.get_reporting_comparison(uuid,date,date)') is not null,
+  'Historical comparison RPC exists'
+);
+select ok(
+  to_regprocedure('public.save_waste_entry(jsonb)') is not null,
+  'Daily waste save RPC exists'
+);
+select ok(
+  to_regprocedure('public.get_report_support_summary(uuid,date,date,uuid)') is not null,
+  'Safe report support summary RPC exists'
+);
+select ok(
+  to_regprocedure('public.get_salary_allocations()') is not null,
+  'Private salary register RPC exists'
+);
+select ok(
+  to_regprocedure('public.save_salary_allocation(jsonb)') is not null,
+  'Private salary save RPC exists'
 );
 select ok(
   (select count(*) >= 5 from public.sites)

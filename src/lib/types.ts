@@ -91,6 +91,11 @@ export type SitePerformance = CostSnapshot & {
   wasteTarget: number;
   status: ReportStatus;
   flags: ReviewFlag[];
+  wasteCost?: number;
+  hourlyStaffCost?: number;
+  salaryStaffCost?: number;
+  salaryOncostCost?: number;
+  salariesIncluded?: boolean;
 };
 
 export type ReportingWeek = {

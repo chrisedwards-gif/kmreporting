@@ -18,13 +18,13 @@ export default async function SitesPage() {
         <div>
           <p className="page-header__eyebrow">Configuration</p>
           <h1 className="page-header__title">Sites & access.</h1>
-          <p className="page-header__copy">Each kitchen has one dated primary-manager assignment. The manager uses one profile/login UUID everywhere; replacing them closes the old assignment without deleting its reports or 1-1s.</p>
+          <p className="page-header__copy">Create, edit, archive and restore kitchens without losing operational history. Permanent deletion is available only for a completely unused kitchen.</p>
         </div>
         <CreateSiteForm defaultReportingStartDate={currentWeek.start} />
       </header>
 
       <section className="panel">
-        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Primary manager assignments drive the weekly 1-1 and its site KPIs</p></div><UserRoundCog aria-hidden="true" color="#5d6b63" size={19} /></div>
+        <div className="panel__header"><div><h2 className="panel__title">Kitchen directory</h2><p className="panel__subtitle">Active kitchens drive weekly reporting; archived kitchens keep every historical record</p></div><UserRoundCog aria-hidden="true" color="#5d6b63" size={19} /></div>
         <div className="table-scroll">
           <table className="data-table">
             <thead><tr><th>Kitchen</th><th>Site code</th><th>Primary manager</th><th>Reporting</th><th>Assignment</th><th><span className="sr-only">Actions</span></th></tr></thead>
@@ -34,7 +34,7 @@ export default async function SitesPage() {
                   <td><strong>{site.name}</strong></td>
                   <td><span className="code-pill">{site.code}</span></td>
                   <td>{site.primaryManager ? site.primaryManager.fullName : <span className="muted-text">Choose primary manager</span>}</td>
-                  <td><span className={`status-badge status-badge--${site.active ? "approved" : "draft"}`}>{site.active ? "Active" : "Inactive"}</span></td>
+                  <td><span className={`status-badge status-badge--${site.active ? "approved" : "draft"}`}>{site.active ? "Active" : "Archived"}</span><div className="table-cell-note">{site.usage.totalDependencies ? `${site.usage.totalDependencies} linked records` : "Unused"}</div></td>
                   <td>{site.primaryManager ? `Since ${formatDate(site.primaryManager.startsOn)}` : site.managerHistory.length ? `${site.managerHistory.length} previous assignment${site.managerHistory.length === 1 ? "" : "s"}` : "No history"}</td>
                   <td><ManageSiteForm defaultAssignmentStart={currentWeek.start} site={site} /></td>
                 </tr>

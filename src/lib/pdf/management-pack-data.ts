@@ -20,6 +20,11 @@ export type SiteView = {
   netSales: number;
   cogs: number;
   staffCost: number;
+  hourlyStaffCost: number;
+  salaryStaffCost: number;
+  salaryOncostCost: number;
+  salariesIncluded: boolean;
+  wasteCost: number;
   foodCostPct: number;
   labourPct: number;
   wastePct: number;
@@ -74,6 +79,22 @@ export const variance = (actual: number, target: number) => {
   };
 };
 
+const salaryBreakdown = (report: WeeklyReport) => {
+  const flag = report.costs.flags.find((item) => item.code === "SALARY_COST_INCLUDED");
+  const match = flag?.detail.match(/([\d,.]+)\s+salary\s+\+\s+([\d,.]+)\s+on-cost/i);
+  const flagBase = match ? Number(match[1].replaceAll(",", "")) : 0;
+  const flagOncost = match ? Number(match[2].replaceAll(",", "")) : 0;
+  const base = report.costs.salaryStaffCost ?? flagBase;
+  const oncost = report.costs.salaryOncostCost ?? flagOncost;
+  const included = Boolean(report.costs.salariesIncluded || flag);
+  return {
+    base,
+    oncost,
+    included,
+    hourly: report.costs.hourlyStaffCost ?? Math.max(report.costs.staffCost - base - oncost, 0),
+  };
+};
+
 export const toSiteView = (report: WeeklyReport): SiteView => {
   const priorities = [
     ["Operational", report.operationalIssues],
@@ -91,6 +112,7 @@ export const toSiteView = (report: WeeklyReport): SiteView => {
   const controls = report.costs.flags
     .filter((flag) => flag.severity !== "info")
     .map((flag) => `${flag.label}: ${flag.detail}`);
+  const salary = salaryBreakdown(report);
 
   return {
     id: report.id,
@@ -102,6 +124,11 @@ export const toSiteView = (report: WeeklyReport): SiteView => {
     netSales: report.costs.netSales,
     cogs: report.costs.cogs,
     staffCost: report.costs.staffCost,
+    hourlyStaffCost: salary.hourly,
+    salaryStaffCost: salary.base,
+    salaryOncostCost: salary.oncost,
+    salariesIncluded: salary.included,
+    wasteCost: report.costs.wasteCost ?? report.costs.netSales * report.costs.wastePct / 100,
     foodCostPct: report.costs.foodCostPct,
     labourPct: report.costs.labourPct,
     wastePct: report.costs.wastePct,

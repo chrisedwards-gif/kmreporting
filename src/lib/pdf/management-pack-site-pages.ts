@@ -30,22 +30,27 @@ export const drawSitePages = (input: ManagementPackInput, report: SiteView) => {
   top += 110;
 
   top = drawSectionTitle(page, "Control position", top, "Financial and compliance controls");
+  const salaryLoaded = report.salaryStaffCost + report.salaryOncostCost;
+  const labourMix = report.salariesIncluded
+    ? `${formatCurrency(report.hourlyStaffCost)} rota + ${formatCurrency(salaryLoaded)} salary`
+    : `${formatCurrency(report.hourlyStaffCost)} hourly / rota only`;
   const controlCells = [
-    ["Waste", `${formatPercentage(report.wastePct)} / ${formatCurrency(report.netSales * report.wastePct / 100)}`],
+    ["Waste", `${formatPercentage(report.wastePct)} / ${formatCurrency(report.wasteCost)}`],
+    ["Labour mix", labourMix],
     ["Stocktake", report.stocktakeCompleted ? "Complete" : "Not complete"],
     ["Pending credits", formatCurrency(report.pendingCredits)],
     ["Awaiting invoice", formatCurrency(report.awaitingInvoice)],
     ["Manual purchases", `${formatCurrency(report.manualPurchases)}${report.manualPurchaseCount ? ` / ${report.manualPurchaseCount} item${report.manualPurchaseCount === 1 ? "" : "s"}` : ""}`],
   ];
   const controlWidth = CONTENT_WIDTH / controlCells.length;
-  page.rectangle(PAGE_MARGIN, top, CONTENT_WIDTH, 54, { fill: PALETTE.panel, stroke: PALETTE.line, strokeWidth: 0.6 });
+  page.rectangle(PAGE_MARGIN, top, CONTENT_WIDTH, 58, { fill: PALETTE.panel, stroke: PALETTE.line, strokeWidth: 0.6 });
   controlCells.forEach(([label, value], index) => {
     const x = PAGE_MARGIN + index * controlWidth;
-    if (index) page.line(x, top, x, top + 54, { stroke: PALETTE.line, strokeWidth: 0.5 });
-    page.text(label.toUpperCase(), x + 8, top + 10, { size: 6.2, font: "F2", fill: PALETTE.muted });
-    page.textBlock(value, x + 8, top + 26, controlWidth - 16, { size: 8.2, font: "F2", fill: PALETTE.ink, lineHeight: 9, maxLines: 2, ellipsis: true });
+    if (index) page.line(x, top, x, top + 58, { stroke: PALETTE.line, strokeWidth: 0.5 });
+    page.text(label.toUpperCase(), x + 7, top + 10, { size: 5.8, font: "F2", fill: PALETTE.muted });
+    page.textBlock(value, x + 7, top + 25, controlWidth - 14, { size: 7.2, font: "F2", fill: PALETTE.ink, lineHeight: 8.5, maxLines: 3, ellipsis: true });
   });
-  top += 72;
+  top += 76;
 
   if (report.controls.length) {
     const controlHeight = 42 + report.controls.reduce((height, item) => height + wrapText(item, 7.6, CONTENT_WIDTH - 50).length * 10 + 4, 0);

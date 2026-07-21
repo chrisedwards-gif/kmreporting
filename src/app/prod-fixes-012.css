@@ -1,0 +1,83 @@
+.management-email-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, .8fr);
+}
+
+.management-email-settings,
+.management-email-test-panel {
+  background: #f7f9f6;
+  border: 1px solid var(--line);
+  border-radius: .9rem;
+  padding: 1rem;
+}
+
+.management-email-test-panel {
+  align-content: start;
+  display: grid;
+  gap: .85rem;
+}
+
+.management-email-live-form {
+  border-top: 1px solid var(--line);
+  margin-top: .2rem;
+  padding-top: .9rem;
+}
+
+.salary-toggle-list {
+  display: grid;
+  gap: .65rem;
+}
+
+.salary-toggle {
+  align-items: center;
+  background: #f7f9f6;
+  border: 1px solid var(--line);
+  border-radius: .85rem;
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: .85rem 1rem;
+}
+
+.salary-toggle > div {
+  display: grid;
+  gap: .2rem;
+}
+
+.salary-toggle > div span {
+  color: var(--ink-600);
+  font-size: .74rem;
+}
+
+.salary-toggle .form-message {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.field--wide {
+  grid-column: span 2;
+}
+
+.waste-flow-note {
+  align-items: flex-start;
+  display: flex;
+  gap: .5rem;
+}
+
+@media (max-width: 900px) {
+  .management-email-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .salary-toggle {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .field--wide {
+    grid-column: auto;
+  }
+}

@@ -17,16 +17,40 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
+      # Pin the CLI so a new upstream release cannot silently break the
+      # production database gate. Upgrade this deliberately after validation.
       - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.101.0
 
       - name: Start a fresh local Supabase database
-        run: supabase db start
+        id: database-start
+        shell: bash
+        run: |
+          set -o pipefail
+          : > supabase-start.log
+          for attempt in 1 2 3; do
+            echo "Starting local Supabase database (attempt ${attempt}/3)" | tee -a supabase-start.log
+            if supabase start --debug 2>&1 | tee -a supabase-start.log; then
+              exit 0
+            fi
+            supabase stop --no-backup 2>&1 | tee -a supabase-start.log || true
+            sleep $((attempt * 10))
+          done
+          echo "Supabase failed to start after three clean attempts." | tee -a supabase-start.log
+          exit 1
+
+      - name: Upload database startup diagnostics
+        if: failure() && steps.database-start.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-database-startup-log
+          path: supabase-start.log
+          retention-days: 7
 
       - name: Rebuild from zero using all migrations and seeds
         run: supabase db reset --local

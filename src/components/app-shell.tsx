@@ -18,6 +18,7 @@ import {
   Menu,
   Settings2,
   ShieldCheck,
+  Trash2,
   UsersRound,
   X,
 } from "lucide-react";
@@ -58,6 +59,7 @@ const kitchenManagerNavigation: NavSection[] = [
     heading: "Run the kitchen",
     items: [
       { href: "/checks", label: "Kitchen checks", icon: ClipboardCheck },
+      { href: "/waste", label: "Daily waste log", icon: Trash2 },
       { href: "/sops", label: "SOPs & systems", icon: BookOpenCheck },
       { href: "/calendar", label: "Kitchen calendar", icon: CalendarDays },
       { href: "/one-to-ones", label: "My 1-1s", icon: UsersRound },
