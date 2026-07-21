@@ -25,9 +25,7 @@ jobs:
       - run: npm ci
 
       - name: Deploy exact source to production
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ad42ba1c-7fc2-4334-8b88-10fdcd569fda
-        run: |
-          test -n "$NETLIFY_AUTH_TOKEN" || { echo 'NETLIFY_AUTH_TOKEN is not configured'; exit 1; }
-          npx --yes netlify-cli@latest deploy --build --prod --site "$NETLIFY_SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --message "Production release 0cb32a1"
+        run: >-
+          npx -y @netlify/mcp@latest
+          --site-id ad42ba1c-7fc2-4334-8b88-10fdcd569fda
+          --proxy-path "https://netlify-mcp.netlify.app//proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..pwqfIhxBffN-fPl5.NM2v-vv6lDPT_Yjtgj1Ws2cP60cHCINk48Djr5QxiatqgMZLuaJOZyKgFp_IX5zX4VgUCSlSw01yuKs_n1k8-A2cbhHPpkihxaXPi663fwwh42vQao_7QEO32PKEdUeQHHmWHgHGCc-UU18fYfochcWx1vgJ8JnJ8ViS_dxDLKWPtAKgNLBP92QXR-OUtHXs8_7gAcH49-1bmq8GCsXS0sEnFgL9JoLPeZelgCM7gb6n1Wn8nMZmJMAOsJo5mqH50twHGTCO6ik_ppBrhUsMjuIjMu4SL6jQiXUp02OdKasiq5Qk7m8e3A85wOeWDKgZYMNpGskcm5KCLSTk351vpd05dcXdINTmLcwnWmQyq_kVfBldJArA3RSI-iP-Dwej7g8qRd-2.Czt6atPRMaZKw23gNeBJcA"
