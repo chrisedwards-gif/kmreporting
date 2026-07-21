@@ -28,19 +28,29 @@ jobs:
           version: 2.101.0
 
       - name: Start a fresh local Supabase database
+        id: database-start
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
+          : > supabase-start.log
           for attempt in 1 2 3; do
-            echo "Starting local Supabase database (attempt ${attempt}/3)"
-            if supabase db start; then
+            echo "Starting local Supabase database (attempt ${attempt}/3)" | tee -a supabase-start.log
+            if supabase db start --debug 2>&1 | tee -a supabase-start.log; then
               exit 0
             fi
-            supabase stop --no-backup || true
+            supabase stop --no-backup 2>&1 | tee -a supabase-start.log || true
             sleep $((attempt * 10))
           done
-          echo "Supabase failed to start after three clean attempts."
-          supabase db start --debug
+          echo "Supabase failed to start after three clean attempts." | tee -a supabase-start.log
+          exit 1
+
+      - name: Upload database startup diagnostics
+        if: failure() && steps.database-start.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-database-startup-log
+          path: supabase-start.log
+          retention-days: 7
 
       - name: Rebuild from zero using all migrations and seeds
         run: supabase db reset --local
