@@ -233,7 +233,7 @@ begin
       and report.status in ('approved', 'shared')
       and period.week_end between least(previous_start, prior_year_start) and range_end
   ),
-  windows(label, starts_on, ends_on) as (
+  comparison_windows(label, starts_on, ends_on) as (
     values
       ('current'::text, range_start, range_end),
       ('previous'::text, previous_start, previous_end),
@@ -241,9 +241,9 @@ begin
   ),
   window_metrics as (
     select
-      window.label,
-      window.starts_on,
-      window.ends_on,
+      comparison_window.label,
+      comparison_window.starts_on,
+      comparison_window.ends_on,
       coalesce(daily_totals.net_sales, 0) as daily_sales,
       coalesce(daily_totals.gross_sales, 0) as gross_sales,
       coalesce(daily_totals.transactions, 0) as transactions,
@@ -255,28 +255,28 @@ begin
       coalesce(cost_totals.waste_cost, 0) as waste_cost,
       coalesce(cost_totals.prime_cost, 0) as prime_cost,
       coalesce(cost_totals.report_weeks, 0) as report_weeks
-    from windows window
+    from comparison_windows comparison_window
     left join lateral (
       select sum(item.net_sales) as net_sales, sum(item.gross_sales) as gross_sales, sum(item.transactions) as transactions, sum(item.covers) as covers, count(distinct item.business_date) as sales_days
       from daily item
-      where item.business_date between window.starts_on and window.ends_on
+      where item.business_date between comparison_window.starts_on and comparison_window.ends_on
     ) daily_totals on true
     left join lateral (
       select sum(item.net_sales) as snapshot_sales, sum(item.cogs) as cogs, sum(item.staff_cost) as staff_cost, sum(item.waste_cost) as waste_cost, sum(item.prime_cost) as prime_cost, count(*) as report_weeks
       from approved_costs item
-      where item.week_end between window.starts_on and window.ends_on
+      where item.week_end between comparison_window.starts_on and comparison_window.ends_on
     ) cost_totals on true
   ),
   daily_json as (
     select jsonb_object_agg(
-      window.label,
+      comparison_window.label,
       coalesce((
         select jsonb_agg(jsonb_build_object('businessDate', item.business_date, 'netSales', item.net_sales, 'grossSales', item.gross_sales, 'transactions', item.transactions, 'covers', item.covers) order by item.business_date)
         from daily item
-        where item.business_date between window.starts_on and window.ends_on
+        where item.business_date between comparison_window.starts_on and comparison_window.ends_on
       ), '[]'::jsonb)
     ) as value
-    from windows window
+    from comparison_windows comparison_window
   ),
   metrics_json as (
     select jsonb_object_agg(
