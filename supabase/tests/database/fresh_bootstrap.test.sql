@@ -1,6 +1,6 @@
 begin;
 
-select plan(14);
+select plan(16);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -27,6 +27,14 @@ select ok(
 select ok(
   to_regprocedure('public.save_sop(jsonb)') is not null,
   'SOP save RPC exists'
+);
+select ok(
+  to_regprocedure('public.delete_unused_site(uuid,text)') is not null,
+  'Safe unused-kitchen deletion RPC exists'
+);
+select ok(
+  to_regprocedure('public.get_reporting_comparison(uuid,date,date)') is not null,
+  'Historical comparison RPC exists'
 );
 select ok(
   (select count(*) >= 5 from public.sites)
