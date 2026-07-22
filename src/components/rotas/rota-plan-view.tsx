@@ -121,7 +121,7 @@ export function RotaPlanView({ plan }: { plan: StoredRotaPlan }) {
             </div>)}
           </div>
 
-          <details className="rota-day__evidence"><summary><Info aria-hidden="true" size={14} /> Forecast evidence and warnings</summary><p>Forecast uses {(selectedDay.evidence.historyValues as number[] | undefined)?.length ?? 0} matching weekdays. Peak shape uses {String(selectedDay.evidence.demandSource ?? "editable day-part template")}. Fixed labour is {formatCurrency(selectedDay.fixedLabourCost)}.</p>{selectedDay.warnings.length ? <ul>{selectedDay.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</details>
+          <details className="rota-day__evidence"><summary><Info aria-hidden="true" size={14} /> Forecast evidence and warnings</summary><p>Forecast uses {(((selectedDay.evidence as Record<string, unknown>).historyValues as number[] | undefined)?.length ?? 0)} matching weekdays. Peak shape uses {String((selectedDay.evidence as Record<string, unknown>).demandSource ?? "editable day-part template")}. Fixed labour is {formatCurrency(selectedDay.fixedLabourCost)}.</p>{selectedDay.warnings.length ? <ul>{selectedDay.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}</details>
         </article> : null}
       </div>
 
