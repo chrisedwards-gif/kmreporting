@@ -115,7 +115,7 @@ function RotaDayFeedback({
           <input name="leftEarlyCount" type="hidden" value="0" />
           <input name="stayedLateCount" type="hidden" value="0" />
           <input name="absenceCount" type="hidden" value="0" />
-          <input name="wouldRepeat" type="hidden" value="yes" />
+          <input name="wouldRepeat" type="hidden" value="unsure" />
           <input name="notes" type="hidden" value="" />
 
           {current ? (
