@@ -21,23 +21,50 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Apply atomic reliability patch
+      - name: Reconstruct and validate patch
         shell: bash
         run: |
-          set -euo pipefail
-          cat .github/patches/prod-fixes-013.part00 \
-              .github/patches/prod-fixes-013.part01 \
-              .github/patches/prod-fixes-013.part02 \
-            | base64 --decode \
-            | gzip --decompress > /tmp/prod-fixes-013.patch
-          git apply --check /tmp/prod-fixes-013.patch
-          git apply /tmp/prod-fixes-013.patch
-          git rm .github/workflows/apply-prod-fixes-013.yml \
-                 .github/patches/prod-fixes-013.part00 \
-                 .github/patches/prod-fixes-013.part01 \
-                 .github/patches/prod-fixes-013.part02
-          git add --all
-          git config user.name 'hos-release-bot'
-          git config user.email 'hos-release-bot@users.noreply.github.com'
-          git commit -m 'Production fixes 013 — reliability and daily usability'
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          set -o pipefail
+          : > apply-prod-fixes-013.log
+          {
+            cat .github/patches/prod-fixes-013.part00 \
+                .github/patches/prod-fixes-013.part01 \
+                .github/patches/prod-fixes-013.part02 \
+              | base64 --decode \
+              | gzip --decompress > /tmp/prod-fixes-013.patch
+            echo "patch-bytes=$(wc -c < /tmp/prod-fixes-013.patch)"
+            sha256sum /tmp/prod-fixes-013.patch
+            git apply --check /tmp/prod-fixes-013.patch
+          } 2>&1 | tee -a apply-prod-fixes-013.log
+
+      - name: Apply and commit reliability release
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            git apply /tmp/prod-fixes-013.patch
+            git rm .github/workflows/apply-prod-fixes-013.yml \
+                   .github/patches/prod-fixes-013.part00 \
+                   .github/patches/prod-fixes-013.part01 \
+                   .github/patches/prod-fixes-013.part02
+            git add --all
+            git status --short
+            git config user.name 'hos-release-bot'
+            git config user.email 'hos-release-bot@users.noreply.github.com'
+            git commit -m 'Production fixes 013 — reliability and daily usability'
+          } 2>&1 | tee -a apply-prod-fixes-013.log
+
+      - name: Push completed release source
+        shell: bash
+        run: |
+          set -o pipefail
+          git push origin HEAD:${{ github.event.pull_request.head.ref }} 2>&1 | tee -a apply-prod-fixes-013.log
+
+      - name: Upload patch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-fixes-013-apply-log
+          path: apply-prod-fixes-013.log
+          if-no-files-found: warn
+          retention-days: 1
