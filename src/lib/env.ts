@@ -53,5 +53,5 @@ export const environment = {
   rotaEventsCity: process.env.ROTA_EVENTS_CITY?.trim() || "Manchester",
   ticketmasterApiKey: process.env.TICKETMASTER_API_KEY?.trim(),
   openaiApiKey: process.env.OPENAI_API_KEY?.trim(),
-  openaiModel: process.env.OPENAI_MODEL?.trim(),
+  openaiModel: process.env.OPENAI_MODEL?.trim() || "gpt-5-mini",
 };
