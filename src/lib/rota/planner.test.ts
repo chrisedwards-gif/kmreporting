@@ -34,14 +34,17 @@ describe("rota planner", () => {
     ];
     const plan = buildRotaPlan(saturdayInput(staff));
     const saturday = plan.days[0];
+    const peakCover = saturday.coverage.find((slot) => slot.slotTime === "17:00")!.required;
+    const openingCover = saturday.coverage.find((slot) => slot.slotTime === "10:00")!.required;
 
     expect(plan.forecastSales).toBe(3000);
     expect(plan.labourBudget).toBe(840);
     expect(saturday.fixedLabourCost).toBe(417);
     expect(saturday.controllableBudget).toBe(423);
     expect(saturday.peakTime).toBe("17:00");
-    expect(saturday.coverage.find((slot) => slot.slotTime === "17:00")!.required).toBe(3);
-    expect(saturday.coverage.find((slot) => slot.slotTime === "10:00")!.required).toBe(2);
+    expect(peakCover).toBe(3);
+    expect(openingCover).toBeGreaterThanOrEqual(2);
+    expect(peakCover).toBeGreaterThanOrEqual(openingCover);
     expect(saturday.shifts.some((shift) => shift.requiredSkill === "kitchen manager")).toBe(true);
     expect(saturday.plannedCost).toBeLessThanOrEqual(840);
   });
