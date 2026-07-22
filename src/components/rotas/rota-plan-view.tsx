@@ -18,16 +18,19 @@ export function RotaPlanView({ plan }: { plan: StoredRotaPlan }) {
 
   const totals = useMemo(() => {
     const days = draft.days.map((day) => {
+      const originalHourlyMinutes = day.shifts
+        .filter((shift) => shift.staffProfileId && shift.payBasis === "hourly")
+        .reduce((sum, shift) => sum + shift.paidMinutes, 0);
+      const originalHourlyCost = Math.max(0, day.plannedCost - day.fixedLabourCost);
+      const blendedHourlyRate = originalHourlyMinutes > 0 ? originalHourlyCost / (originalHourlyMinutes / 60) : 0;
       const shifts = day.shifts.map((shift) => {
         const paidMinutes = Math.max(0, minutesBetween(shift.shiftStart, shift.shiftEnd) - shift.breakMinutes);
-        const originalHours = shift.paidMinutes / 60;
-        const inferredRate = originalHours > 0 ? shift.privateCost / originalHours : 0;
-        const privateCost = shift.payBasis === "hourly" ? inferredRate * paidMinutes / 60 : 0;
+        const privateCost = shift.payBasis === "hourly" ? blendedHourlyRate * paidMinutes / 60 : 0;
         return { ...shift, paidMinutes, privateCost };
       });
       const plannedHours = shifts.filter((shift) => shift.staffProfileId).reduce((sum, shift) => sum + shift.paidMinutes / 60, 0);
       const plannedCost = day.fixedLabourCost + shifts.reduce((sum, shift) => sum + shift.privateCost, 0);
-      return { ...day, shifts, plannedHours, plannedCost };
+      return { ...day, shifts, plannedHours, plannedCost, evidence: { ...day.evidence, blendedHourlyRate } };
     });
     return {
       days,
@@ -102,12 +105,12 @@ export function RotaPlanView({ plan }: { plan: StoredRotaPlan }) {
             <div className="rota-demand__legend"><span><i className="rota-demand__key rota-demand__key--demand" /> Demand</span><span><i className="rota-demand__key rota-demand__key--cover" /> Required cover</span></div>
             <div className="rota-demand__chart">{selectedDay.coverage.map((slot) => {
               const maxRequired = Math.max(...selectedDay.coverage.map((item) => item.required), 1);
-              const demandHeight = Math.max(5, slot.demandWeight);
-              return <div className="rota-demand__slot" key={slot.slotTime}><div className="rota-demand__bars"><span className="rota-demand__bar rota-demand__bar--demand" style={{ height: `${Math.min(100, demandHeight)}%` }} /><span className="rota-demand__bar rota-demand__bar--cover" style={{ height: `${slot.required / maxRequired * 100}%` }} /></div><small>{slot.slotTime}</small><b>{slot.assigned}/{slot.required}</b></div>;
+              const maxDemand = Math.max(...selectedDay.coverage.map((item) => item.demandWeight), 1);
+              return <div className="rota-demand__slot" key={slot.slotTime}><div className="rota-demand__bars"><span className="rota-demand__bar rota-demand__bar--demand" style={{ height: `${Math.max(5, slot.demandWeight / maxDemand * 100)}%` }} /><span className="rota-demand__bar rota-demand__bar--cover" style={{ height: `${slot.required / maxRequired * 100}%` }} /></div><small>{slot.slotTime}</small><b>{slot.assigned}/{slot.required}</b></div>;
             })}</div>
           </section>
 
-          <div className="rota-editor__heading"><div><SlidersHorizontal aria-hidden="true" size={17} /><strong>Edit shifts</strong></div><small>Times and breaks recalculate hours, cost and labour percentage immediately.</small></div>
+          <div className="rota-editor__heading"><div><SlidersHorizontal aria-hidden="true" size={17} /><strong>Edit shifts</strong></div><small>Times and breaks recalculate hours and cost using the privacy-safe daily blended rate.</small></div>
           <div className="rota-editor">
             {selectedDay.shifts.map((shift, index) => <div className={`rota-editor__row ${shift.staffProfileId ? "" : "rota-editor__row--unfilled"}`} key={`${shift.staffName}-${index}`}>
               <div className="rota-shift__person"><strong>{shift.staffName}</strong><span>{shift.roleTitle}</span></div>
