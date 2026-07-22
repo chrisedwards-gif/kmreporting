@@ -77,18 +77,19 @@ test("Kitchen Manager can see and unlock weekly submission before reaching the f
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Rota suggestion is explainable, downloadable and kitchen-scoped", async ({ page }) => {
+test("Rota suggestion is easy to plan, downloadable and kitchen-scoped", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: "Rota intelligence." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Forecast-led weekly rota" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Plan next week.s rota/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan the week in four simple steps" })).toBeVisible();
   await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Generate rota suggestion" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download for manual entry" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Staff profiles" })).toHaveCount(0);
-  await expect(page.getByText(/This is a suggestion, not a published rota/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rebuild suggestion" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Team" })).toHaveCount(0);
+  await expect(page.getByLabel("Demand and rota coverage by hour")).toBeVisible();
+  await expect(page.getByText("Shifts and breaks")).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
