@@ -44,6 +44,31 @@ describe("rota planner", () => {
     expect(saturday.plannedCost).toBeLessThanOrEqual(840);
   });
 
+  it("uses the controllable budget—not the full labour envelope—to buy hourly cover", () => {
+    const salariedManager = profile("00000000-0000-4000-8000-000000000001", "Scott", "Kitchen Manager", {
+      payBasis: "salaried",
+      fixedWeeklyCost: 417,
+      loadedHourlyRate: 16,
+      targetWeeklyHours: 8,
+    });
+    const input = saturdayInput([
+      salariedManager,
+      profile("00000000-0000-4000-8000-000000000002", "Bhavya", "Pizzaiolo"),
+      profile("00000000-0000-4000-8000-000000000003", "Finlay", "Pizzaiolo"),
+      profile("00000000-0000-4000-8000-000000000004", "Owen", "Pizzaiolo"),
+      profile("00000000-0000-4000-8000-000000000005", "Logan", "Pizzaiolo"),
+    ]);
+    input.salesPerLabourHourTarget = 50;
+    input.dayRules = input.dayRules.map((rule) => ({ ...rule, maximumStaff: 5 }));
+
+    const saturday = buildRotaPlan(input).days[0];
+
+    expect(saturday.controllableBudget).toBe(423);
+    expect(saturday.evidence.salariedCoverageHours).toBe(8);
+    expect(saturday.evidence.controllableHourlyHours).toBe(30);
+    expect(saturday.evidence.targetStaffHours).toBe(38);
+  });
+
   it("never fills a shift with someone unavailable or missing the required skill", () => {
     const unavailableManager = profile("00000000-0000-4000-8000-000000000001", "Scott", "Kitchen Manager", {
       availability: [{ date: "2026-07-25", available: [], unavailable: [{ startTime: "00:00", endTime: "00:00" }] }],
