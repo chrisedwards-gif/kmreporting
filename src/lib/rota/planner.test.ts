@@ -22,6 +22,8 @@ function saturdayInput(staff: RotaStaffProfile[]): RotaPlanningInput {
   };
 }
 
+const shiftMinutes = (start: string, end: string) => (new Date(end).getTime() - new Date(start).getTime()) / 60_000;
+
 describe("rota planner", () => {
   it("turns a £3,000 Saturday into a £840 labour envelope and puts extra cover at peak", () => {
     const staff = [
@@ -42,6 +44,38 @@ describe("rota planner", () => {
     expect(saturday.coverage.find((slot) => slot.slotTime === "10:00")!.required).toBe(2);
     expect(saturday.shifts.some((shift) => shift.requiredSkill === "kitchen manager")).toBe(true);
     expect(saturday.plannedCost).toBeLessThanOrEqual(840);
+  });
+
+  it("splits long generic coverage into practical six-to-ten-hour shifts", () => {
+    const staff = [
+      profile("00000000-0000-4000-8000-000000000001", "Scott", "Kitchen Manager", { payBasis: "salaried", fixedWeeklyCost: 417, loadedHourlyRate: 16 }),
+      profile("00000000-0000-4000-8000-000000000002", "Bhavya", "Pizzaiolo", { maximumShiftMinutes: 600 }),
+      profile("00000000-0000-4000-8000-000000000003", "Finlay", "Pizzaiolo", { maximumShiftMinutes: 600 }),
+      profile("00000000-0000-4000-8000-000000000004", "Owen", "Pizzaiolo", { maximumShiftMinutes: 600 }),
+    ];
+    const saturday = buildRotaPlan(saturdayInput(staff)).days[0];
+    const generic = saturday.shifts.filter((shift) => shift.staffProfileId && !shift.requiredSkill);
+
+    expect(generic.length).toBeGreaterThanOrEqual(2);
+    expect(generic.every((shift) => {
+      const minutes = shiftMinutes(shift.shiftStart, shift.shiftEnd);
+      return minutes >= 360 && minutes <= 600;
+    })).toBe(true);
+  });
+
+  it("uses agreed minimum hours as a planning floor when demand and budget would schedule less", () => {
+    const staff = [
+      profile("00000000-0000-4000-8000-000000000001", "Bhavya", "Pizzaiolo", { minimumWeeklyHours: 6, targetWeeklyHours: 8 }),
+      profile("00000000-0000-4000-8000-000000000002", "Finlay", "Pizzaiolo", { minimumWeeklyHours: 6, targetWeeklyHours: 8 }),
+      profile("00000000-0000-4000-8000-000000000003", "Owen", "Pizzaiolo", { minimumWeeklyHours: 6, targetWeeklyHours: 8 }),
+    ];
+    const input = saturdayInput(staff);
+    input.history = Array.from({ length: 10 }, (_, index) => ({ businessDate: addDays("2026-07-25", -(index + 1) * 7), netSales: 500 }));
+    input.dayRules = input.dayRules.map((rule) => ({ ...rule, minimumStaff: 1, maximumStaff: 3, requiredSkills: [] }));
+    const saturday = buildRotaPlan(input).days[0];
+
+    expect(saturday.evidence.committedHoursFloor).toBe(18);
+    expect(saturday.evidence.targetStaffHours).toBe(18);
   });
 
   it("uses the controllable budget—not the full labour envelope—to buy hourly cover", () => {
