@@ -1,0 +1,32 @@
+name: Apply production fixes 014 lint correction
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-prod-fixes-014-lint.yml'
+      - '.github/patches/prod-fixes-014-lint.patch'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply lint correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/patches/prod-fixes-014-lint.patch
+          git apply .github/patches/prod-fixes-014-lint.patch
+          git add src/components/product-development/product-development-board.tsx
+          git config user.name 'hos-release-bot'
+          git config user.email 'hos-release-bot@users.noreply.github.com'
+          git commit -m 'Fix management integrity product board lint'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
