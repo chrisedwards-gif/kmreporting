@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export type ProductDevelopmentActionState = {
   status: "idle" | "success" | "error";
   message: string;
+  recordId?: string;
 };
 
 const optionalUuid = z.union([z.literal(""), z.string().uuid()]);
@@ -25,13 +26,40 @@ const productSchema = z.object({
   targetLaunchDate: optionalDate.default(""),
   nextTrialDate: optionalDate.default(""),
   recipeSummary: z.string().max(8000).default(""),
+  methodText: z.string().max(12000).default(""),
   yieldText: z.string().max(160).default(""),
   portionText: z.string().max(160).default(""),
+  shelfLifeText: z.string().max(1000).default(""),
+  operationalPlan: z.string().max(8000).default(""),
   foodCost: optionalMoney.default(""),
   sellPrice: optionalMoney.default(""),
   allergens: z.string().max(1000).default(""),
   trialNotes: z.string().max(12000).default(""),
   approvalNotes: z.string().max(8000).default(""),
+});
+
+type ProductInput = z.infer<typeof productSchema>;
+
+const toPayload = (input: ProductInput) => ({
+  id: input.id,
+  siteId: input.siteId,
+  ownerProfileId: input.ownerProfileId,
+  title: input.title,
+  category: input.category,
+  status: input.status,
+  targetLaunchDate: input.targetLaunchDate,
+  nextTrialDate: input.nextTrialDate,
+  recipeSummary: input.recipeSummary,
+  methodText: input.methodText,
+  yieldText: input.yieldText,
+  portionText: input.portionText,
+  shelfLifeText: input.shelfLifeText,
+  operationalPlan: input.operationalPlan,
+  foodCost: input.foodCost === "" ? "" : String(input.foodCost),
+  sellPrice: input.sellPrice === "" ? "" : String(input.sellPrice),
+  allergens: input.allergens.split(",").map((item) => item.trim()).filter(Boolean),
+  trialNotes: input.trialNotes,
+  approvalNotes: input.approvalNotes,
 });
 
 export async function saveProductDevelopmentItem(
@@ -47,29 +75,14 @@ export async function saveProductDevelopmentItem(
   const input = parsed.data;
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "error", message: "The database connection is unavailable." };
-  const { error } = await supabase.rpc("save_product_development_item", {
-    payload: {
-      id: input.id,
-      siteId: input.siteId,
-      ownerProfileId: input.ownerProfileId,
-      title: input.title,
-      category: input.category,
-      status: input.status,
-      targetLaunchDate: input.targetLaunchDate,
-      nextTrialDate: input.nextTrialDate,
-      recipeSummary: input.recipeSummary,
-      yieldText: input.yieldText,
-      portionText: input.portionText,
-      foodCost: input.foodCost === "" ? "" : String(input.foodCost),
-      sellPrice: input.sellPrice === "" ? "" : String(input.sellPrice),
-      allergens: input.allergens.split(",").map((item) => item.trim()).filter(Boolean),
-      trialNotes: input.trialNotes,
-      approvalNotes: input.approvalNotes,
-    },
-  });
-  if (error) return { status: "error", message: error.message };
+  const { data: recordId, error } = await supabase.rpc("save_product_development_item", { payload: toPayload(input) });
+  if (error || typeof recordId !== "string") return { status: "error", message: error?.message ?? "The product record could not be saved." };
   revalidatePath("/product-development");
-  return { status: "success", message: input.id ? "Product development record updated." : "Product development record created." };
+  return {
+    status: "success",
+    message: input.id ? "Product development record updated." : "Product development record created. Re-open it to attach photos and launch evidence.",
+    recordId,
+  };
 }
 
 export async function updateProductDevelopmentStatus(formData: FormData) {
@@ -80,11 +93,11 @@ export async function updateProductDevelopmentStatus(formData: FormData) {
   if (!supabase) return;
   const { data: item } = await supabase
     .from("product_development_items")
-    .select("id, site_id, owner_profile_id, title, category, target_launch_date, next_trial_date, recipe_summary, yield_text, portion_text, food_cost, sell_price, allergens, trial_notes, approval_notes")
+    .select("id, site_id, owner_profile_id, title, category, target_launch_date, next_trial_date, recipe_summary, method_text, yield_text, portion_text, shelf_life_text, operational_plan, food_cost, sell_price, allergens, trial_notes, approval_notes")
     .eq("id", id)
     .maybeSingle();
   if (!item) return;
-  await supabase.rpc("save_product_development_item", {
+  const { error } = await supabase.rpc("save_product_development_item", {
     payload: {
       id: item.id,
       siteId: item.site_id ?? "",
@@ -95,8 +108,11 @@ export async function updateProductDevelopmentStatus(formData: FormData) {
       targetLaunchDate: item.target_launch_date ?? "",
       nextTrialDate: item.next_trial_date ?? "",
       recipeSummary: item.recipe_summary,
+      methodText: item.method_text ?? "",
       yieldText: item.yield_text,
       portionText: item.portion_text,
+      shelfLifeText: item.shelf_life_text ?? "",
+      operationalPlan: item.operational_plan ?? "",
       foodCost: item.food_cost === null ? "" : String(item.food_cost),
       sellPrice: item.sell_price === null ? "" : String(item.sell_price),
       allergens: item.allergens ?? [],
@@ -104,5 +120,6 @@ export async function updateProductDevelopmentStatus(formData: FormData) {
       approvalNotes: item.approval_notes,
     },
   });
+  if (error) throw new Error(error.message);
   revalidatePath("/product-development");
 }

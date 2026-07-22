@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type KitchenCheckCadence = "daily" | "weekly";
@@ -87,6 +88,7 @@ export type KitchenCheckDetail = KitchenCheckRunSummary & {
   responses: KitchenCheckResponse[];
   owners: KitchenCheckOwner[];
   reviewNotes: string;
+  evidence: EvidenceFile[];
 };
 
 type TemplateRow = {
@@ -229,9 +231,12 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
   if (!template) return null;
 
   const ownerIds = [...new Set((assignments ?? []).map((item) => item.manager_profile_id))];
-  const { data: profiles } = ownerIds.length
-    ? await supabase.from("profiles").select("id, full_name").in("id", ownerIds)
-    : { data: [] };
+  const [{ data: profiles }, evidenceByRun] = await Promise.all([
+    ownerIds.length
+      ? supabase.from("profiles").select("id, full_name").in("id", ownerIds)
+      : Promise.resolve({ data: [] }),
+    getEvidenceFiles("kitchen_check_run", [run.id]),
+  ]);
 
   const itemRows: KitchenCheckItem[] = (items ?? []).map((item) => ({
     id: item.id,
@@ -288,5 +293,6 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
     })),
     owners: (profiles ?? []).map((profile) => ({ id: profile.id, name: profile.full_name })),
     reviewNotes: run.review_notes,
+    evidence: evidenceByRun[run.id] ?? [],
   };
 }

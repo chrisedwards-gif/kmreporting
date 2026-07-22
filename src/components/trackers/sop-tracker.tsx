@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { Download, ExternalLink, Plus } from "lucide-react";
 import { saveSop, type TrackerActionState } from "@/app/actions/trackers";
+import { EvidencePanel } from "@/components/evidence/evidence-panel";
 import type { SopRecord, TrackerSite } from "@/lib/data/trackers";
 import { formatDate } from "@/lib/utils";
 
@@ -85,7 +86,7 @@ export function SopTracker({ canEdit, sites, sops }: { canEdit: boolean; sites: 
         <button className="button button--secondary performance-filters__export" onClick={exportCsv} type="button"><Download aria-hidden="true" size={15} /> Export CSV</button>
         {canEdit ? <button className="button button--primary performance-filters__export" onClick={() => { setEditing(null); setAdding(true); }} type="button"><Plus aria-hidden="true" size={15} /> Add SOP</button> : null}
       </div>
-      {(adding || editing) ? <SopForm editing={editing} key={editing?.id ?? "new"} onDone={() => { setAdding(false); setEditing(null); }} sites={sites} /> : null}
+      {(adding || editing) ? <div className="tracker-editor"><SopForm editing={editing} key={editing?.id ?? "new"} onDone={() => { setAdding(false); setEditing(null); }} sites={sites} />{editing ? <EvidencePanel canEdit={canEdit} description="Attach the controlled SOP file, sign-off or supporting photographs. Stored files are private; the legacy document link can remain for external systems." entityId={editing.id} entityType="sop" files={editing.evidence} recommendedType="signed_document" title="SOP evidence" /> : <div className="privacy-callout">Save the SOP first, then reopen it to attach the controlled document and sign-off evidence.</div>}</div> : null}
       <div className="table-scroll"><table className="data-table"><thead><tr><th>SOP</th><th>Kitchen</th><th>Category</th><th>Owner</th><th>Status</th><th>Due</th><th>Next review</th><th>Document</th></tr></thead><tbody>{filtered.map((item) => <tr key={item.id}><td>{canEdit ? <button className="link-button" onClick={() => { setAdding(false); setEditing(item); }} type="button"><strong>{item.title}</strong></button> : <strong>{item.title}</strong>}<div className="data-table__subtext">v{item.version}{item.priority === "high" ? " · high priority" : ""}</div></td><td>{item.siteName}</td><td>{categoryLabels[item.category]}</td><td>{item.owner}</td><td><span className={`rag-chip rag-chip--${["live", "reviewed"].includes(item.status) ? "green" : item.status === "in_review" ? "amber" : "neutral"}`}>{statusLabels[item.status]}</span></td><td>{item.dueDate ? formatDate(item.dueDate) : "—"}</td><td>{item.nextReviewDate ? formatDate(item.nextReviewDate) : "—"}</td><td>{item.documentLink ? <a className="button button--secondary button--compact" href={item.documentLink} rel="noopener noreferrer" target="_blank">Open SOP <ExternalLink aria-hidden="true" size={14} /></a> : <span className="muted-text">No document linked</span>}</td></tr>)}</tbody></table>{!filtered.length ? <div className="empty-inline">No SOPs match these filters yet.{canEdit ? " Add the first kitchen standard to start the register." : ""}</div> : null}</div>
     </>
   );
