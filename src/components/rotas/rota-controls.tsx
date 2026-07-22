@@ -15,6 +15,7 @@ import {
   saveRotaForecastEvent,
   type RotaActionState,
 } from "@/app/actions/rotas";
+import "./rota-controls.css";
 
 const initialState: RotaActionState = { status: "idle", message: "" };
 const initialStartState: RotaStartActionState = { status: "idle", message: "" };
