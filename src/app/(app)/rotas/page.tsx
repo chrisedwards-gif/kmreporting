@@ -7,7 +7,6 @@ import "@/components/rotas/rota-workspace.module.css";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
 import { environment } from "@/lib/env";
-import { getRotaAiReview } from "@/lib/rota/ai-review";
 import { getExternalRotaSignals } from "@/lib/rota/external-signals";
 import { addDays } from "@/lib/rota/forecasting";
 import { buildRotaPlan } from "@/lib/rota/planner";
@@ -45,7 +44,6 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
     targetHours: staff.targetWeeklyHours,
     maximumHours: staff.maximumWeeklyHours,
   }));
-  const aiReview = await getRotaAiReview(plan, signals, staffTargets);
   const priorWeek = addDays(workspace.weekStart, -7);
   const nextWeek = addDays(workspace.weekStart, 7);
   const siteQuery = site ? `&site=${encodeURIComponent(site.id)}` : "";
@@ -84,7 +82,7 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
         <div className="rota-setup__details">{readiness.map((item) => <div className="rota-setup__item" key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}</div>
       </details>
       <RotaControls hasPlan={Boolean(plan)} siteId={site.id} weekStart={workspace.weekStart} />
-      {plan ? <><RotaPlanView aiReview={aiReview} plan={plan} signals={signals} staffTargets={staffTargets} /><RotaCopilot initialReview={aiReview} plan={plan} signals={signals} staffTargets={staffTargets} /></> : <section className="panel empty-state"><CalendarClock aria-hidden="true" size={30} /><h2>No rota has been built for this week yet</h2><p>Use “Build this week’s rota” above. You will get an editable starting point, not a published rota.</p></section>}
+      {plan ? <><RotaPlanView aiReview={null} plan={plan} signals={signals} staffTargets={staffTargets} /><RotaCopilot initialReview={null} plan={plan} signals={signals} staffTargets={staffTargets} /></> : <section className="panel empty-state"><CalendarClock aria-hidden="true" size={30} /><h2>No rota has been built for this week yet</h2><p>Use “Build this week’s rota” above. You will get an editable starting point, not a published rota.</p></section>}
     </> : null}
   </>;
 }
