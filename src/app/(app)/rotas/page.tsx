@@ -14,6 +14,11 @@ import { RotaCopilot } from "@/components/rotas/rota-copilot";
 import { RotaWeekOverlay } from "@/components/rotas/rota-week-overlay";
 import "@/components/rotas/rota-workspace.module.css";
 import { requireSessionProfile } from "@/lib/auth/dal";
+import {
+  applyRotaBuilderNotes,
+  getRotaBuilderMetadata,
+  type RotaBuilderMetadata,
+} from "@/lib/data/rota-builder";
 import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
 import { environment } from "@/lib/env";
 import { getExternalRotaSignals } from "@/lib/rota/external-signals";
@@ -26,8 +31,10 @@ import {
 } from "@/lib/rota/visibility";
 import { formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Rota planning overlay" };
+export const metadata = { title: "Rota builder" };
 type Params = { site?: string; week?: string };
+
+const emptyBuilderMetadata: RotaBuilderMetadata = { marks: [], notes: [] };
 
 export default async function RotasPage({
   searchParams,
@@ -72,7 +79,19 @@ export default async function RotasPage({
 
   const financeVisibility: RotaFinanceVisibility =
     profile.actualRole === "kitchen_manager" ? "hourly_only" : "full";
-  const plan = rawPlan ? visibleRotaPlan(rawPlan, financeVisibility) : null;
+  const builderMetadata = rawPlan && site && rawPlan.id !== "demo-plan"
+    ? await getRotaBuilderMetadata({
+        planId: rawPlan.id,
+        organisationId: profile.organisationId,
+        siteId: site.id,
+      })
+    : emptyBuilderMetadata;
+  const plan = rawPlan
+    ? applyRotaBuilderNotes(
+        visibleRotaPlan(rawPlan, financeVisibility),
+        builderMetadata,
+      )
+    : null;
   const visibleStaff = visibleRotaStaff(workspace.staff);
   const staffTargets = visibleStaff.map((staff) => ({
     id: staff.id,
@@ -111,8 +130,8 @@ export default async function RotasPage({
     },
     {
       label: "RotaCloud handoff",
-      value: workspace.rotacloudConfigured ? "Read-only connection" : "Manual comparison",
-      detail: "Build and publish the final rota in RotaCloud",
+      value: workspace.rotacloudConfigured ? "Read-only connection" : "Copy or CSV",
+      detail: "Build here, then publish the approved rota in RotaCloud",
       ready: true,
     },
   ];
@@ -125,11 +144,11 @@ export default async function RotasPage({
       <header className="rota-page-header">
         <div>
           <p className="page-header__eyebrow">People and labour</p>
-          <h1>Plan in RotaCloud with smarter guidance</h1>
+          <h1>Build next week’s rota with the forecast beside you</h1>
           <p>
-            Use the familiar weekly rota layout to compare shifts against sales
-            demand, agreed hours, cover, weather and events before you publish in
-            RotaCloud.
+            Work in the same Monday-to-Sunday pattern your managers already know.
+            KM Reporting adds sales demand, cover, agreed hours, weather, events and
+            management checks before the rota is copied into RotaCloud.
           </p>
         </div>
         <nav aria-label="Rota tools" className="rota-page-header__links">
@@ -215,7 +234,7 @@ export default async function RotasPage({
               <span>
                 <strong>
                   {readyCount === readiness.length
-                    ? "Everything needed for the overlay is ready"
+                    ? "Everything needed for the rota builder is ready"
                     : `${readyCount} of ${readiness.length} planning inputs are ready`}
                 </strong>
                 <small>Open this only when you need to check where the guidance comes from.</small>
@@ -242,8 +261,11 @@ export default async function RotasPage({
             <>
               <RotaWeekOverlay
                 financeVisibility={financeVisibility}
+                key={`${plan.id}-${plan.plannedHours}-${plan.plannedCost}`}
+                marks={builderMetadata.marks}
                 plan={plan}
                 signals={signals}
+                siteId={site.id}
                 staff={visibleStaff}
               />
               <RotaCopilot
@@ -256,10 +278,10 @@ export default async function RotasPage({
           ) : (
             <section className="panel empty-state">
               <CalendarClock aria-hidden="true" size={30} />
-              <h2>No planning overlay exists for this week yet</h2>
+              <h2>No rota draft exists for this week yet</h2>
               <p>
-                Create the overlay to compare expected demand and team hours.
-                The final rota remains in RotaCloud.
+                Create the forecast-led starting point, then add and edit shifts in
+                the weekly grid before copying the approved rota into RotaCloud.
               </p>
             </section>
           )}
