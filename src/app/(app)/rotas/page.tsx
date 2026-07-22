@@ -4,9 +4,10 @@ import { RotaControls } from "@/components/rotas/rota-controls";
 import { RotaPlanView } from "@/components/rotas/rota-plan-view";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
+import { environment } from "@/lib/env";
+import { getExternalRotaSignals } from "@/lib/rota/external-signals";
 import { addDays } from "@/lib/rota/forecasting";
 import { buildRotaPlan } from "@/lib/rota/planner";
-import { environment } from "@/lib/env";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Rota intelligence" };
@@ -18,6 +19,7 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
   if (!["admin", "group_manager", "kitchen_manager"].includes(profile.actualRole)) return <AccessDenied />;
   const workspace = await getRotaPlanningWorkspace({ profile, requestedSiteId: params.site, requestedWeekStart: params.week });
   const site = workspace.selectedSite;
+  const signals = await getExternalRotaSignals(workspace.weekStart);
   const demoPlan = environment.isDemo && site && workspace.staff.length ? buildRotaPlan({
     weekStart: workspace.weekStart, labourTargetPct: site.labourTarget, history: workspace.history, events: workspace.events,
     dayRules: workspace.dayRules, demand: workspace.demand, staff: workspace.staff, forecastWeeks: workspace.forecastWeeks,
@@ -30,6 +32,13 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
   const historyWeeks = Math.floor(workspace.history.length / 7);
   const hasHourlyShape = workspace.demand.some((point) => point.source === "hourly_sales");
   const canManageTeam = profile.actualRole === "admin" || profile.actualRole === "group_manager";
+  const staffTargets = workspace.staff.map((staff) => ({
+    id: staff.id,
+    name: staff.staffName,
+    minimumHours: staff.minimumWeeklyHours,
+    targetHours: staff.targetWeeklyHours,
+    maximumHours: staff.maximumWeeklyHours,
+  }));
 
   return (
     <>
@@ -59,7 +68,7 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
           </section>
           <RotaControls siteId={site.id} weekStart={workspace.weekStart} />
           {workspace.events.length ? <section className="rota-events panel"><strong>Forecast adjustments this week</strong>{workspace.events.map((event) => <span key={`${event.eventDate}-${event.title}`}>{formatDate(event.eventDate)} · {event.title} · {event.salesUpliftPct >= 0 ? "+" : ""}{event.salesUpliftPct}%</span>)}</section> : null}
-          {plan ? <RotaPlanView plan={plan} /> : <section className="panel empty-state"><CalendarClock aria-hidden="true" size={28} /><h2>No suggestion generated for this week.</h2><p>Complete the readiness gaps above, add known events, then generate. A new run creates a new audited version and supersedes the previous suggestion.</p></section>}
+          {plan ? <RotaPlanView plan={plan} signals={signals} staffTargets={staffTargets} /> : <section className="panel empty-state"><CalendarClock aria-hidden="true" size={28} /><h2>No suggestion generated for this week.</h2><p>Complete the readiness gaps above, add known events, then generate. A new run creates a new audited version and supersedes the previous suggestion.</p></section>}
         </>
       ) : null}
     </>
