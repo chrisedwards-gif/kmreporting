@@ -1,0 +1,358 @@
+.rota-builder-header {
+  align-items: center;
+}
+
+.rota-builder-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.rota-save-state {
+  background: #e9f5ef;
+  border: 1px solid #c9e3d7;
+  border-radius: 999px;
+  color: #28634f;
+  font-size: .76rem;
+  font-weight: 750;
+  padding: 7px 10px;
+}
+
+.rota-save-state--dirty {
+  background: #fff2d9;
+  border-color: #efd297;
+  color: #875a08;
+}
+
+.rota-week-shell > .rota-week-shell__privacy {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  display: flex;
+  margin: 0;
+  max-width: none;
+  padding: 10px 18px;
+  width: auto;
+}
+
+.rota-week-shell > .form-message {
+  border-radius: 0;
+  margin: 0;
+}
+
+.rota-builder-alerts,
+.rota-builder-clear {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.rota-builder-alerts {
+  background: #fff8ec;
+}
+
+.rota-builder-alerts span {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #efdcb7;
+  border-radius: 999px;
+  color: #7e5510;
+  display: inline-flex;
+  font-size: .74rem;
+  font-weight: 700;
+  gap: 5px;
+  padding: 6px 9px;
+}
+
+.rota-builder-clear {
+  background: #eef8f3;
+  color: #286a53;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.rota-week-shift {
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+
+.rota-week-shift:hover,
+.rota-week-shift:focus-visible {
+  border-color: #5f9f87;
+  box-shadow: 0 0 0 2px rgba(45, 122, 98, .12);
+  outline: none;
+}
+
+.rota-week-shift__edit {
+  align-items: center;
+  background: #edf5f1;
+  border-radius: 999px;
+  color: #2d7a62 !important;
+  display: inline-flex !important;
+  height: 22px;
+  justify-content: center;
+  opacity: 0;
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  transition: opacity .15s ease;
+  width: 22px;
+}
+
+.rota-week-shift:hover .rota-week-shift__edit,
+.rota-week-shift:focus-visible .rota-week-shift__edit {
+  opacity: 1;
+}
+
+.rota-week-cell__add {
+  align-items: center;
+  align-self: stretch;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 7px;
+  color: #7a8a83;
+  cursor: pointer;
+  display: flex;
+  font-size: .72rem;
+  gap: 4px;
+  justify-content: center;
+  min-height: 30px;
+  opacity: .42;
+  padding: 4px 7px;
+  transition: opacity .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.rota-week-cell:hover .rota-week-cell__add,
+.rota-week-cell__add:focus-visible {
+  background: rgba(255, 255, 255, .82);
+  border-color: #a9bcb3;
+  opacity: 1;
+  outline: none;
+}
+
+.rota-day-mark {
+  align-content: center;
+  background: repeating-linear-gradient(-45deg, #f3f4f7, #f3f4f7 6px, #fff 6px, #fff 12px);
+  border: 1px solid #d8dbe3;
+  border-radius: 7px;
+  color: #626779;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  min-height: 58px;
+  padding: 8px 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.rota-day-mark strong {
+  font-size: .78rem;
+}
+
+.rota-day-mark small {
+  color: #767b88;
+  font-size: .67rem;
+}
+
+.rota-day-mark--leave {
+  background: repeating-linear-gradient(-45deg, #fff5f2, #fff5f2 6px, #fff 6px, #fff 12px);
+  border-color: #efc3b8;
+  color: #9a4838;
+}
+
+.rota-day-mark--training {
+  background: #eef6ff;
+  border-color: #b9d5ef;
+  color: #2f628e;
+}
+
+.rota-day-mark--unavailable {
+  background: repeating-linear-gradient(-45deg, #f5f5f6, #f5f5f6 5px, #e7e8ec 5px, #e7e8ec 10px);
+  color: #555966;
+}
+
+.rota-editor-backdrop {
+  align-items: center;
+  background: rgba(14, 29, 23, .48);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.rota-editor-dialog {
+  background: #fff;
+  border: 1px solid #d7e1dc;
+  border-radius: 15px;
+  box-shadow: 0 24px 70px rgba(12, 34, 25, .25);
+  max-height: calc(100vh - 40px);
+  max-width: 560px;
+  overflow: auto;
+  width: 100%;
+}
+
+.rota-editor-dialog > header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.rota-editor-dialog h3 {
+  margin: 3px 0 0;
+}
+
+.rota-editor-tabs {
+  background: #f2f5f3;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  margin: 16px 20px 0;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.rota-editor-tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #66736d;
+  cursor: pointer;
+  font-weight: 750;
+  padding: 9px;
+}
+
+.rota-editor-tabs button.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(20, 48, 37, .12);
+  color: #234d3e;
+}
+
+.rota-editor-fields {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.rota-editor-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.rota-editor-fields label > span:first-child {
+  color: #53625c;
+  font-size: .75rem;
+  font-weight: 750;
+}
+
+.rota-editor-fields input,
+.rota-editor-fields select,
+.rota-editor-fields textarea {
+  background: #fff;
+  border: 1px solid #cfdad5;
+  border-radius: 9px;
+  color: #18231f;
+  font: inherit;
+  min-width: 0;
+  padding: 10px 11px;
+}
+
+.rota-editor-fields textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.rota-editor-fields input:focus,
+.rota-editor-fields select:focus,
+.rota-editor-fields textarea:focus {
+  border-color: #2d7a62;
+  box-shadow: 0 0 0 3px rgba(45, 122, 98, .12);
+  outline: none;
+}
+
+.rota-editor-time-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.rota-editor-warning {
+  align-items: flex-start;
+  background: #fff7e7;
+  border: 1px solid #efd8a9;
+  border-radius: 9px;
+  color: #7c5612;
+  display: flex;
+  font-size: .78rem;
+  gap: 7px;
+  margin: 0;
+  padding: 10px;
+}
+
+.rota-editor-dialog > footer {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.rota-editor-dialog > footer > div {
+  display: flex;
+  gap: 8px;
+}
+
+.button--danger {
+  background: #fff3ef;
+  border-color: #efb7a9;
+  color: #a4402e;
+}
+
+@media (max-width: 980px) {
+  .rota-builder-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rota-builder-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .rota-editor-time-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .rota-builder-actions .button {
+    flex: 1 1 auto;
+  }
+
+  .rota-editor-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .rota-editor-dialog {
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+  }
+
+  .rota-editor-time-grid {
+    grid-template-columns: 1fr;
+  }
+}
