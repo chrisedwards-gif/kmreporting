@@ -57,6 +57,27 @@ const extractText = (payload: { output_text?: string; output?: Array<{ content?:
   || payload.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("\n").trim()
   || "";
 
+type OpenAiErrorPayload = {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string | null;
+  };
+};
+
+function publicOpenAiError(status: number, payload: OpenAiErrorPayload) {
+  const code = payload.error?.code ?? payload.error?.type ?? "unknown";
+  if (status === 401) return "OpenAI rejected the API key. Create a new project API key and replace OPENAI_API_KEY in Vercel.";
+  if (status === 403) return "The OpenAI key does not have permission to use the Responses API or selected model.";
+  if (status === 404) return `The configured OpenAI model (${environment.openaiModel}) is not available to this API project.`;
+  if (status === 429 && (code === "insufficient_quota" || code === "billing_not_active")) {
+    return "The OpenAI API project has no available credit or active billing. ChatGPT Plus does not include API usage.";
+  }
+  if (status === 429) return "OpenAI is rate-limiting this project. Wait briefly and try again.";
+  if (status === 400) return "OpenAI rejected the rota request format. The server log now contains the exact reason.";
+  return `OpenAI returned an error (${status}). Try again after checking the API project status.`;
+}
+
 export async function POST(request: NextRequest) {
   const profile = await getSessionProfile();
   if (!profile) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -69,6 +90,7 @@ export async function POST(request: NextRequest) {
 
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
+    console.error("rota copilot validation failed", { issues: parsed.error.issues });
     return NextResponse.json({ error: "Invalid copilot request." }, { status: 400 });
   }
 
@@ -91,13 +113,22 @@ export async function POST(request: NextRequest) {
         ].join(" "),
         input: JSON.stringify({ question: parsed.data.question, rota: parsed.data.context }),
         max_output_tokens: 700,
+        store: false,
       }),
       cache: "no-store",
     });
 
     if (!response.ok) {
-      console.error("rota copilot request failed", { status: response.status });
-      return NextResponse.json({ error: "The copilot could not answer right now." }, { status: 502 });
+      const payload = await response.json().catch(() => ({})) as OpenAiErrorPayload;
+      console.error("rota copilot OpenAI request failed", {
+        status: response.status,
+        requestId: response.headers.get("x-request-id"),
+        model: environment.openaiModel,
+        type: payload.error?.type,
+        code: payload.error?.code,
+        message: payload.error?.message,
+      });
+      return NextResponse.json({ error: publicOpenAiError(response.status, payload) }, { status: 502 });
     }
 
     const answer = extractText(await response.json());
@@ -105,6 +136,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ answer });
   } catch (error) {
     console.error("rota copilot request failed", error);
-    return NextResponse.json({ error: "The copilot could not answer right now." }, { status: 500 });
+    return NextResponse.json({ error: "The copilot could not reach OpenAI right now." }, { status: 500 });
   }
 }
