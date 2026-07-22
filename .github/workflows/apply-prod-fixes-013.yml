@@ -1,0 +1,43 @@
+name: Apply production fixes 013
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/apply-prod-fixes-013.yml'
+      - '.github/patches/prod-fixes-013.part00'
+      - '.github/patches/prod-fixes-013.part01'
+      - '.github/patches/prod-fixes-013.part02'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Apply atomic reliability patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/patches/prod-fixes-013.part00 \
+              .github/patches/prod-fixes-013.part01 \
+              .github/patches/prod-fixes-013.part02 \
+            | base64 --decode \
+            | gzip --decompress > /tmp/prod-fixes-013.patch
+          git apply --check /tmp/prod-fixes-013.patch
+          git apply /tmp/prod-fixes-013.patch
+          git rm .github/workflows/apply-prod-fixes-013.yml \
+                 .github/patches/prod-fixes-013.part00 \
+                 .github/patches/prod-fixes-013.part01 \
+                 .github/patches/prod-fixes-013.part02
+          git add --all
+          git config user.name 'hos-release-bot'
+          git config user.email 'hos-release-bot@users.noreply.github.com'
+          git commit -m 'Production fixes 013 — reliability and daily usability'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
