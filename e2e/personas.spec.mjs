@@ -77,18 +77,21 @@ test("Kitchen Manager can see and unlock weekly submission before reaching the f
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Rota suggestion is easy to plan, downloadable and kitchen-scoped", async ({ page }) => {
+test("Kitchen Manager can build a salary-safe rota with score and daily learning", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: /Plan next week.s rota/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Plan the week in four simple steps" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Build next week.s rota/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Management review before you build or approve" })).toBeVisible();
   await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Rebuild suggestion" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
-  await expect(page.getByLabel("Demand and rota coverage by hour")).toBeVisible();
-  await expect(page.getByText("Shifts and breaks")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Build the week here, then copy it into RotaCloud." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
+  await expect(page.getByText("Kitchen-manager cost view", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Salaries are not sent to this screen or the copilot/)).toBeVisible();
+  await expect(page.getByText("Allocated salary cost", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Was the cover right?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Add/ }).first()).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
