@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   GripVertical,
-  Image,
+  Image as ImageIcon,
   Pencil,
   Plus,
   ShieldCheck,
@@ -151,11 +151,11 @@ export function ProductDevelopmentBoard({
   const [moving, startMoving] = useTransition();
   const activeStatuses = PRODUCT_STATUSES.filter((status) => status !== "archived");
 
-  useEffect(() => {
-    if (editorItem === undefined) return;
-    const fresh = editorItem ? items.find((item) => item.id === editorItem.id) : null;
-    if (editorItem && fresh && fresh.updatedAt !== editorItem.updatedAt) setEditorItem(fresh);
-  }, [editorItem, items]);
+  const currentEditorItem = editorItem === undefined
+    ? undefined
+    : editorItem === null
+      ? null
+      : items.find((item) => item.id === editorItem.id) ?? editorItem;
 
   const moveItem = (id: string, status: ProductStatus) => {
     if (!canEdit) return;
@@ -204,7 +204,7 @@ export function ProductDevelopmentBoard({
                         <span><CalendarDays aria-hidden="true" size={13} /> {item.targetLaunchDate ? formatDate(item.targetLaunchDate) : "No launch date"}</span>
                         <span><Beaker aria-hidden="true" size={13} /> {item.nextTrialDate ? formatDate(item.nextTrialDate) : "No trial booked"}</span>
                         <span><CircleDollarSign aria-hidden="true" size={13} /> {gp === null ? "Not costed" : `${gp}% GP · ${formatCurrency(item.foodCost ?? 0)} cost`}</span>
-                        <span><Image aria-hidden="true" size={13} /> {item.evidence.length} evidence files</span>
+                        <span><ImageIcon aria-hidden="true" size={13} /> {item.evidence.length} evidence files</span>
                       </div>
                       <div className={`product-card__gate${completed === controls.length ? " product-card__gate--ready" : ""}`}><ShieldCheck aria-hidden="true" size={14} /><strong>{completed}/{controls.length}</strong> Live controls complete</div>
                       {item.trialNotes ? <p className="product-card__notes">{item.trialNotes}</p> : null}
@@ -225,7 +225,7 @@ export function ProductDevelopmentBoard({
           );
         })}
       </div>
-      {editorItem !== undefined ? <ProductEditor item={editorItem} key={editorItem?.id ?? "new"} onClose={() => setEditorItem(undefined)} owners={owners} sites={sites} /> : null}
+      {currentEditorItem !== undefined ? <ProductEditor item={currentEditorItem} key={currentEditorItem?.id ?? "new"} onClose={() => setEditorItem(undefined)} owners={owners} sites={sites} /> : null}
     </>
   );
 }
