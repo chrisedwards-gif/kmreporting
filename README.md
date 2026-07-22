@@ -153,6 +153,14 @@ Example shape (use non-sensitive test data only in development):
 
 This connector is optional. The normal manager workflow stores a single site/week RotaCloud total. If an enterprise payroll connector is added later, map its employee identifier to `employeeRef`; never use employee names in the reporting UI.
 
+## Rota intelligence
+
+`/rotas` creates a versioned weekly suggestion from dated same-weekday sales, the site labour target, an editable day-part demand curve, known event uplifts and private staff constraints. It backtests the sales forecast, displays a range and confidence level, separates fixed and controllable labour, applies minimum cover before cost optimisation, and leaves any impossible shift visibly unfilled.
+
+Individual wages, salaries and employer on-costs are stored only in `payroll_private`. Kitchen rota views receive staff names, suggested shifts and aggregate site totals; they never receive an individual rate or shift cost. Administrators and group managers maintain those private inputs at `/rotas/team`.
+
+`ROTACLOUD_API_KEY` is optional and server-only. When present, the first release reads paginated people, locations, roles, wages, contracted hours, availability and approved leave. It deliberately does not create or publish RotaCloud shifts: managers review the suggestion and download a CSV for manual entry. Automatic write-back should only be enabled after read-only matching, cross-site conflicts and UAT are proven. The full data, guardrail and accuracy plan is in [`ROTA_INTELLIGENCE_PLAN.md`](./ROTA_INTELLIGENCE_PLAN.md).
+
 ## EPOS, purchasing and waste integrations
 
 Provider adapters send normalized daily figures to `POST /api/imports/operations` using the same `IMPORT_SECRET`. Supported domains are `sales`, `purchasing` and `waste`. A connector can own one or several domains without overwriting stocktake or payroll fields.

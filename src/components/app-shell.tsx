@@ -8,6 +8,7 @@ import {
   Beaker,
   BookOpenCheck,
   CalendarDays,
+  CalendarClock,
   ChefHat,
   ClipboardCheck,
   ClipboardList,
@@ -38,6 +39,7 @@ const groupNavigation: NavSection[] = [
     items: [
       { href: "/dashboard", label: "Overview", icon: BarChart3 },
       { href: "/reports", label: "Weekly reports", icon: ClipboardList },
+      { href: "/rotas", label: "Rota intelligence", icon: CalendarClock, roles: ["admin", "group_manager"] },
       { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
       { href: "/workspace", label: "Kitchen workspace", icon: ChefHat, roles: ["admin", "group_manager"] },
       { href: "/people", label: "People & performance", icon: UsersRound, roles: ["admin", "group_manager"] },
@@ -54,6 +56,7 @@ const kitchenManagerNavigation: NavSection[] = [
     items: [
       { href: "/dashboard", label: "Overview & actions", icon: BarChart3 },
       { href: "/reports", label: "Weekly reports", icon: ClipboardList },
+      { href: "/rotas", label: "Rota suggestion", icon: CalendarClock },
     ],
   },
   {
