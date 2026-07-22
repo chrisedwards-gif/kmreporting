@@ -43,4 +43,5 @@ export const environment = {
   resendApiKey: process.env.RESEND_API_KEY,
   resendFromEmail: process.env.RESEND_FROM_EMAIL?.trim(),
   resendReplyTo: process.env.RESEND_REPLY_TO?.trim(),
+  rotacloudApiKey: process.env.ROTACLOUD_API_KEY?.trim(),
 };

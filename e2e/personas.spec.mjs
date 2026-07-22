@@ -77,6 +77,34 @@ test("Kitchen Manager can see and unlock weekly submission before reaching the f
   await expectNoSeriousAccessibilityViolations(page);
 });
 
+test("Rota suggestion is explainable, downloadable and kitchen-scoped", async ({ page }) => {
+  await switchPersona(page, "kitchen_manager");
+  await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Rota intelligence." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Forecast-led weekly rota" })).toBeVisible();
+  await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
+  await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Generate rota suggestion" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download for manual entry" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Staff profiles" })).toHaveCount(0);
+  await expect(page.getByText(/This is a suggestion, not a published rota/)).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+});
+
+test("Admin can calibrate the rota demand curve and safety rules", async ({ page }) => {
+  await switchPersona(page, "admin");
+  await page.goto("/rotas/settings?site=00000000-0000-4000-8000-000000000001", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Rota calibration." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Trading hours and safe cover" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Day-part demand curve" })).toBeVisible();
+  await expect(page.getByLabel("Curve mode")).toHaveValue("automatic");
+  await expect(page.getByLabel("Saturday demand at 17:00")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save rota calibration" })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+});
+
 test("Viewer lands on reporting insight with no operational controls", async ({ page }) => {
   await switchPersona(page, "viewer");
   await expect(page.getByText("Management summary", { exact: true }).first()).toBeVisible();
