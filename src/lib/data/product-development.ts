@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ProductStatus } from "@/lib/product-development/calculations";
 
@@ -15,8 +16,11 @@ export type ProductDevelopmentItem = {
   targetLaunchDate: string | null;
   nextTrialDate: string | null;
   recipeSummary: string;
+  methodText: string;
   yieldText: string;
   portionText: string;
+  shelfLifeText: string;
+  operationalPlan: string;
   foodCost: number | null;
   sellPrice: number | null;
   allergens: string[];
@@ -24,6 +28,7 @@ export type ProductDevelopmentItem = {
   approvalNotes: string;
   version: number;
   updatedAt: string;
+  evidence: EvidenceFile[];
 };
 
 export type ProductDevelopmentOption = { id: string; name: string };
@@ -33,19 +38,20 @@ export async function getProductDevelopmentItems(): Promise<ProductDevelopmentIt
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("product_development_items")
-    .select("id, site_id, owner_profile_id, title, category, status, target_launch_date, next_trial_date, recipe_summary, yield_text, portion_text, food_cost, sell_price, allergens, trial_notes, approval_notes, version, updated_at")
+    .select("id, site_id, owner_profile_id, title, category, status, target_launch_date, next_trial_date, recipe_summary, method_text, yield_text, portion_text, shelf_life_text, operational_plan, food_cost, sell_price, allergens, trial_notes, approval_notes, version, updated_at")
     .neq("status", "archived")
     .order("updated_at", { ascending: false });
   if (error || !data?.length) return [];
 
   const siteIds = [...new Set(data.flatMap((item) => item.site_id ? [item.site_id] : []))];
   const ownerIds = [...new Set(data.flatMap((item) => item.owner_profile_id ? [item.owner_profile_id] : []))];
-  const [{ data: sites }, { data: owners }] = await Promise.all([
+  const [siteResult, ownerResult, evidenceByItem] = await Promise.all([
     siteIds.length ? supabase.from("sites").select("id, name").in("id", siteIds) : Promise.resolve({ data: [] }),
     ownerIds.length ? supabase.from("profiles").select("id, full_name").in("id", ownerIds) : Promise.resolve({ data: [] }),
+    getEvidenceFiles("product_development", data.map((item) => item.id)),
   ]);
-  const sitesById = new Map((sites ?? []).map((item) => [item.id, item.name]));
-  const ownersById = new Map((owners ?? []).map((item) => [item.id, item.full_name]));
+  const sitesById = new Map((siteResult.data ?? []).map((item) => [item.id, item.name]));
+  const ownersById = new Map((ownerResult.data ?? []).map((item) => [item.id, item.full_name]));
 
   return data.map((item) => ({
     id: item.id,
@@ -59,8 +65,11 @@ export async function getProductDevelopmentItems(): Promise<ProductDevelopmentIt
     targetLaunchDate: item.target_launch_date,
     nextTrialDate: item.next_trial_date,
     recipeSummary: item.recipe_summary,
+    methodText: item.method_text ?? "",
     yieldText: item.yield_text,
     portionText: item.portion_text,
+    shelfLifeText: item.shelf_life_text ?? "",
+    operationalPlan: item.operational_plan ?? "",
     foodCost: item.food_cost === null ? null : Number(item.food_cost),
     sellPrice: item.sell_price === null ? null : Number(item.sell_price),
     allergens: item.allergens ?? [],
@@ -68,6 +77,7 @@ export async function getProductDevelopmentItems(): Promise<ProductDevelopmentIt
     approvalNotes: item.approval_notes,
     version: item.version,
     updatedAt: item.updated_at,
+    evidence: evidenceByItem[item.id] ?? [],
   }));
 }
 

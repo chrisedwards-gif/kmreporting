@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -8,7 +9,9 @@ import {
   probationStageLabel,
   SCORE_AREAS,
   weightedProbationScore,
+  scoreRag,
   type ProbationStage,
+  type Rag,
   type ScoreArea,
   type ScoreMap,
 } from "@/lib/performance/scoring";
@@ -45,19 +48,59 @@ export type PerformanceActionItem = {
   updatedAt: string;
 };
 
+export type RagOverrideRecord = {
+  id: string;
+  calculatedRag: Rag;
+  overrideRag: Rag;
+  reason: string;
+  createdByName: string;
+  createdAt: string;
+  revokedAt: string | null;
+  revokedByName: string | null;
+  revokeReason: string;
+};
+
+export type ProbationReviewStage = "30_day" | "60_day" | "90_day" | "final" | "other";
+export type ProbationOutcome = "pending" | "pass" | "extend" | "fail";
+
+export type ProbationReviewRecord = {
+  id: string;
+  managerProfileId: string;
+  siteId: string | null;
+  siteName: string;
+  reviewDate: string;
+  reviewStage: ProbationReviewStage;
+  status: "draft" | "finalised";
+  outcome: ProbationOutcome;
+  extensionEndDate: string | null;
+  notes: string;
+  requiredActions: string;
+  scoreSnapshot: number | null;
+  ragSnapshot: Rag | null;
+  finalisedAt: string | null;
+  finalisedByName: string | null;
+  evidence: EvidenceFile[];
+};
+
 export type ProbationSummary = {
   managerId: string;
   fullName: string;
   roleTitle: string;
+  siteId: string | null;
   siteName: string;
   employmentStartDate: string | null;
   probationEndDate: string | null;
   stage: ProbationStage | null;
   stageLabel: string;
   weightedScore: number | null;
+  calculatedRag: Rag;
+  displayRag: Rag;
+  activeOverride: RagOverrideRecord | null;
+  overrideHistory: RagOverrideRecord[];
   reviewCount: number;
   latestReviewDate: string | null;
   weights: Record<ScoreArea, number>;
+  probationReviews: ProbationReviewRecord[];
 };
 
 export type ManagerAdminRecord = {
@@ -206,7 +249,7 @@ export async function getProbationSummaries(today = new Date().toISOString().sli
   if (error || !details?.length) return [];
 
   const profileIds = details.map((detail) => detail.profile_id);
-  const [{ data: profiles }, { data: assignments }, { data: reviews }] = await Promise.all([
+  const [{ data: profiles }, { data: assignments }, { data: reviews }, { data: probationRows }, { data: overrideRows }] = await Promise.all([
     supabase.from("profiles").select("id, full_name").in("id", profileIds),
     supabase.from("site_manager_assignments").select("manager_profile_id, site_id").in("manager_profile_id", profileIds).is("ends_on", null),
     supabase
@@ -215,14 +258,39 @@ export async function getProbationSummaries(today = new Date().toISOString().sli
       .in("manager_profile_id", profileIds)
       .in("status", ["finalised", "acknowledged"])
       .order("week_commencing", { ascending: false }),
+    supabase
+      .from("probation_reviews")
+      .select("id, manager_profile_id, site_id, review_date, review_stage, status, outcome, extension_end_date, notes, required_actions, score_snapshot, rag_snapshot, finalised_at, finalised_by")
+      .in("manager_profile_id", profileIds)
+      .order("review_date", { ascending: false }),
+    supabase
+      .from("rag_overrides")
+      .select("id, entity_id, calculated_rag, override_rag, reason, created_by, created_at, revoked_by, revoked_at, revoke_reason")
+      .eq("entity_type", "manager_probation")
+      .eq("metric_key", "weighted_score")
+      .in("entity_id", profileIds)
+      .order("created_at", { ascending: false }),
   ]);
+
   const reviewIds = (reviews ?? []).map((review) => review.id);
-  const siteIds = [...new Set((assignments ?? []).map((assignment) => assignment.site_id))];
-  const [{ data: scores }, { data: sites }] = await Promise.all([
+  const probationIds = (probationRows ?? []).map((review) => review.id);
+  const siteIds = [...new Set([
+    ...(assignments ?? []).map((assignment) => assignment.site_id),
+    ...(probationRows ?? []).flatMap((review) => review.site_id ? [review.site_id] : []),
+  ])];
+  const actorIds = [...new Set([
+    ...(probationRows ?? []).flatMap((review) => review.finalised_by ? [review.finalised_by] : []),
+    ...(overrideRows ?? []).flatMap((override) => [override.created_by, override.revoked_by].filter((id): id is string => Boolean(id))),
+  ])];
+  const [{ data: scores }, { data: sites }, { data: actors }, evidenceByReview] = await Promise.all([
     reviewIds.length ? supabase.from("one_to_one_scores").select("review_id, area, score").in("review_id", reviewIds) : Promise.resolve({ data: [] }),
     siteIds.length ? supabase.from("sites").select("id, name").in("id", siteIds) : Promise.resolve({ data: [] }),
+    actorIds.length ? supabase.from("profiles").select("id, full_name").in("id", actorIds) : Promise.resolve({ data: [] }),
+    getEvidenceFiles("probation_review", probationIds),
   ]);
+
   const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const actorMap = new Map((actors ?? []).map((profile) => [profile.id, profile.full_name]));
   const siteMap = new Map((sites ?? []).map((site) => [site.id, site.name]));
   const assignmentMap = new Map((assignments ?? []).map((assignment) => [assignment.manager_profile_id, assignment.site_id]));
   const reviewsByManager = new Map<string, Array<{ id: string; week_commencing: string }>>();
@@ -238,6 +306,47 @@ export async function getProbationSummaries(today = new Date().toISOString().sli
     scoresByReview.set(row.review_id, current);
   }
 
+  const probationByManager = new Map<string, ProbationReviewRecord[]>();
+  for (const row of probationRows ?? []) {
+    const current = probationByManager.get(row.manager_profile_id) ?? [];
+    current.push({
+      id: row.id,
+      managerProfileId: row.manager_profile_id,
+      siteId: row.site_id,
+      siteName: row.site_id ? siteMap.get(row.site_id) ?? "Kitchen" : "No kitchen recorded",
+      reviewDate: row.review_date,
+      reviewStage: row.review_stage as ProbationReviewStage,
+      status: row.status as "draft" | "finalised",
+      outcome: row.outcome as ProbationOutcome,
+      extensionEndDate: row.extension_end_date,
+      notes: row.notes,
+      requiredActions: row.required_actions,
+      scoreSnapshot: numberOrNull(row.score_snapshot),
+      ragSnapshot: row.rag_snapshot as Rag | null,
+      finalisedAt: row.finalised_at,
+      finalisedByName: row.finalised_by ? actorMap.get(row.finalised_by) ?? "Group management" : null,
+      evidence: evidenceByReview[row.id] ?? [],
+    });
+    probationByManager.set(row.manager_profile_id, current);
+  }
+
+  const overrideHistoryByManager = new Map<string, RagOverrideRecord[]>();
+  for (const row of overrideRows ?? []) {
+    const current = overrideHistoryByManager.get(row.entity_id) ?? [];
+    current.push({
+      id: row.id,
+      calculatedRag: row.calculated_rag as Rag,
+      overrideRag: row.override_rag as Rag,
+      reason: row.reason,
+      createdByName: row.created_by ? actorMap.get(row.created_by) ?? "Group management" : "Group management",
+      createdAt: row.created_at,
+      revokedAt: row.revoked_at,
+      revokedByName: row.revoked_by ? actorMap.get(row.revoked_by) ?? "Group management" : null,
+      revokeReason: row.revoke_reason ?? "",
+    });
+    overrideHistoryByManager.set(row.entity_id, current);
+  }
+
   return details.map((detail) => {
     const managerReviews = reviewsByManager.get(detail.profile_id) ?? [];
     const latest = managerReviews[0] ?? null;
@@ -249,21 +358,30 @@ export async function getProbationSummaries(today = new Date().toISOString().sli
     const weightedScore = weightedProbationScore(
       SCORE_AREAS.map((area) => ({ score: latestScores[area], weight: weights[area] })),
     );
+    const calculatedRag = scoreRag(weightedScore);
+    const overrideHistory = overrideHistoryByManager.get(detail.profile_id) ?? [];
+    const activeOverride = overrideHistory.find((override) => !override.revokedAt) ?? null;
     const stage = detail.employment_start_date ? probationStage(detail.employment_start_date, today) : null;
-    const siteId = assignmentMap.get(detail.profile_id);
+    const siteId = assignmentMap.get(detail.profile_id) ?? null;
     return {
       managerId: detail.profile_id,
       fullName: profileMap.get(detail.profile_id) ?? "Manager",
       roleTitle: detail.role_title,
+      siteId,
       siteName: siteId ? siteMap.get(siteId) ?? "Kitchen" : "Not currently assigned",
       employmentStartDate: detail.employment_start_date,
       probationEndDate: detail.probation_end_date,
       stage,
       stageLabel: stage ? probationStageLabel[stage] : "Start date not set",
       weightedScore,
+      calculatedRag,
+      displayRag: activeOverride?.overrideRag ?? calculatedRag,
+      activeOverride,
+      overrideHistory,
       reviewCount: managerReviews.length,
       latestReviewDate: latest?.week_commencing ?? null,
       weights,
+      probationReviews: probationByManager.get(detail.profile_id) ?? [],
     };
   });
 }

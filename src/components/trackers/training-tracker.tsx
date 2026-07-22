@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { Download, Plus } from "lucide-react";
 import { saveTrainingRecord, type TrackerActionState } from "@/app/actions/trackers";
+import { EvidencePanel } from "@/components/evidence/evidence-panel";
 import type { TrackerSite, TrainingRecord } from "@/lib/data/trackers";
 import { isActionOverdue } from "@/lib/performance/scoring";
 import { formatDate } from "@/lib/utils";
@@ -79,7 +80,7 @@ export function TrainingTracker({ canEdit, records, sites, weekEnd, weekStart }:
         <button className="button button--secondary performance-filters__export" onClick={exportCsv} type="button"><Download aria-hidden="true" size={15} /> Export CSV</button>
         {canEdit ? <button className="button button--primary performance-filters__export" onClick={() => { setEditing(null); setAdding(true); }} type="button"><Plus aria-hidden="true" size={15} /> Record training</button> : null}
       </div>
-      {(adding || editing) ? <TrainingForm editing={editing} key={editing?.id ?? "new"} onDone={() => { setAdding(false); setEditing(null); }} sites={sites} /> : null}
+      {(adding || editing) ? <div className="tracker-editor"><TrainingForm editing={editing} key={editing?.id ?? "new"} onDone={() => { setAdding(false); setEditing(null); }} sites={sites} />{editing ? <EvidencePanel canEdit={canEdit} description="Attach observation sheets, photographs, quizzes or signed competency evidence." entityId={editing.id} entityType="training_record" files={editing.evidence} recommendedType="training_evidence" title="Training evidence" /> : <div className="privacy-callout">Save the training record first, then reopen it to attach sign-off or competency evidence.</div>}</div> : null}
       <div className="table-scroll"><table className="data-table"><thead><tr><th>Team member</th><th>Kitchen</th><th>Date</th><th>Topic</th><th>Result</th><th>Follow-up</th><th>Signed off</th></tr></thead><tbody>{filtered.map((item) => { const overdue = item.followUpRequired && !item.signedOff && isActionOverdue(item.followUpDate, "in_progress", today); return <tr key={item.id}><td>{canEdit ? <button className="link-button" onClick={() => { setAdding(false); setEditing(item); }} type="button"><strong>{item.teamMember}</strong></button> : <strong>{item.teamMember}</strong>}{item.method ? <div className="data-table__subtext">{item.method}</div> : null}</td><td>{item.siteName}</td><td>{formatDate(item.trainingDate)}</td><td>{item.topic}</td><td>{item.result || "—"}</td><td>{item.followUpRequired ? <span className={`rag-chip rag-chip--${item.signedOff ? "green" : overdue ? "red" : "amber"}`}>{item.signedOff ? "Done" : overdue ? `Overdue · ${formatDate(item.followUpDate ?? "")}` : formatDate(item.followUpDate ?? "")}</span> : "—"}</td><td>{item.signedOff ? <span className="rag-chip rag-chip--green">{item.signedOffDate ? formatDate(item.signedOffDate) : "Yes"}{item.signedOffByName ? ` · ${item.signedOffByName}` : ""}</span> : <span className="rag-chip rag-chip--neutral">Not yet</span>}</td></tr>; })}</tbody></table>{!filtered.length ? <div className="empty-inline">No training records match these filters yet.{canEdit ? " Record the first session to start the log." : ""}</div> : null}</div>
     </>
   );
