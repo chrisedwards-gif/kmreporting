@@ -31,6 +31,14 @@ const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
 type Slot = { start: number; end: number; weight: number; required: number };
 type ShiftPattern = { start: number; end: number; requiredSkill: string | null; layer: number };
 type StaffState = { profile: RotaStaffProfile; assignedMinutes: number; shifts: SuggestedShift[] };
+type CandidateOption = {
+  state: StaffState;
+  adjacent: SuggestedShift | null;
+  start: number;
+  end: number;
+  breakMinutes: number;
+  paidMinutes: number;
+};
 
 function ruleForDate(rules: RotaDayRule[], date: string) {
   return rules.find((rule) => rule.weekday === weekday(date));
@@ -196,12 +204,19 @@ function consecutiveDays(state: StaffState, date: string) {
   return longest;
 }
 
-function restAllows(state: StaffState, startIso: string, endIso: string, minimumRestHours: number, existing: ExistingStaffShift[]) {
+function restAllows(
+  state: StaffState,
+  startIso: string,
+  endIso: string,
+  minimumRestHours: number,
+  existing: ExistingStaffShift[],
+  excludedShift: SuggestedShift | null = null,
+) {
   const proposedStart = new Date(startIso).getTime();
   const proposedEnd = new Date(endIso).getTime();
   const minimumRestMs = minimumRestHours * 3_600_000;
   const all = [
-    ...state.shifts.map((shift) => ({ start: shift.shiftStart, end: shift.shiftEnd })),
+    ...state.shifts.filter((shift) => shift !== excludedShift).map((shift) => ({ start: shift.shiftStart, end: shift.shiftEnd })),
     ...existing.filter((shift) => shift.staffProfileId === state.profile.id).map((shift) => ({ start: shift.shiftStart, end: shift.shiftEnd })),
   ];
   return all.every((shift) => {
@@ -213,7 +228,19 @@ function restAllows(state: StaffState, startIso: string, endIso: string, minimum
   });
 }
 
-function candidateScore(state: StaffState, date: string, start: number, end: number, requiredSkill: string | null) {
+function criticalSkillCounts(dayRules: RotaDayRule[], staff: RotaStaffProfile[]) {
+  const required = new Set(dayRules.flatMap((rule) => rule.requiredSkills.map(normaliseSkill)));
+  return new Map([...required].map((skill) => [skill, staff.filter((profile) => profileHasSkill(profile, skill)).length]));
+}
+
+function candidateScore(
+  state: StaffState,
+  date: string,
+  start: number,
+  end: number,
+  requiredSkill: string | null,
+  scarceSkills: Map<string, number>,
+) {
   const profile = state.profile;
   const hours = state.assignedMinutes / 60;
   const targetGap = Math.max(0, profile.targetWeeklyHours - hours);
@@ -225,12 +252,55 @@ function candidateScore(state: StaffState, date: string, start: number, end: num
   if (profile.preferredStart && start >= timeToMinutes(profile.preferredStart)) score += 4;
   if (profile.preferredEnd && end <= timeToMinutes(profile.preferredEnd)) score += 4;
   if (requiredSkill && profileHasSkill(profile, requiredSkill)) score += 30;
+  if (!requiredSkill) {
+    for (const [skill, count] of scarceSkills) {
+      if (profileHasSkill(profile, skill)) score -= count === 1 ? 250 : count === 2 ? 60 : 0;
+    }
+  }
   if (profile.payBasis === "salaried") score += 8;
   if (end >= 21 * 60) score -= closes * 5;
   if ([0, 6].includes(weekday(date))) score -= weekends * 3;
   score -= state.shifts.length * 1.5;
   score -= Math.min(12, profile.loadedHourlyRate / 3);
   return score;
+}
+
+function adjacentShift(state: StaffState, date: string, start: number, end: number) {
+  return state.shifts.find((shift) => {
+    if (shift.shiftStart.slice(0, 10) !== date) return false;
+    const shiftStart = timeToMinutes(shift.shiftStart.slice(11, 16));
+    const shiftEnd = timeToMinutes(shift.shiftEnd.slice(11, 16));
+    return shiftEnd === start || shiftStart === end;
+  }) ?? null;
+}
+
+function candidateOption(
+  state: StaffState,
+  pattern: ShiftPattern,
+  date: string,
+  minimumRestHours: number,
+  existing: ExistingStaffShift[],
+): CandidateOption | null {
+  const profile = state.profile;
+  const patternDuration = pattern.end - pattern.start;
+  const patternBreak = patternDuration >= 6 * 60 ? 30 : 0;
+  const adjacent = adjacentShift(state, date, pattern.start, pattern.end);
+  const start = adjacent ? Math.min(pattern.start, timeToMinutes(adjacent.shiftStart.slice(11, 16))) : pattern.start;
+  const end = adjacent ? Math.max(pattern.end, timeToMinutes(adjacent.shiftEnd.slice(11, 16))) : pattern.end;
+  const duration = end - start;
+  const breakMinutes = adjacent ? adjacent.breakMinutes + patternBreak : patternBreak;
+  const paidMinutes = duration - breakMinutes;
+  const projectedMinutes = state.assignedMinutes - (adjacent?.paidMinutes ?? 0) + paidMinutes;
+  const startIso = dateTime(date, start);
+  const endIso = dateTime(date, end);
+
+  if (duration < profile.minimumShiftMinutes || duration > profile.maximumShiftMinutes) return null;
+  if (projectedMinutes > profile.maximumWeeklyHours * 60) return null;
+  if (!profileHasSkill(profile, pattern.requiredSkill)) return null;
+  if (!availabilityAllows(profile, date, start, end)) return null;
+  if (consecutiveDays(state, date) > profile.maximumConsecutiveDays) return null;
+  if (!restAllows(state, startIso, endIso, minimumRestHours, existing, adjacent)) return null;
+  return { state, adjacent, start, end, breakMinutes, paidMinutes };
 }
 
 function rejectionReason(states: StaffState[], pattern: ShiftPattern, date: string, minimumRestHours: number, existing: ExistingStaffShift[]) {
@@ -241,7 +311,7 @@ function rejectionReason(states: StaffState[], pattern: ShiftPattern, date: stri
   if (!skilled.length && pattern.requiredSkill) return `No active team member has the required ${pattern.requiredSkill} skill.`;
   const lengthEligible = skilled.filter((state) => duration >= state.profile.minimumShiftMinutes && duration <= state.profile.maximumShiftMinutes);
   if (!lengthEligible.length) return "No eligible person can work this shift length.";
-  const hoursEligible = lengthEligible.filter((state) => state.assignedMinutes + paidMinutes <= state.profile.maximumWeeklyHours * 60);
+  const hoursEligible = lengthEligible.filter((state) => state.assignedMinutes + paidMinutes <= state.profile.maximumWeeklyHours * 60 || adjacentShift(state, date, pattern.start, pattern.end));
   if (!hoursEligible.length) return "Every eligible person would exceed their maximum weekly hours.";
   const available = hoursEligible.filter((state) => availabilityAllows(state.profile, date, pattern.start, pattern.end));
   if (!available.length) return "No eligible person is available for the full shift window.";
@@ -258,39 +328,32 @@ function assignPatterns(input: {
   states: StaffState[];
   existing: ExistingStaffShift[];
   minimumRestHours: number;
+  scarceSkills: Map<string, number>;
 }) {
   const shifts: SuggestedShift[] = [];
   const warnings: string[] = [];
   for (const pattern of input.patterns) {
-    const duration = pattern.end - pattern.start;
-    const breakMinutes = duration >= 6 * 60 ? 30 : 0;
-    const paidMinutes = duration - breakMinutes;
-    const startIso = dateTime(input.date, pattern.start);
-    const endIso = dateTime(input.date, pattern.end);
-    const candidates = input.states.filter((state) => {
-      const profile = state.profile;
-      return duration >= profile.minimumShiftMinutes
-        && duration <= profile.maximumShiftMinutes
-        && state.assignedMinutes + paidMinutes <= profile.maximumWeeklyHours * 60
-        && profileHasSkill(profile, pattern.requiredSkill)
-        && availabilityAllows(profile, input.date, pattern.start, pattern.end)
-        && consecutiveDays(state, input.date) <= profile.maximumConsecutiveDays
-        && restAllows(state, startIso, endIso, input.minimumRestHours, input.existing);
-    }).sort((a, b) => candidateScore(b, input.date, pattern.start, pattern.end, pattern.requiredSkill) - candidateScore(a, input.date, pattern.start, pattern.end, pattern.requiredSkill)
-      || a.profile.staffName.localeCompare(b.profile.staffName));
+    const options = input.states
+      .map((state) => candidateOption(state, pattern, input.date, input.minimumRestHours, input.existing))
+      .filter((option): option is CandidateOption => Boolean(option))
+      .sort((a, b) => candidateScore(b.state, input.date, pattern.start, pattern.end, pattern.requiredSkill, input.scarceSkills)
+        - candidateScore(a.state, input.date, pattern.start, pattern.end, pattern.requiredSkill, input.scarceSkills)
+        || a.state.profile.staffName.localeCompare(b.state.profile.staffName));
 
-    const selected = candidates[0];
+    const selected = options[0];
     if (!selected) {
       const reason = rejectionReason(input.states, pattern, input.date, input.minimumRestHours, input.existing);
+      const duration = pattern.end - pattern.start;
+      const breakMinutes = duration >= 6 * 60 ? 30 : 0;
       warnings.push(`Unfilled ${minutesToTime(pattern.start)}–${minutesToTime(pattern.end)}${pattern.requiredSkill ? ` (${pattern.requiredSkill})` : ""}. ${reason}`);
       shifts.push({
         staffProfileId: null,
         staffName: "Unfilled shift",
         roleTitle: pattern.requiredSkill ?? "Cover required",
-        shiftStart: startIso,
-        shiftEnd: endIso,
+        shiftStart: dateTime(input.date, pattern.start),
+        shiftEnd: dateTime(input.date, pattern.end),
         breakMinutes,
-        paidMinutes,
+        paidMinutes: duration - breakMinutes,
         requiredSkill: pattern.requiredSkill,
         assignmentReason: reason,
         payBasis: "unfilled",
@@ -299,46 +362,64 @@ function assignPatterns(input: {
       continue;
     }
 
-    const profile = selected.profile;
-    const privateCost = profile.payBasis === "hourly" ? profile.loadedHourlyRate * paidMinutes / 60 : 0;
+    const profile = selected.state.profile;
+    if (selected.adjacent) {
+      const oldPaid = selected.adjacent.paidMinutes;
+      selected.adjacent.shiftStart = dateTime(input.date, selected.start);
+      selected.adjacent.shiftEnd = dateTime(input.date, selected.end);
+      selected.adjacent.breakMinutes = selected.breakMinutes;
+      selected.adjacent.paidMinutes = selected.paidMinutes;
+      selected.adjacent.requiredSkill = selected.adjacent.requiredSkill ?? pattern.requiredSkill;
+      selected.adjacent.privateCost = profile.payBasis === "hourly" ? profile.loadedHourlyRate * selected.paidMinutes / 60 : 0;
+      selected.adjacent.assignmentReason = `Combined adjacent cover · ${roundHours(selected.state.assignedMinutes - oldPaid + selected.paidMinutes)}h projected this week`;
+      selected.state.assignedMinutes += selected.paidMinutes - oldPaid;
+      continue;
+    }
+
+    const privateCost = profile.payBasis === "hourly" ? profile.loadedHourlyRate * selected.paidMinutes / 60 : 0;
     const reason = [
       profile.preferredDays.includes(weekday(input.date)) ? "preferred day" : "available day",
       pattern.requiredSkill ? `${pattern.requiredSkill} cover` : profile.roleTitle || profile.primaryRole,
-      `${roundHours(selected.assignedMinutes + paidMinutes)}h projected this week`,
+      `${roundHours(selected.state.assignedMinutes + selected.paidMinutes)}h projected this week`,
     ].filter(Boolean).join(" · ");
     const shift: SuggestedShift = {
       staffProfileId: profile.id,
       staffName: profile.staffName,
       roleTitle: profile.roleTitle || profile.primaryRole,
-      shiftStart: startIso,
-      shiftEnd: endIso,
-      breakMinutes,
-      paidMinutes,
+      shiftStart: dateTime(input.date, selected.start),
+      shiftEnd: dateTime(input.date, selected.end),
+      breakMinutes: selected.breakMinutes,
+      paidMinutes: selected.paidMinutes,
       requiredSkill: pattern.requiredSkill,
       assignmentReason: reason,
       payBasis: profile.payBasis,
       privateCost,
     };
-    selected.assignedMinutes += paidMinutes;
-    selected.shifts.push(shift);
+    selected.state.assignedMinutes += selected.paidMinutes;
+    selected.state.shifts.push(shift);
     shifts.push(shift);
   }
   return { shifts, warnings };
 }
 
-function rebalanceMinimumHours(states: StaffState[], existing: ExistingStaffShift[], minimumRestHours: number) {
+function rebalanceHours(
+  states: StaffState[],
+  existing: ExistingStaffShift[],
+  minimumRestHours: number,
+  floorFor: (profile: RotaStaffProfile) => number,
+) {
   const recipients = [...states].sort((a, b) => {
-    const gapA = Math.max(0, a.profile.minimumWeeklyHours * 60 - a.assignedMinutes);
-    const gapB = Math.max(0, b.profile.minimumWeeklyHours * 60 - b.assignedMinutes);
+    const gapA = Math.max(0, floorFor(a.profile) * 60 - a.assignedMinutes);
+    const gapB = Math.max(0, floorFor(b.profile) * 60 - b.assignedMinutes);
     return gapB - gapA;
   });
 
   for (const recipient of recipients) {
     let guard = 0;
-    while (recipient.assignedMinutes + 1 < recipient.profile.minimumWeeklyHours * 60 && guard < 100) {
+    while (recipient.assignedMinutes + 1 < floorFor(recipient.profile) * 60 && guard < 100) {
       guard += 1;
       const candidates = states.flatMap((donor) => donor === recipient ? [] : donor.shifts.map((shift) => ({ donor, shift })))
-        .filter(({ donor, shift }) => donor.assignedMinutes - shift.paidMinutes >= donor.profile.minimumWeeklyHours * 60)
+        .filter(({ donor, shift }) => donor.assignedMinutes - shift.paidMinutes >= floorFor(donor.profile) * 60)
         .filter(({ shift }) => {
           const date = shift.shiftStart.slice(0, 10);
           const start = timeToMinutes(shift.shiftStart.slice(11, 16));
@@ -353,8 +434,8 @@ function rebalanceMinimumHours(states: StaffState[], existing: ExistingStaffShif
             && restAllows(recipient, shift.shiftStart, shift.shiftEnd, minimumRestHours, existing);
         })
         .sort((a, b) => {
-          const donorSurplusA = a.donor.assignedMinutes - a.donor.profile.targetWeeklyHours * 60;
-          const donorSurplusB = b.donor.assignedMinutes - b.donor.profile.targetWeeklyHours * 60;
+          const donorSurplusA = a.donor.assignedMinutes - floorFor(a.donor.profile) * 60;
+          const donorSurplusB = b.donor.assignedMinutes - floorFor(b.donor.profile) * 60;
           return donorSurplusB - donorSurplusA || a.shift.paidMinutes - b.shift.paidMinutes;
         });
 
@@ -416,11 +497,13 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     .filter((staff) => staff.payBasis === "salaried")
     .map((staff) => staff.targetWeeklyHours * staff.costAllocationPct / 100)) / tradingDayCount;
   const committedWeeklyHours = sum(input.staff.map((staff) => staff.minimumWeeklyHours * staff.costAllocationPct / 100));
+  const targetWeeklyHours = sum(input.staff.map((staff) => staff.targetWeeklyHours * staff.costAllocationPct / 100));
   const hourlyStaff = input.staff.filter((staff) => staff.payBasis === "hourly" && staff.loadedHourlyRate > 0);
   const blendedHourlyRate = hourlyStaff.length ? sum(hourlyStaff.map((staff) => staff.loadedHourlyRate)) / hourlyStaff.length : 0;
   const states: StaffState[] = input.staff.map((profile) => ({ profile, assignedMinutes: 0, shifts: [] }));
   const existing = input.existingShifts ?? [];
   const days: RotaPlanDay[] = [];
+  const scarceSkills = criticalSkillCounts(input.dayRules, input.staff);
 
   for (const forecast of forecasts) {
     const rule = ruleForDate(input.dayRules, forecast.businessDate);
@@ -435,14 +518,17 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     const demandAndBudgetHours = Math.min(productivityHours, costAffordableHours);
     const forecastShare = tradingForecastSales > 0 ? forecast.forecastSales / tradingForecastSales : 1 / tradingDayCount;
     const committedDailyHours = committedWeeklyHours * forecastShare;
-    const effectiveHours = Math.max(demandAndBudgetHours, committedDailyHours);
+    const targetDailyHours = targetWeeklyHours * forecastShare;
+    const affordableTargetHours = Math.min(targetDailyHours, costAffordableHours);
+    const effectivePaidHours = Math.max(demandAndBudgetHours, committedDailyHours, affordableTargetHours);
+    const effectiveCoverageHours = effectivePaidHours * 1.08;
     const slots = coverageTargets(
       demandForDay(input.demand, weekday(forecast.businessDate), open, close, intervalMinutes),
       rule,
-      effectiveHours,
+      effectiveCoverageHours,
     );
     const patterns = patternsFromCoverage(slots, rule, input.staff, intervalMinutes);
-    const assigned = assignPatterns({ date: forecast.businessDate, patterns, states, existing, minimumRestHours });
+    const assigned = assignPatterns({ date: forecast.businessDate, patterns, states, existing, minimumRestHours, scarceSkills });
     const coverage = coverageActual(slots, assigned.shifts);
     const peak = [...slots].sort((a, b) => b.weight - a.weight)[0];
     const dayWarnings = [...assigned.warnings];
@@ -467,8 +553,9 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
         baseForecast: forecast.baseForecast,
         eventUpliftPct: forecast.eventUpliftPct,
         salesPerLabourHourTarget,
-        targetStaffHours: Math.round(effectiveHours * 100) / 100,
+        targetStaffHours: Math.round(effectivePaidHours * 100) / 100,
         committedHoursFloor: Math.round(committedDailyHours * 100) / 100,
+        preferredHoursFloor: Math.round(affordableTargetHours * 100) / 100,
         salariedCoverageHours: Math.round(salariedDailyHours * 100) / 100,
         controllableHourlyHours: Math.round(controllableHourlyHours * 100) / 100,
         demandSource: input.demand.some((point) => point.weekday === weekday(forecast.businessDate) && point.source === "hourly_sales") ? "hourly sales" : "editable day-part template",
@@ -478,7 +565,8 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     });
   }
 
-  rebalanceMinimumHours(states, existing, minimumRestHours);
+  rebalanceHours(states, existing, minimumRestHours, (profile) => profile.minimumWeeklyHours);
+  rebalanceHours(states, existing, minimumRestHours, (profile) => profile.targetWeeklyHours);
 
   for (const day of days) {
     const hourlyCost = sum(day.shifts.map((shift) => shift.privateCost));
@@ -495,6 +583,8 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     const hours = state.assignedMinutes / 60;
     if (hours + 0.01 < state.profile.minimumWeeklyHours) {
       planWarnings.push(`${state.profile.staffName} is ${roundHours(state.profile.minimumWeeklyHours * 60 - state.assignedMinutes)}h below their agreed minimum hours.`);
+    } else if (hours + 1 < state.profile.targetWeeklyHours) {
+      planWarnings.push(`${state.profile.staffName} is ${roundHours(state.profile.targetWeeklyHours * 60 - state.assignedMinutes)}h below their target hours.`);
     }
     if (hours > state.profile.maximumWeeklyHours + 0.01) {
       planWarnings.push(`${state.profile.staffName} exceeds their configured maximum weekly hours.`);
@@ -518,7 +608,7 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     plannedHours: Math.round(sum(days.map((day) => day.plannedHours)) * 100) / 100,
     accuracyMape,
     confidence,
-    explanation: `Forecast uses up to ${forecastWeeks} matching weekdays with recent weeks weighted most heavily; ${within}. The planner first protects minimum cover and agreed hours, then places extra cover into the busiest periods. Long generic coverage blocks are split into practical shifts before staff are assigned within availability, rest, skill and weekly-hour limits.`,
+    explanation: `Forecast uses up to ${forecastWeeks} matching weekdays with recent weeks weighted most heavily; ${within}. The planner protects scarce management skills for the shifts that require them, plans toward agreed target hours where the labour budget permits, combines adjacent cover into practical shifts and then balances assignments within availability, rest, skill and weekly-hour limits.`,
     warnings: [...new Set(planWarnings)],
     days,
   };
