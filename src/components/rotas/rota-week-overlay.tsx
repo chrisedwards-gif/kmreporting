@@ -1,3 +1,5 @@
+import "./rota-builder-accessibility.css";
+
 export {
   RotaWeekBuilder as RotaWeekOverlay,
   type RotaWeekBuilderProps as RotaWeekOverlayProps,
