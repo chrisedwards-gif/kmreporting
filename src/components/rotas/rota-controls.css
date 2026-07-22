@@ -1,0 +1,66 @@
+.rota-launchbar__ready {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+}
+
+.rota-launchbar__ready > svg {
+  color: #2d7a62;
+  margin-top: 2px;
+}
+
+.rota-launchbar__ready span {
+  display: grid;
+  gap: 3px;
+}
+
+.rota-launchbar__ready small {
+  color: var(--muted);
+}
+
+.rota-launchbar__starter-tools {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.rota-launchbar__starter-tools summary {
+  align-items: center;
+  color: #375f50;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: .78rem;
+  font-weight: 750;
+  gap: 6px;
+}
+
+.rota-launchbar__starter-tools > div {
+  background: #f8faf9;
+  border: 1px solid #dce5e1;
+  border-radius: 10px;
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.rota-launchbar__starter-tools p {
+  color: var(--muted);
+  font-size: .78rem;
+  margin: 0 0 10px;
+}
+
+.rota-launchbar__starter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rota-launchbar__warning {
+  align-items: flex-start;
+  background: #fff6e8;
+  border: 1px solid #ecd2a1;
+  border-radius: 8px;
+  color: #7c5612 !important;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
