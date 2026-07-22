@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: set -o pipefail; npm test 2>&1 | tee unit-test.log
       - name: Install isolated Playwright runner
-        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0 @axe-core/playwright@4.11.3
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Walk Admin, Kitchen Manager and Viewer personas
