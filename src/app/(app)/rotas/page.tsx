@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { RotaControls } from "@/components/rotas/rota-controls";
 import { RotaCopilot } from "@/components/rotas/rota-copilot";
+import { RotaWeekFeedbackStrip } from "@/components/rotas/rota-week-feedback";
 import { RotaWeekOverlay } from "@/components/rotas/rota-week-overlay";
 import "@/components/rotas/rota-workspace.module.css";
 import { requireSessionProfile } from "@/lib/auth/dal";
@@ -20,6 +21,7 @@ import {
   type RotaBuilderMetadata,
 } from "@/lib/data/rota-builder";
 import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
+import { getRotaWeekFeedback } from "@/lib/data/rota-week-feedback";
 import { environment } from "@/lib/env";
 import { getExternalRotaSignals } from "@/lib/rota/external-signals";
 import { addDays } from "@/lib/rota/forecasting";
@@ -92,6 +94,15 @@ export default async function RotasPage({
         builderMetadata,
       )
     : null;
+  const weekFeedback = plan && site && plan.id !== "demo-plan"
+    ? await getRotaWeekFeedback({
+        organisationId: profile.organisationId,
+        siteId: site.id,
+        profileId: profile.id,
+        weekStart: plan.weekStart,
+        weekEnd: plan.weekEnd,
+      })
+    : [];
   const visibleStaff = visibleRotaStaff(workspace.staff);
   const staffTargets = visibleStaff.map((staff) => ({
     id: staff.id,
@@ -146,9 +157,9 @@ export default async function RotasPage({
           <p className="page-header__eyebrow">People and labour</p>
           <h1>Build next week’s rota with the forecast beside you</h1>
           <p>
-            Work in the same Monday-to-Sunday pattern your managers already know.
-            KM Reporting adds sales demand, cover, agreed hours, weather, events and
-            management checks before the rota is copied into RotaCloud.
+            The kitchen manager chooses every shift. KM Reporting supplies demand,
+            heat maps, agreed-hours checks, labour guidance, a rota score and AI
+            challenge before the approved week is copied into RotaCloud.
           </p>
         </div>
         <nav aria-label="Rota tools" className="rota-page-header__links">
@@ -157,7 +168,7 @@ export default async function RotasPage({
               className="button button--secondary"
               href={`/rotas/feedback?site=${site.id}`}
             >
-              <MessageSquareText aria-hidden="true" size={16} /> Shift feedback
+              <MessageSquareText aria-hidden="true" size={16} /> Feedback history
             </Link>
           ) : null}
           {canManageTeam ? (
@@ -259,6 +270,12 @@ export default async function RotasPage({
 
           {plan ? (
             <>
+              <RotaCopilot
+                initialReview={null}
+                plan={plan}
+                signals={signals}
+                staffTargets={staffTargets}
+              />
               <RotaWeekOverlay
                 financeVisibility={financeVisibility}
                 key={`${plan.id}-${plan.plannedHours}-${plan.plannedCost}`}
@@ -268,11 +285,10 @@ export default async function RotasPage({
                 siteId={site.id}
                 staff={visibleStaff}
               />
-              <RotaCopilot
-                initialReview={null}
-                plan={plan}
-                signals={signals}
-                staffTargets={staffTargets}
+              <RotaWeekFeedbackStrip
+                days={plan.days.map((day) => day.businessDate)}
+                feedback={weekFeedback}
+                siteId={site.id}
               />
             </>
           ) : (
@@ -280,8 +296,8 @@ export default async function RotasPage({
               <CalendarClock aria-hidden="true" size={30} />
               <h2>No rota draft exists for this week yet</h2>
               <p>
-                Create the forecast-led starting point, then add and edit shifts in
-                the weekly grid before copying the approved rota into RotaCloud.
+                Start a blank forecast-led week, then let the kitchen manager add
+                each shift using the heat map and cover guidance.
               </p>
             </section>
           )}
