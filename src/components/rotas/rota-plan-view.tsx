@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Download, Info, RotateCcw, ShieldCheck, SlidersHorizontal, UsersRound } from "lucide-react";
 import type { StoredRotaPlan } from "@/lib/data/rotas";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import "./rota-workspace.module.css";
 
 const formatTime = (value: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }).format(new Date(value));
 const dayName = (value: string) => new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
