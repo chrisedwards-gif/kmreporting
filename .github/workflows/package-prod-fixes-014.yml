@@ -1,9 +1,8 @@
 name: Package production fixes 014 source
 
 on:
-  push:
-    branches:
-      - agent/prod-fixes-014-management-integrity
+  pull_request:
+    branches: [main]
     paths:
       - '.github/workflows/package-prod-fixes-014.yml'
 
