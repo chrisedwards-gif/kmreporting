@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
 import { environment } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -25,6 +26,7 @@ export type SopRecord = {
   version: number;
   documentLink: string;
   notes: string;
+  evidence: EvidenceFile[];
 };
 
 export type TrainingRecord = {
@@ -42,6 +44,7 @@ export type TrainingRecord = {
   signedOffDate: string | null;
   signedOffByName: string;
   notes: string;
+  evidence: EvidenceFile[];
 };
 
 export type TrackerSite = { id: string; name: string };
@@ -66,7 +69,10 @@ export async function getSops(): Promise<SopRecord[]> {
     .order("due_date", { ascending: true, nullsFirst: false });
   if (error || !data?.length) return [];
   const siteIds = [...new Set(data.map((row) => row.site_id))];
-  const { data: sites } = await supabase.from("sites").select("id, name").in("id", siteIds);
+  const [{ data: sites }, evidenceBySop] = await Promise.all([
+    supabase.from("sites").select("id, name").in("id", siteIds),
+    getEvidenceFiles("sop", data.map((row) => row.id)),
+  ]);
   const siteNames = new Map((sites ?? []).map((site) => [site.id, site.name]));
   return data.map((row) => ({
     id: row.id,
@@ -83,6 +89,7 @@ export async function getSops(): Promise<SopRecord[]> {
     version: Number(row.version),
     documentLink: row.document_link,
     notes: row.notes,
+    evidence: evidenceBySop[row.id] ?? [],
   }));
 }
 
@@ -98,12 +105,13 @@ export async function getTrainingRecords(): Promise<TrainingRecord[]> {
   if (error || !data?.length) return [];
   const siteIds = [...new Set(data.map((row) => row.site_id))];
   const signerIds = [...new Set(data.flatMap((row) => row.signed_off_by ? [row.signed_off_by] : []))];
-  const [{ data: sites }, { data: signers }] = await Promise.all([
+  const [siteResult, signerResult, evidenceByRecord] = await Promise.all([
     supabase.from("sites").select("id, name").in("id", siteIds),
     signerIds.length ? supabase.from("profiles").select("id, full_name").in("id", signerIds) : Promise.resolve({ data: [] }),
+    getEvidenceFiles("training_record", data.map((row) => row.id)),
   ]);
-  const siteNames = new Map((sites ?? []).map((site) => [site.id, site.name]));
-  const signerNames = new Map((signers ?? []).map((profile) => [profile.id, profile.full_name]));
+  const siteNames = new Map((siteResult.data ?? []).map((site) => [site.id, site.name]));
+  const signerNames = new Map((signerResult.data ?? []).map((profile) => [profile.id, profile.full_name]));
   return data.map((row) => ({
     id: row.id,
     siteId: row.site_id,
@@ -119,5 +127,6 @@ export async function getTrainingRecords(): Promise<TrainingRecord[]> {
     signedOffDate: row.signed_off_date,
     signedOffByName: row.signed_off_by ? signerNames.get(row.signed_off_by) ?? "Manager" : "",
     notes: row.notes,
+    evidence: evidenceByRecord[row.id] ?? [],
   }));
 }

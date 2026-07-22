@@ -1,6 +1,6 @@
 begin;
 
-select plan(24);
+select plan(35);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -14,6 +14,32 @@ select has_table('public', 'training_records', 'Training tracker exists');
 select has_table('public', 'waste_log_entries', 'Daily waste log exists');
 select has_table('public', 'management_email_settings', 'Weekly management email settings exist');
 select has_table('payroll_private', 'salary_allocations', 'Private salary allocations exist');
+select has_table('public', 'evidence_files', 'Private evidence register exists');
+select has_table('public', 'rag_overrides', 'Audited RAG override register exists');
+select has_table('public', 'probation_reviews', 'Probation decision records exist');
+select ok(
+  exists (select 1 from storage.buckets where id = 'management-evidence' and public = false),
+  'Management evidence bucket is private'
+);
+select ok(
+  to_regprocedure('public.set_rag_override(text,uuid,text,text,text,text)') is not null,
+  'RAG override RPC exists'
+);
+select ok(
+  to_regprocedure('public.revoke_rag_override(uuid,text)') is not null,
+  'RAG override removal RPC exists'
+);
+select ok(
+  to_regprocedure('public.save_probation_review(jsonb)') is not null,
+  'Probation draft RPC exists'
+);
+select ok(
+  to_regprocedure('public.finalise_probation_review(uuid,jsonb,numeric,text)') is not null,
+  'Probation finalisation RPC exists'
+);
+select has_column('public', 'product_development_items', 'method_text', 'Product method is stored');
+select has_column('public', 'product_development_items', 'shelf_life_text', 'Product shelf-life control is stored');
+select has_column('public', 'product_development_items', 'operational_plan', 'Product operational plan is stored');
 
 select ok(
   to_regprocedure('public.save_weekly_report_v2(jsonb)') is not null,
