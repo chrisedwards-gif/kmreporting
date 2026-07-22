@@ -1,13 +1,13 @@
 .rota-week-cell__add {
-  background: rgba(255, 255, 255, .7);
-  border-color: #c7d2cd;
-  color: #4d5d56;
-  opacity: 1;
+  background: rgba(255, 255, 255, .7) !important;
+  border-color: #c7d2cd !important;
+  color: #4d5d56 !important;
+  opacity: 1 !important;
 }
 
 .rota-week-cell__add:hover,
 .rota-week-cell__add:focus-visible {
-  background: #fff;
-  border-color: #6f8f82;
-  color: #234d3e;
+  background: #fff !important;
+  border-color: #6f8f82 !important;
+  color: #234d3e !important;
 }
