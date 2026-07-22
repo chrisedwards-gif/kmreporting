@@ -120,12 +120,12 @@ export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
             return <div className="app-shell__nav-section" key={section.heading ?? index}>{section.heading ? <div className="app-shell__nav-heading">{section.heading}</div> : null}{visibleItems.map(({ href, icon: Icon, label }) => { const active = pathname === href || pathname.startsWith(`${href}/`); return <Link className={classNames("app-shell__nav-link", active && "app-shell__nav-link--active")} href={href} key={href} onClick={() => setNavOpen(false)}><Icon aria-hidden="true" size={18} />{label}</Link>; })}</div>;
           })}
         </nav>
-        <div className="app-shell__profile"><div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.isAccessPreview ? `Viewing ${user.previewSiteName ?? "kitchen"} as Kitchen Manager` : `${roleLabel(user.actualRole)} · scoped access`}</div></div><form action={signOut}><button aria-label="Sign out" className="app-shell__signout" title="Sign out" type="submit"><LogOut aria-hidden="true" size={16} /></button></form></div></div>
+        <div className="app-shell__profile"><div className="app-shell__profile-copy"><div><div className="app-shell__profile-name">{user.fullName}</div><div className="app-shell__profile-role">{user.isAccessPreview ? `Admin site mode · ${user.previewSiteName ?? "kitchen"}` : `${roleLabel(user.actualRole)} · scoped access`}</div></div><form action={signOut}><button aria-label="Sign out" className="app-shell__signout" title="Sign out" type="submit"><LogOut aria-hidden="true" size={16} /></button></form></div></div>
       </aside>
       <div className="app-shell__main">
         <header className="app-shell__topbar">
           <button aria-label={navOpen ? "Close navigation" : "Open navigation"} className="app-shell__mobile-button" onClick={() => setNavOpen((value) => !value)} type="button">{navOpen ? <X size={22} /> : <Menu size={22} />}</button>
-          <div className="app-shell__context">{user.isAccessPreview ? `${user.previewSiteName} · Kitchen Manager workspace` : "Group reporting · Europe/London"}</div>
+          <div className={classNames("app-shell__context", user.isAccessPreview && "app-shell__context--site-mode")}>{user.isAccessPreview ? `Admin site mode · ${user.previewSiteName} · mirrors ${user.previewManagerName ?? "Kitchen Manager"}` : "Group reporting · Europe/London"}</div>
           <div className="app-shell__topbar-status">
             {user.capabilities.admin ? <AccessPreviewControls previewManagerName={user.previewManagerName} previewSiteId={user.previewSiteId} previewSiteName={user.previewSiteName} sites={previewSites} /> : null}
             <LiveReportingStatus isDemo={isDemo} />

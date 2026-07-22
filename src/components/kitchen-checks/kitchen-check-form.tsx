@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { AlertTriangle, Check, Save, Send, ShieldAlert } from "lucide-react";
 import { saveKitchenCheck, type KitchenCheckActionState } from "@/app/actions/kitchen-checks";
+import { ActionToast } from "@/components/ui/action-toast";
 import type { KitchenCheckDetail, KitchenCheckRating, KitchenCheckResponse } from "@/lib/data/kitchen-checks";
 
 const initialState: KitchenCheckActionState = { status: "idle", message: "" };
@@ -40,8 +41,9 @@ export function KitchenCheckForm({ detail, forceReadOnly = false }: { detail: Ki
 
   return (
     <form action={formAction} className="check-form">
+      <ActionToast errorTitle="Kitchen check could not be saved" state={state} successTitle="Kitchen check saved" />
       <input name="payload" type="hidden" value={payload} />
-      {forceReadOnly ? <div className="privacy-callout">Preview mode is read-only. Ratings, evidence and corrective actions shown here are the saved manager record.</div> : null}
+      {forceReadOnly ? <div className="privacy-callout">This completed check is read-only. Ratings, evidence and corrective actions shown here are the saved manager record.</div> : null}
       <section className={`check-scoreboard check-scoreboard--${summary.result}`}><div><span>Live score</span><strong>{summary.percentage.toFixed(1)}%</strong><small>{summary.score} / {summary.max} points</small></div><div><span>Progress</span><strong>{summary.answered} / {allItems.length}</strong><small>checks rated</small></div><div><span>Issues</span><strong>{summary.issues}</strong><small>Amber or Red</small></div><div><span>Result</span><strong>{summary.result.replaceAll("_", " ")}</strong><small>{summary.criticalFail ? "Critical Red — automatic fail" : `Pass ≥ ${detail.passThreshold}%`}</small></div></section>
       {summary.criticalFail ? <div className="critical-warning"><ShieldAlert aria-hidden="true" size={18} /><strong>Critical failure:</strong> at least one food-safety item is Red. It must be fixed immediately and assigned as an action.</div> : null}
       {detail.sections.map((section) => {

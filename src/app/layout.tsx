@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-page-custom-font -- App Router root layout applies globally. */
 import type { Metadata } from "next";
 import { AuthFragmentGuard } from "@/components/auth-fragment-guard";
+import { ToastProvider } from "@/components/ui/toast-provider";
 import "./globals.css";
 import "./uat006.css";
 import "./uat008.css";
@@ -16,6 +17,7 @@ import "./prod-fixes-008.css";
 import "./prod-fixes-009.css";
 import "./prod-fixes-011.css";
 import "./prod-fixes-012.css";
+import "./prod-fixes-013.css";
 
 export const metadata: Metadata = {
   title: { default: "HOS Kitchen Reports", template: "%s · HOS Kitchen Reports" },
@@ -31,8 +33,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <AuthFragmentGuard />
-        {children}
+        <ToastProvider>
+          <AuthFragmentGuard />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

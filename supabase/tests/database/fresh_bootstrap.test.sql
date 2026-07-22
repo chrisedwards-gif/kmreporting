@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(24);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -22,6 +22,10 @@ select ok(
 select ok(
   to_regprocedure('public.save_one_to_one(jsonb)') is not null,
   '1-1 draft save RPC exists'
+);
+select ok(
+  position('isNew' in pg_get_functiondef('public.save_one_to_one(jsonb)'::regprocedure)) > 0,
+  '1-1 autosave uses idempotent client-generated action IDs'
 );
 select ok(
   to_regprocedure('public.save_kitchen_check(jsonb)') is not null,
