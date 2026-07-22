@@ -1,0 +1,33 @@
+name: Apply production fixes 014
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-prod-fixes-014.yml'
+      - '.github/patches/prod-fixes-014.part00'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply management integrity release
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/patches/prod-fixes-014.part00 | gzip --decompress > /tmp/prod-fixes-014.patch
+          git apply --check /tmp/prod-fixes-014.patch
+          git apply /tmp/prod-fixes-014.patch
+          git add --all
+          git config user.name 'hos-release-bot'
+          git config user.email 'hos-release-bot@users.noreply.github.com'
+          git commit -m 'Production fixes 014 — management integrity'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
