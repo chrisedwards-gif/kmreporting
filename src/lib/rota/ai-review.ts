@@ -7,7 +7,7 @@ import type { ExternalRotaSignals } from "@/lib/rota/external-signals";
 type StaffTarget = { id: string; name: string; minimumHours: number; targetHours: number; maximumHours: number };
 
 export async function getRotaAiReview(plan: StoredRotaPlan | null, signals: ExternalRotaSignals, staffTargets: StaffTarget[]) {
-  if (!plan || !environment.openaiApiKey || !environment.openaiModel) return null;
+  if (!plan || !environment.aiApiKey || !environment.aiProvider) return null;
 
   const staffHours = staffTargets.map((staff) => ({
     name: staff.name,
@@ -42,14 +42,15 @@ export async function getRotaAiReview(plan: StoredRotaPlan | null, signals: Exte
   };
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch(`${environment.aiBaseUrl}/responses`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${environment.openaiApiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${environment.aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: environment.openaiModel,
+        model: environment.aiModel,
         instructions: "You are reviewing a restaurant kitchen rota suggestion. Never change or dismiss hard constraints. Give a concise operational review with: 1) top three risks, 2) hours/fairness concern, 3) weather or event consideration, 4) the single best manager action. Do not infer facts not present. Do not mention individual pay.",
         input: JSON.stringify(safePlan),
         max_output_tokens: 500,
+        ...(environment.aiProvider === "openai" ? { store: false } : {}),
       }),
       cache: "no-store",
     });
