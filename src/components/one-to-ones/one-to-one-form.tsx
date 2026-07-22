@@ -177,32 +177,37 @@ export function OneToOneForm({
     intent: "save",
   }), [actions, assignmentId, kpiManual, reviewDate, scores, summary, weekCommencing, wins]);
   const payloadRef = useRef(payload);
-  const lastSavedPayloadRef = useRef(payload);
+  const [lastSavedPayload, setLastSavedPayload] = useState(payload);
   const saveSequenceRef = useRef(0);
   const explicitSubmitRef = useRef(false);
   const explicitPayloadRef = useRef(payload);
   const [saveStatus, setSaveStatus] = useState<"idle" | "unsaved" | "saving" | "saved" | "error">(detail ? "saved" : "idle");
   const [savedAt, setSavedAt] = useState<Date | null>(detail ? new Date() : null);
-  payloadRef.current = payload;
+
+  useEffect(() => {
+    payloadRef.current = payload;
+  }, [payload]);
 
   useEffect(() => {
     if (state.status === "idle") return;
-    explicitSubmitRef.current = false;
-    if (state.status === "error") {
-      setSaveStatus("error");
-      return;
-    }
-    lastSavedPayloadRef.current = explicitPayloadRef.current;
-    setSaveStatus(payloadRef.current === explicitPayloadRef.current ? "saved" : "unsaved");
-    setSavedAt(new Date());
-    if (!state.reviewId) return;
-    if (!detail) router.replace(`/one-to-ones/${state.reviewId}`);
-    else router.refresh();
+    const timer = window.setTimeout(() => {
+      explicitSubmitRef.current = false;
+      if (state.status === "error") {
+        setSaveStatus("error");
+        return;
+      }
+      setLastSavedPayload(explicitPayloadRef.current);
+      setSaveStatus(payloadRef.current === explicitPayloadRef.current ? "saved" : "idle");
+      setSavedAt(new Date());
+      if (!state.reviewId) return;
+      if (!detail) router.replace(`/one-to-ones/${state.reviewId}`);
+      else router.refresh();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [detail, router, state.message, state.reviewId, state.status]);
 
   useEffect(() => {
-    if (!editable || pending || explicitSubmitRef.current || payload === lastSavedPayloadRef.current) return;
-    setSaveStatus("unsaved");
+    if (!editable || pending || explicitSubmitRef.current || payload === lastSavedPayload) return;
     const timer = window.setTimeout(async () => {
       const sentPayload = payload;
       const sequence = ++saveSequenceRef.current;
@@ -210,9 +215,9 @@ export function OneToOneForm({
       const result = await autosaveOneToOne(sentPayload);
       if (sequence !== saveSequenceRef.current) return;
       if (result.status === "success") {
-        lastSavedPayloadRef.current = sentPayload;
+        setLastSavedPayload(sentPayload);
         setSavedAt(new Date());
-        setSaveStatus(payloadRef.current === sentPayload ? "saved" : "unsaved");
+        setSaveStatus(payloadRef.current === sentPayload ? "saved" : "idle");
         if (!detail && result.reviewId && window.location.pathname.endsWith("/new")) {
           window.history.replaceState(window.history.state, "", `/one-to-ones/${result.reviewId}`);
         }
@@ -222,11 +227,11 @@ export function OneToOneForm({
       pushToast({ title: "Autosave failed", description: result.message, variant: "error", persistent: true });
     }, 1_500);
     return () => window.clearTimeout(timer);
-  }, [detail, editable, payload, pending, pushToast]);
+  }, [detail, editable, lastSavedPayload, payload, pending, pushToast]);
 
   useEffect(() => {
     if (!editable) return;
-    const hasUnsavedChanges = () => payloadRef.current !== lastSavedPayloadRef.current || saveStatus === "saving" || saveStatus === "error";
+    const hasUnsavedChanges = () => payload !== lastSavedPayload || saveStatus === "saving" || saveStatus === "error";
     const warning = "Your latest 1-1 changes have not been saved. Leave this page anyway?";
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (!hasUnsavedChanges()) return;
@@ -255,7 +260,7 @@ export function OneToOneForm({
       document.removeEventListener("click", blockInternalNavigation, true);
       window.removeEventListener("popstate", blockHistoryNavigation);
     };
-  }, [editable, saveStatus]);
+  }, [editable, lastSavedPayload, payload, saveStatus]);
 
   const email = buildFollowUpEmail({
     firstName: managerFirstName,
@@ -269,23 +274,28 @@ export function OneToOneForm({
 
   const gpRag = kpis.available ? foodGpKpi(kpis.foodGpPct, kpis.foodGpTarget).rag : "neutral";
   const labourRag = kpis.available ? labourKpi(kpis.labourPct, kpis.labourTarget).rag : "neutral";
-  const saveLabel = saveStatus === "saving"
+  const visibleSaveStatus = saveStatus === "saving" || saveStatus === "error"
+    ? saveStatus
+    : payload !== lastSavedPayload
+      ? "unsaved"
+      : saveStatus;
+  const saveLabel = visibleSaveStatus === "saving"
     ? "Saving changes…"
-    : saveStatus === "error"
+    : visibleSaveStatus === "error"
       ? "Autosave failed — use Save draft"
-      : saveStatus === "unsaved"
+      : visibleSaveStatus === "unsaved"
         ? "Changes waiting to save"
-        : saveStatus === "saved" && savedAt
+        : visibleSaveStatus === "saved" && savedAt
           ? `Saved at ${savedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
           : "Autosave starts when you edit";
-  const SaveStateIcon = saveStatus === "saving" ? LoaderCircle : saveStatus === "error" ? AlertTriangle : CheckCircle2;
-  const autosaveBusy = saveStatus === "saving";
+  const SaveStateIcon = visibleSaveStatus === "saving" ? LoaderCircle : visibleSaveStatus === "error" ? AlertTriangle : CheckCircle2;
+  const autosaveBusy = visibleSaveStatus === "saving";
 
   return (
     <form action={formAction} className="report-form" onSubmit={() => { explicitSubmitRef.current = true; explicitPayloadRef.current = payloadRef.current; setSaveStatus("saving"); }}>
       <input name="payload" type="hidden" value={payload} />
       <ActionToast errorTitle="1-1 could not be saved" state={state} successTitle="1-1 saved" />
-      {editable ? <div className={`one-to-one-save-state one-to-one-save-state--${saveStatus}`} role="status"><span className="one-to-one-save-state__status"><SaveStateIcon aria-hidden="true" className={saveStatus === "saving" ? "one-to-one-save-state__spinner" : undefined} size={16} /><strong>{saveLabel}</strong></span><small>Drafts save automatically after 1.5 seconds of inactivity.</small></div> : null}
+      {editable ? <div className={`one-to-one-save-state one-to-one-save-state--${visibleSaveStatus}`} role="status"><span className="one-to-one-save-state__status"><SaveStateIcon aria-hidden="true" className={visibleSaveStatus === "saving" ? "one-to-one-save-state__spinner" : undefined} size={16} /><strong>{saveLabel}</strong></span><small>Drafts save automatically after 1.5 seconds of inactivity.</small></div> : null}
 
       <section className="form-section">
         <div className="form-section__heading">
