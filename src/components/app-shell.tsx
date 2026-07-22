@@ -34,14 +34,30 @@ type NavSection = { heading?: string; items: NavItem[] };
 
 const groupNavigation: NavSection[] = [
   {
+    heading: "This week",
     items: [
       { href: "/dashboard", label: "Overview", icon: BarChart3 },
       { href: "/reports", label: "Weekly reports", icon: ClipboardList },
       { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
+    ],
+  },
+  {
+    heading: "Operations",
+    items: [
       { href: "/workspace", label: "Kitchen workspace", icon: ChefHat, roles: ["admin", "group_manager"] },
       { href: "/people", label: "People & performance", icon: UsersRound, roles: ["admin", "group_manager"] },
+    ],
+  },
+  {
+    heading: "Finance",
+    items: [
       { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
       { href: "/costs", label: "Cost control", icon: LockKeyhole, roles: ["admin", "group_manager", "finance"] },
+    ],
+  },
+  {
+    heading: "Manage",
+    items: [
       { href: "/admin", label: "Administration", icon: Settings2, roles: ["admin", "group_manager"] },
     ],
   },

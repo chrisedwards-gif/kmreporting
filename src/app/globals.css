@@ -102,8 +102,14 @@ a {
 }
 
 .app-shell__nav {
+  align-content: start;
   display: grid;
+  flex: 1 1 auto;
   gap: 0.35rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .app-shell__nav-link {
