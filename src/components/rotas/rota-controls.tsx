@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, LoaderCircle, Sparkles } from "lucide-react";
+import { CalendarPlus, LoaderCircle, RefreshCw } from "lucide-react";
 import {
   generateRotaSuggestion,
   saveRotaForecastEvent,
@@ -50,12 +50,12 @@ export function RotaControls({
   }, [eventState.status, generateState.status, router]);
 
   const buildProgress = buildSeconds < 3
-    ? "Loading sales, team and availability…"
+    ? "Refreshing sales history, demand and team constraints…"
     : buildSeconds < 8
-      ? "Balancing cover, skills and agreed hours…"
+      ? "Recalculating recommended cover and agreed hours…"
       : buildSeconds < 20
-        ? "Checking the full week and saving a new version…"
-        : "This is taking longer than expected. Your existing rota remains safe; wait a little longer or refresh and try again.";
+        ? "Saving the latest planning overlay…"
+        : "This is taking longer than expected. Your RotaCloud rota is untouched; wait a little longer or refresh and try again.";
 
   return (
     <section className="rota-launchbar panel">
@@ -64,17 +64,27 @@ export function RotaControls({
           <input name="siteId" type="hidden" value={siteId} />
           <input name="weekStart" type="hidden" value={weekStart} />
           <button className="button button--primary" disabled={generating} type="submit">
-            {generating ? <LoaderCircle aria-hidden="true" className="rota-copilot__spinner" size={16} /> : <Sparkles aria-hidden="true" size={16} />}
+            {generating ? (
+              <LoaderCircle aria-hidden="true" className="rota-copilot__spinner" size={16} />
+            ) : (
+              <RefreshCw aria-hidden="true" size={16} />
+            )}
             {generating
-              ? "Building the rota…"
+              ? "Refreshing overlay…"
               : hasPlan
-                ? "Rebuild suggestion"
-                : "Build this week’s rota"}
+                ? "Refresh planning overlay"
+                : "Create planning overlay"}
           </button>
         </form>
         <div className="rota-launchbar__copy">
-          <strong>{hasPlan ? "The current suggestion stays available until the new one is ready." : "We will create a safe starting rota for you."}</strong>
-          <small>Uses expected sales, hourly demand, availability, skills and agreed hours.</small>
+          <strong>
+            {hasPlan
+              ? "Your current overlay stays visible until the refreshed one is ready."
+              : "Create a forecast and staffing guide for the week."}
+          </strong>
+          <small>
+            This does not create, edit or publish shifts in RotaCloud.
+          </small>
         </div>
         {generating ? (
           <p aria-live="polite" className="form-message" role="status">
@@ -92,7 +102,9 @@ export function RotaControls({
       </div>
 
       <details className="rota-launchbar__event">
-        <summary><CalendarPlus aria-hidden="true" size={16} /> Add a special event or busy day</summary>
+        <summary>
+          <CalendarPlus aria-hidden="true" size={16} /> Add a special event or busy day
+        </summary>
         <form action={eventAction} className="rota-launchbar__event-form">
           <input name="siteId" type="hidden" value={siteId} />
           <label className="field">
