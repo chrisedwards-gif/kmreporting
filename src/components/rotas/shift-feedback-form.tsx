@@ -33,6 +33,11 @@ const causes = [
   ["stayed_late", "Someone stayed late"],
 ] as const;
 
+const checkboxStyle = {
+  alignItems: "center",
+  gridTemplateColumns: "auto minmax(0, 1fr)",
+} as const;
+
 export function ShiftFeedbackForm({
   siteId,
   businessDate,
@@ -48,12 +53,12 @@ export function ShiftFeedbackForm({
   }, [router, state.status]);
 
   return (
-    <form action={action} className="panel stack">
+    <form action={action} className="form-section stack">
       <input name="siteId" type="hidden" value={siteId} />
       <div>
         <p className="page-header__eyebrow">30-second learning loop</p>
         <h2>How did the shift feel?</h2>
-        <p>Use operational judgement. The system will compare this with actual sales, scheduled hours and worked hours rather than treating the note as fact on its own.</p>
+        <p className="form-section__copy">Use operational judgement. The system compares this with actual sales, scheduled hours and worked hours rather than treating one note as fact.</p>
       </div>
 
       <label className="field">
@@ -74,9 +79,9 @@ export function ShiftFeedbackForm({
 
       <fieldset className="field">
         <legend className="field__label">Affected period</legend>
-        <div className="checkbox-grid">
+        <div className="form-grid form-grid--three">
           {periods.map(([value, label]) => (
-            <label className="checkbox-field" key={value}>
+            <label className="field" key={value} style={checkboxStyle}>
               <input name="affectedPeriods" type="checkbox" value={value} />
               <span>{label}</span>
             </label>
@@ -86,9 +91,9 @@ export function ShiftFeedbackForm({
 
       <fieldset className="field">
         <legend className="field__label">What influenced it?</legend>
-        <div className="checkbox-grid">
+        <div className="form-grid form-grid--three">
           {causes.map(([value, label]) => (
-            <label className="checkbox-field" key={value}>
+            <label className="field" key={value} style={checkboxStyle}>
               <input name="causes" type="checkbox" value={value} />
               <span>{label}</span>
             </label>
@@ -111,7 +116,7 @@ export function ShiftFeedbackForm({
         </label>
       </div>
 
-      <div className="form-grid form-grid--two">
+      <div className="form-grid">
         <label className="field">
           <span className="field__label">Service impact</span>
           <select className="field__input" defaultValue="none" name="serviceImpact" required>
