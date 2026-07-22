@@ -16,6 +16,10 @@ const quickLoginEmail = process.env.UAT_QUICK_LOGIN_EMAIL?.trim().toLowerCase();
 const quickLoginPassword = process.env.UAT_QUICK_LOGIN_PASSWORD;
 const canonicalOrigin = process.env.UAT_CANONICAL_ORIGIN?.trim().replace(/\/$/, "");
 const demoRequested = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const numberFromEnv = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 export const environment = {
   // Production must fail closed when Supabase is misconfigured. Demo mode is
@@ -44,4 +48,10 @@ export const environment = {
   resendFromEmail: process.env.RESEND_FROM_EMAIL?.trim(),
   resendReplyTo: process.env.RESEND_REPLY_TO?.trim(),
   rotacloudApiKey: process.env.ROTACLOUD_API_KEY?.trim(),
+  rotaWeatherLatitude: numberFromEnv(process.env.ROTA_WEATHER_LATITUDE, 53.4808),
+  rotaWeatherLongitude: numberFromEnv(process.env.ROTA_WEATHER_LONGITUDE, -2.2426),
+  rotaEventsCity: process.env.ROTA_EVENTS_CITY?.trim() || "Manchester",
+  ticketmasterApiKey: process.env.TICKETMASTER_API_KEY?.trim(),
+  openaiApiKey: process.env.OPENAI_API_KEY?.trim(),
+  openaiModel: process.env.OPENAI_MODEL?.trim(),
 };
