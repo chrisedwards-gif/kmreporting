@@ -32,10 +32,7 @@ export function RotaControls({
   const router = useRouter();
 
   useEffect(() => {
-    if (!generating) {
-      setBuildSeconds(0);
-      return;
-    }
+    if (!generating) return;
     const started = Date.now();
     const timer = window.setInterval(() => {
       setBuildSeconds(Math.floor((Date.now() - started) / 1000));
@@ -63,7 +60,12 @@ export function RotaControls({
         <form action={generateAction}>
           <input name="siteId" type="hidden" value={siteId} />
           <input name="weekStart" type="hidden" value={weekStart} />
-          <button className="button button--primary" disabled={generating} type="submit">
+          <button
+            className="button button--primary"
+            disabled={generating}
+            onClick={() => setBuildSeconds(0)}
+            type="submit"
+          >
             {generating ? (
               <LoaderCircle aria-hidden="true" className="rota-copilot__spinner" size={16} />
             ) : (
