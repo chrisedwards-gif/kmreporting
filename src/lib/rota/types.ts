@@ -89,6 +89,14 @@ export type SuggestedShift = {
   assignmentReason: string;
   payBasis: "hourly" | "salaried" | "unfilled";
   privateCost: number;
+  note?: string;
+};
+
+export type RotaPlanMark = {
+  staffProfileId: string;
+  businessDate: string;
+  markType: "day_off" | "unavailable" | "leave" | "training";
+  note: string;
 };
 
 export type RotaPlanDay = {
