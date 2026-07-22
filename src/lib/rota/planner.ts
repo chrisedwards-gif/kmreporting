@@ -249,7 +249,7 @@ function assignPatterns(input: {
       requiredSkill: pattern.requiredSkill,
       assignmentReason: reason,
       payBasis: profile.payBasis,
-      privateCost: privateCost,
+      privateCost,
     };
     selected.assignedMinutes += paidMinutes;
     selected.shifts.push(shift);
@@ -294,10 +294,11 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
   const tradingDayCount = forecasts.filter((day) => ruleForDate(input.dayRules, day.businessDate)?.trading).length || 1;
   const fixedWeeklyCost = sum(input.staff.map((staff) => staff.fixedWeeklyCost * staff.costAllocationPct / 100));
   const fixedDailyCost = fixedWeeklyCost / tradingDayCount;
+  const salariedDailyHours = sum(input.staff
+    .filter((staff) => staff.payBasis === "salaried")
+    .map((staff) => staff.targetWeeklyHours * staff.costAllocationPct / 100)) / tradingDayCount;
   const hourlyStaff = input.staff.filter((staff) => staff.payBasis === "hourly" && staff.loadedHourlyRate > 0);
   const blendedHourlyRate = hourlyStaff.length ? sum(hourlyStaff.map((staff) => staff.loadedHourlyRate)) / hourlyStaff.length : 0;
-  const costedStaff = input.staff.filter((staff) => staff.loadedHourlyRate > 0);
-  const blendedLoadedRate = costedStaff.length ? sum(costedStaff.map((staff) => staff.loadedHourlyRate)) / costedStaff.length : blendedHourlyRate;
   const states: StaffState[] = input.staff.map((profile) => ({ profile, assignedMinutes: 0, shifts: [] }));
   const existing = input.existingShifts ?? [];
   const days: RotaPlanDay[] = [];
@@ -311,7 +312,8 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     const labourBudget = forecast.forecastSales * input.labourTargetPct / 100;
     const controllableBudget = Math.max(0, labourBudget - fixedDailyCost);
     const productivityHours = forecast.forecastSales / salesPerLabourHourTarget;
-    const costAffordableHours = blendedLoadedRate > 0 ? labourBudget / blendedLoadedRate : productivityHours;
+    const controllableHourlyHours = blendedHourlyRate > 0 ? controllableBudget / blendedHourlyRate : 0;
+    const costAffordableHours = salariedDailyHours + controllableHourlyHours;
     const effectiveHours = Math.min(productivityHours, costAffordableHours);
     const slots = coverageTargets(
       demandForDay(input.demand, weekday(forecast.businessDate), open, close, intervalMinutes),
@@ -350,6 +352,8 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
         eventUpliftPct: forecast.eventUpliftPct,
         salesPerLabourHourTarget,
         targetStaffHours: Math.round(effectiveHours * 100) / 100,
+        salariedCoverageHours: Math.round(salariedDailyHours * 100) / 100,
+        controllableHourlyHours: Math.round(controllableHourlyHours * 100) / 100,
         demandSource: input.demand.some((point) => point.weekday === weekday(forecast.businessDate) && point.source === "hourly_sales") ? "hourly sales" : "editable day-part template",
       },
       warnings: dayWarnings,
@@ -382,7 +386,7 @@ export function buildRotaPlan(input: RotaPlanningInput): RotaPlan {
     plannedHours: Math.round(sum(days.map((day) => day.plannedHours)) * 100) / 100,
     accuracyMape,
     confidence,
-    explanation: `Forecast uses up to ${forecastWeeks} matching weekdays with recent weeks weighted most heavily; ${within}. Coverage follows the site day-part curve, then named shifts are assigned within availability, rest, skill and weekly-hour limits.`,
+    explanation: `Forecast uses up to ${forecastWeeks} matching weekdays with recent weeks weighted most heavily; ${within}. Coverage follows the site day-part curve, then named shifts are assigned within availability, rest, skill and weekly-hour limits. Fixed salaried cover is separated from the controllable hourly budget.`,
     warnings: [...new Set(planWarnings)],
     days,
   };
