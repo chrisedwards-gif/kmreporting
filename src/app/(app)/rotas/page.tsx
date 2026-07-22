@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarClock, DatabaseZap, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, DatabaseZap, MessageSquareText, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { RotaControls } from "@/components/rotas/rota-controls";
 import { RotaPlanView } from "@/components/rotas/rota-plan-view";
 import { requireSessionProfile } from "@/lib/auth/dal";
@@ -35,7 +35,10 @@ export default async function RotasPage({ searchParams }: { searchParams: Promis
     <>
       <header className="page-header">
         <div><p className="page-header__eyebrow">Forecast · cover · people</p><h1 className="page-header__title">Rota intelligence.</h1><p className="page-header__copy">Turn dated sales, labour targets and private staff constraints into a one-click rota suggestion—with every assumption visible.</p></div>
-        <div className="page-header__actions">{canManageTeam ? <><Link className="button button--secondary" href={site ? `/rotas/settings?site=${site.id}` : "/rotas/settings"}><Settings2 aria-hidden="true" size={16} /> Calibrate site</Link><Link className="button button--secondary" href="/rotas/team"><UsersRound aria-hidden="true" size={16} /> Staff profiles</Link></> : null}</div>
+        <div className="page-header__actions">
+          {site ? <Link className="button button--secondary" href={`/rotas/feedback?site=${site.id}`}><MessageSquareText aria-hidden="true" size={16} /> Shift feedback</Link> : null}
+          {canManageTeam ? <><Link className="button button--secondary" href={site ? `/rotas/settings?site=${site.id}` : "/rotas/settings"}><Settings2 aria-hidden="true" size={16} /> Calibrate site</Link><Link className="button button--secondary" href="/rotas/team"><UsersRound aria-hidden="true" size={16} /> Staff profiles</Link></> : null}
+        </div>
       </header>
 
       <form className="rota-filters panel" method="get">
