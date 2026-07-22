@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle } from "lucide-react";
 import { saveWasteEntry, type WasteActionState } from "@/app/actions/waste";
+import { ActionToast } from "@/components/ui/action-toast";
 
 const initialState: WasteActionState = { status: "idle", message: "" };
 
@@ -20,6 +21,7 @@ export function WasteEntryForm({ sites, today }: { sites: Array<{ id: string; na
 
   return (
     <form action={action} className="report-form" ref={formRef}>
+      <ActionToast errorTitle="Waste could not be logged" state={state} successTitle="Waste logged" />
       <div className="form-grid form-grid--three">
         <label className="field"><span className="field__label">Kitchen</span><select className="field__input" name="siteId" required>{sites.map((site) => <option key={site.id} value={site.id}>{site.name} · {site.code}</option>)}</select></label>
         <label className="field"><span className="field__label">Waste date</span><input className="field__input" defaultValue={today} max={today} name="businessDate" required type="date" /></label>

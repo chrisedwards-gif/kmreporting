@@ -26,7 +26,8 @@ const scoreSchema = z.object({
 });
 
 const actionItemSchema = z.object({
-  id: z.string().default(""),
+  id: z.union([z.string().uuid(), z.literal("")]).default(""),
+  isNew: z.boolean().default(false),
   priority: z.enum(["high", "medium", "low"]),
   action: z.string().max(500),
   successMeasure: z.string().max(500).default(""),
@@ -46,6 +47,7 @@ const reviewSchema = z.object({
   summary: z.record(z.string(), z.string().max(4000)),
   scores: z.array(scoreSchema),
   actions: z.array(actionItemSchema).max(7, "A weekly 1-1 holds at most seven agreed actions."),
+  saveMode: z.enum(["manual", "autosave"]).default("manual"),
   intent: z.enum(["save", "finalise"]),
 });
 
@@ -241,9 +243,24 @@ export async function saveOneToOne(
     return { status: "success", message: deliveryMessage, reviewId };
   }
 
-  revalidatePath("/one-to-ones");
-  revalidatePath(`/one-to-ones/${reviewId}`);
-  return { status: "success", message: "Draft saved. You can leave this page and continue it from Manager 1-1s.", reviewId };
+  if (input.saveMode !== "autosave") {
+    revalidatePath("/one-to-ones");
+    revalidatePath(`/one-to-ones/${reviewId}`);
+  }
+  return { status: "success", message: input.saveMode === "autosave" ? "Draft autosaved." : "Draft saved. You can leave this page and continue it from Manager 1-1s.", reviewId };
+}
+
+export async function autosaveOneToOne(payload: string): Promise<OneToOneActionState> {
+  let autosavePayload = payload;
+  try {
+    autosavePayload = JSON.stringify({ ...JSON.parse(payload), saveMode: "autosave" });
+  } catch {
+    return { status: "error", message: "The autosave payload is invalid." };
+  }
+  const formData = new FormData();
+  formData.set("payload", autosavePayload);
+  formData.set("intent", "save");
+  return saveOneToOne({ status: "idle", message: "" }, formData);
 }
 
 export async function acknowledgeOneToOne(formData: FormData) {

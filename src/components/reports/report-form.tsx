@@ -17,6 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import { saveWeeklyReport, type ReportActionState } from "@/app/actions/reports";
+import { ActionToast } from "@/components/ui/action-toast";
 import {
   normaliseSiteName,
   parseCreditsOverview,
@@ -324,6 +325,7 @@ export function ReportForm({
 
   return (
     <form action={formAction} className="report-form">
+      <ActionToast errorTitle="Report could not be saved" state={state} successTitle="Report saved" />
       {initial ? <div className="form-message form-message--success" role="status"><CheckCircle2 aria-hidden="true" size={15} />Draft restored. Review the totals and confirmations before submitting.</div> : null}
       {browserDraftRestored ? <div className="form-message form-message--success" role="status"><CheckCircle2 aria-hidden="true" size={15} />Your unsaved browser draft has been restored. Raw upload files are not retained, but their extracted totals and confirmations are.</div> : null}
       <input name="salesSource" type="hidden" value={salesSource.mode} />

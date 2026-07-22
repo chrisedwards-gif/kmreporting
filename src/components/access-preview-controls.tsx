@@ -24,11 +24,10 @@ export function AccessPreviewControls({
         <div className="access-preview__copy">
           <Eye aria-hidden="true" size={15} />
           <span>
-            <strong>Viewing Kitchen Manager workspace</strong>
-            {previewSiteName ? ` · ${previewSiteName}` : ""}
-            {previewManagerName ? ` · ${previewManagerName}` : " · no primary manager assigned"}
+            <span className="access-preview__mode-label">Admin site mode</span><strong>{previewSiteName ?? "Kitchen"}</strong>
+            {previewManagerName ? ` · mirroring ${previewManagerName}` : " · no primary manager assigned"}
           </span>
-          <small>The navigation and data match the manager view; your Admin write powers remain available.</small>
+          <small>You see only this Kitchen Manager workspace. Full Admin edit rights remain available.</small>
         </div>
         <form action={startAccessPreview} className="access-preview__switcher">
           <label className="sr-only" htmlFor="preview-site-switch">View another kitchen</label>
@@ -49,7 +48,7 @@ export function AccessPreviewControls({
       <Eye aria-hidden="true" size={15} />
       <label className="sr-only" htmlFor="preview-site">View a Kitchen Manager workspace</label>
       <select defaultValue="" id="preview-site" name="siteId" required>
-        <option disabled value="">View as Kitchen Manager…</option>
+        <option disabled value="">Open Admin site mode…</option>
         {sites.map((site) => <option key={site.id} value={site.id}>{site.name}{site.active ? "" : " · inactive"}</option>)}
       </select>
       <button className="access-preview__button" type="submit">View</button>
