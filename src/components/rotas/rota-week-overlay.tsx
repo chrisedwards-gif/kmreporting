@@ -321,7 +321,16 @@ export function RotaWeekOverlay({
               <span>
                 <small>Break plan</small>
                 <strong>{selectedBreaks.filter((item) => item.startTime).length} suggested windows</strong>
-                <p>{selectedBreaks.filter((item) => item.startTime).slice(0, 3).map((item) => `${item.staffName} ${item.startTime}–${item.endTime}`).join(" · ") || "No break suggestion is required or a safe window needs manager judgement."}</p>
+                <p>
+                  {selectedBreaks
+                    .filter((item) => item.startTime)
+                    .slice(0, 3)
+                    .map((item) => {
+                      const shift = selectedDay.shifts[item.shiftIndex];
+                      return `${shift?.staffName ?? "Team member"} ${item.startTime}–${item.endTime}`;
+                    })
+                    .join(" · ") || "No break suggestion is required or a safe window needs manager judgement."}
+                </p>
               </span>
             </article>
           </div>
