@@ -1,0 +1,53 @@
+.operations-intelligence { display: grid; gap: 1rem; margin-top: 1rem; overflow: hidden; padding: 0; }
+.operations-intelligence__header { align-items: center; background: linear-gradient(135deg, #17362e, #24584a); color: white; display: grid; gap: 1rem; grid-template-columns: auto minmax(0, 1fr) auto; padding: 1.15rem 1.25rem; }
+.operations-intelligence__header h2 { color: white; font-size: 1.35rem; margin: .15rem 0 .3rem; }
+.operations-intelligence__header p { color: rgb(255 255 255 / 75%); font-size: .8rem; line-height: 1.5; margin: 0; max-width: 58rem; }
+.operations-intelligence__header .page-header__eyebrow { color: #cce8dd; }
+.operations-intelligence__score { align-items: baseline; background: rgb(255 255 255 / 12%); border: 1px solid rgb(255 255 255 / 22%); border-radius: 1rem; display: flex; min-width: 5.2rem; padding: .65rem .8rem; }
+.operations-intelligence__score span { font-size: 2rem; font-weight: 850; line-height: 1; }
+.operations-intelligence__score small { color: rgb(255 255 255 / 65%); font-size: .75rem; }
+.operations-intelligence__status { align-items: center; border-radius: 999px; display: inline-flex; font-size: .72rem; font-weight: 800; gap: .4rem; padding: .5rem .7rem; white-space: nowrap; }
+.operations-intelligence__status--good { background: #dff4e9; color: #205f48; }
+.operations-intelligence__status--watch { background: #fff0c9; color: #745016; }
+.operations-intelligence__status--risk { background: #ffe1da; color: #8a3428; }
+.operations-intelligence__grid { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 1rem; }
+.operations-insight { border: 1px solid var(--line); border-radius: .8rem; min-width: 0; overflow: hidden; }
+.operations-insight header { align-items: center; background: #f3f8f5; display: flex; gap: .45rem; padding: .7rem .8rem; }
+.operations-insight h3 { font-size: .86rem; margin: 0; }
+.operations-insight ul { display: grid; gap: .55rem; list-style: none; margin: 0; padding: .75rem .8rem .85rem; }
+.operations-insight li { color: var(--ink-700); font-size: .74rem; line-height: 1.45; padding-left: .9rem; position: relative; }
+.operations-insight li::before { background: var(--sage); border-radius: 999px; content: ""; height: .38rem; left: 0; position: absolute; top: .38rem; width: .38rem; }
+.operations-insight--risk header { background: #fff4f1; color: #8a3428; }
+.operations-insight--risk li::before { background: var(--red); }
+.operations-insight--action header { background: #fff8e8; color: #765116; }
+.operations-insight--action li::before { background: var(--amber); }
+.operations-intelligence__facts { display: flex; flex-wrap: wrap; gap: .55rem; padding: 0 1rem; }
+.operations-intelligence__facts span { align-items: center; background: #f7f5ef; border-radius: 999px; color: var(--ink-700); display: inline-flex; font-size: .7rem; gap: .4rem; padding: .42rem .62rem; }
+.operations-intelligence__facts strong { color: var(--ink); }
+.operations-intelligence__deep-review { border-top: 1px solid var(--line); margin: 0 1rem; padding: .8rem 0 0; }
+.operations-intelligence__deep-review summary { align-items: center; cursor: pointer; display: flex; font-size: .78rem; font-weight: 800; gap: .45rem; }
+.operations-intelligence__deep-review p { color: var(--ink-700); font-size: .76rem; line-height: 1.55; white-space: pre-wrap; }
+.rota-copilot { background: #f7f9f8; border-top: 1px solid var(--line); display: grid; gap: .8rem; padding: 1rem; }
+.rota-copilot__heading { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.rota-copilot__heading > div { align-items: center; display: flex; gap: .55rem; }
+.rota-copilot__heading strong, .rota-copilot__heading small { display: block; }
+.rota-copilot__heading strong { font-size: .9rem; }
+.rota-copilot__heading small { color: var(--ink-600); font-size: .68rem; margin-top: .1rem; }
+.rota-copilot__privacy { background: #e6f2ed; border-radius: 999px; color: #275f4e; font-size: .65rem; font-weight: 750; padding: .35rem .55rem; }
+.rota-copilot__suggestions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.rota-copilot__suggestions button { background: white; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-700); cursor: pointer; font: inherit; font-size: .7rem; padding: .42rem .65rem; }
+.rota-copilot__suggestions button:hover { border-color: var(--sage); color: var(--ink); }
+.rota-copilot__suggestions button:disabled { cursor: wait; opacity: .55; }
+.rota-copilot__conversation { display: grid; gap: .6rem; }
+.rota-copilot__conversation article { background: white; border: 1px solid var(--line); border-radius: .75rem; padding: .75rem .85rem; }
+.rota-copilot__conversation strong { display: block; font-size: .76rem; margin-bottom: .35rem; }
+.rota-copilot__conversation p { color: var(--ink-700); font-size: .75rem; line-height: 1.55; margin: 0; white-space: pre-wrap; }
+.rota-copilot__form { display: grid; gap: .35rem; }
+.rota-copilot__form > label { color: var(--ink-600); font-size: .66rem; font-weight: 750; }
+.rota-copilot__form > div { display: grid; gap: .5rem; grid-template-columns: 1fr auto; }
+.rota-copilot__form input { background: white; border: 1px solid var(--line); border-radius: .65rem; color: var(--ink); font: inherit; min-height: 2.7rem; padding: .65rem .75rem; }
+.rota-copilot__form input:focus { border-color: var(--sage); box-shadow: 0 0 0 3px rgb(45 122 98 / 12%); outline: 0; }
+.rota-copilot__spinner { animation: rota-copilot-spin .8s linear infinite; }
+@keyframes rota-copilot-spin { to { transform: rotate(360deg); } }
+@media (max-width: 950px) { .operations-intelligence__header { grid-template-columns: auto 1fr; } .operations-intelligence__status { grid-column: 1 / -1; justify-self: start; } .operations-intelligence__grid { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .operations-intelligence__header { align-items: start; grid-template-columns: 1fr; } .operations-intelligence__score { justify-self: start; } .rota-copilot__heading { align-items: flex-start; flex-direction: column; gap: .5rem; } .rota-copilot__form > div { grid-template-columns: 1fr; } .rota-copilot__form .button { width: 100%; } }
