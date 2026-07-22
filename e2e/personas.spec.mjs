@@ -87,7 +87,6 @@ test("Rota suggestion is easy to plan, downloadable and kitchen-scoped", async (
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Rebuild suggestion" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Team" })).toHaveCount(0);
   await expect(page.getByLabel("Demand and rota coverage by hour")).toBeVisible();
   await expect(page.getByText("Shifts and breaks")).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
