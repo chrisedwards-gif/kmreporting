@@ -24,22 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Run lint
-        id: lint
-        continue-on-error: true
-        shell: bash
-        run: set -o pipefail; npm run lint 2>&1 | tee lint.log
-      - name: Upload lint diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: uat-lint-log
-          path: lint.log
-          if-no-files-found: ignore
-          retention-days: 1
-      - name: Enforce lint result
-        if: steps.lint.outcome != 'success'
-        run: exit 1
+      - run: npm run lint
       - run: npm test
       - name: Build
         id: build
