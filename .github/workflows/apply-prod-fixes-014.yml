@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/apply-prod-fixes-014.yml'
-      - '.github/patches/prod-fixes-014.part00'
+      - '.github/patches/prod-fixes-014.part*'
 
 permissions:
   contents: write
@@ -23,7 +23,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode .github/patches/prod-fixes-014.part00 | gzip --decompress > /tmp/prod-fixes-014.patch
+          cat .github/patches/prod-fixes-014.part{00..09} \
+            | base64 --decode \
+            | gzip --decompress > /tmp/prod-fixes-014.patch
           git apply --check /tmp/prod-fixes-014.patch
           git apply /tmp/prod-fixes-014.patch
           git add --all
