@@ -1,0 +1,207 @@
+/* Production fixes 015 — submission clarity, reliable acknowledgements and command search. */
+
+.report-submission {
+  align-items: center;
+  display: flex;
+  gap: 0.85rem;
+}
+
+.report-submission--overview {
+  align-items: start;
+  background: color-mix(in srgb, var(--sage) 5%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--sage) 24%, var(--line));
+  border-radius: 0.85rem;
+  box-shadow: 0 8px 28px rgb(23 33 30 / 5%);
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(18rem, 1.25fr) auto;
+  padding: 1rem;
+}
+
+.report-submission__summary h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0.15rem 0 0;
+}
+
+.report-submission__summary > p:last-child {
+  color: var(--ink-600);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  margin: 0.35rem 0 0;
+}
+
+.report-submission__actions {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.report-submission--footer {
+  background: rgb(244 240 232 / 94%);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  bottom: 0.75rem;
+  box-shadow: var(--shadow);
+  padding: 0.75rem;
+  position: sticky;
+  z-index: 10;
+}
+
+.report-submission .form-checklist { margin-right: auto; }
+
+.manager-acknowledgement {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.manager-acknowledgement .field { margin: 0; }
+.manager-acknowledgement .button { justify-self: start; }
+
+.acknowledgement-record .panel__body p {
+  line-height: 1.65;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.command-trigger {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  color: var(--ink-600);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.72rem;
+  gap: 0.45rem;
+  margin-left: auto;
+  padding: 0.38rem 0.45rem 0.38rem 0.6rem;
+}
+
+.command-trigger:hover,
+.command-trigger:focus-visible {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--sage) 45%, var(--line));
+  color: var(--ink-950);
+  outline: 0;
+}
+
+.command-trigger kbd {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--ink-600);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.58rem;
+  padding: 0.18rem 0.3rem;
+}
+
+.command-palette {
+  background: transparent;
+  border: 0;
+  color: var(--ink-950);
+  max-width: 38rem;
+  padding: 0;
+  width: calc(100% - 2rem);
+}
+
+.command-palette::backdrop { background: rgb(23 33 30 / 52%); backdrop-filter: blur(3px); }
+
+.command-palette__surface {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 0.9rem;
+  box-shadow: 0 32px 100px rgb(23 33 30 / 32%);
+  overflow: hidden;
+}
+
+.command-palette__header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.8rem;
+}
+
+.command-palette__header > svg { color: var(--ink-600); }
+
+.command-palette__header input {
+  background: transparent;
+  border: 0;
+  color: var(--ink-950);
+  flex: 1;
+  font-size: 0.95rem;
+  min-width: 0;
+  outline: 0;
+}
+
+.command-palette__results {
+  display: grid;
+  gap: 0.25rem;
+  max-height: min(26rem, 55vh);
+  overflow-y: auto;
+  padding: 0.55rem;
+}
+
+.command-palette__result {
+  align-items: center;
+  border-radius: 0.55rem;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.7rem 0.75rem;
+}
+
+.command-palette__result:hover,
+.command-palette__result:focus-visible {
+  background: color-mix(in srgb, var(--sage) 9%, var(--surface));
+  outline: 0;
+}
+
+.command-palette__result small {
+  color: var(--ink-600);
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.58rem;
+  font-weight: 500;
+}
+
+.command-palette__empty {
+  color: var(--ink-600);
+  font-size: 0.78rem;
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+}
+
+.command-palette__footer {
+  border-top: 1px solid var(--line);
+  color: var(--ink-600);
+  display: flex;
+  font-family: var(--font-mono), ui-monospace;
+  font-size: 0.58rem;
+  gap: 0.9rem;
+  justify-content: flex-end;
+  padding: 0.55rem 0.8rem;
+}
+
+@media (max-width: 1080px) {
+  .report-submission--overview { grid-template-columns: 1fr 1fr; }
+  .report-submission--overview .report-submission__actions { grid-column: 1 / -1; justify-content: stretch; }
+  .report-submission--overview .button { flex: 1; }
+  .command-trigger span { display: none; }
+}
+
+@media (max-width: 720px) {
+  .command-trigger { margin-left: 0; }
+  .command-trigger kbd { display: none; }
+  .report-submission--overview { grid-template-columns: 1fr; }
+  .report-submission--overview .report-submission__actions { grid-column: auto; }
+  .report-submission--footer { align-items: stretch; bottom: 0; flex-wrap: wrap; }
+  .report-submission--footer .form-checklist { flex-basis: 100%; }
+  .report-submission--footer .report-submission__actions { width: 100%; }
+  .report-submission--footer .button { flex: 1; }
+  .command-palette__result small { display: none; }
+}

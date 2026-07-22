@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { environment } from "@/lib/env";
 import { deliverManagementPackEmail } from "@/lib/notifications/management-pack-email";
+import { hasValidBearerSecret } from "@/lib/security/secrets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const weekdayIndex: Record<string, number> = {
@@ -14,8 +15,7 @@ const weekdayIndex: Record<string, number> = {
 };
 
 export async function POST(request: NextRequest) {
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (!environment.cronSecret || token !== environment.cronSecret) {
+  if (!hasValidBearerSecret(request.headers.get("authorization"), environment.cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

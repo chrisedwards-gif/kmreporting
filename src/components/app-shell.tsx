@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { AccessPreviewControls, type AccessPreviewSite } from "@/components/access-preview-controls";
+import { CommandPalette, type CommandPaletteItem } from "@/components/command-palette";
 import { LiveReportingStatus } from "@/components/live-reporting-status";
 import type { Capabilities } from "@/lib/auth/capabilities";
 import type { AppRole } from "@/lib/types";
@@ -91,6 +92,10 @@ export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const sections = user.navigationRole === "kitchen_manager" ? kitchenManagerNavigation : groupNavigation;
+  const commands: CommandPaletteItem[] = sections.flatMap((section) => section.items)
+    .filter((item) => !item.roles || item.roles.includes(user.navigationRole))
+    .map((item) => ({ href: item.href, label: item.label }));
+  if (user.capabilities.editReports) commands.push({ href: "/reports/new", label: "Start weekly report", keywords: "submit new kitchen" });
 
   return (
     <div className={classNames("app-shell", user.isAccessPreview && "app-shell--access-preview")}>
@@ -110,6 +115,7 @@ export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
         <header className="app-shell__topbar">
           <button aria-label={navOpen ? "Close navigation" : "Open navigation"} className="app-shell__mobile-button" onClick={() => setNavOpen((value) => !value)} type="button">{navOpen ? <X size={22} /> : <Menu size={22} />}</button>
           <div className={classNames("app-shell__context", user.isAccessPreview && "app-shell__context--site-mode")}>{user.isAccessPreview ? `Admin site mode · ${user.previewSiteName} · mirrors ${user.previewManagerName ?? "Kitchen Manager"}` : "Group reporting · Europe/London"}</div>
+          <CommandPalette commands={commands} />
           <div className="app-shell__topbar-status">
             {user.capabilities.admin ? <AccessPreviewControls previewManagerName={user.previewManagerName} previewSiteId={user.previewSiteId} previewSiteName={user.previewSiteName} sites={previewSites} /> : null}
             <LiveReportingStatus isDemo={isDemo} />

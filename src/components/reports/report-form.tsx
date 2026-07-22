@@ -64,6 +64,50 @@ type BrowserDraft = {
   manualPurchases: ManualPurchase[];
 };
 
+type SubmissionCheck = { label: string; done: boolean };
+
+function ReportSubmissionControls({ checklist, pending, placement }: {
+  checklist: SubmissionCheck[];
+  pending: boolean;
+  placement: "overview" | "footer";
+}) {
+  const missing = checklist.filter((item) => !item.done);
+  const ready = missing.length === 0;
+  const messageId = `report-submission-${placement}`;
+
+  return (
+    <div className={`report-submission report-submission--${placement}`}>
+      {placement === "overview" ? (
+        <div className="report-submission__summary">
+          <p className="form-section__step">Weekly report status</p>
+          <h2>{ready ? "Ready to submit" : `${missing.length} ${missing.length === 1 ? "check" : "checks"} before submission`}</h2>
+          <p id={messageId}>
+            {ready
+              ? "All required totals and source confirmations are complete. You can submit this report for management review."
+              : `Complete ${missing.map((item) => item.label.toLowerCase()).join(", ")}. You can save a draft at any time.`}
+          </p>
+        </div>
+      ) : null}
+      <div aria-label="Submission readiness" className="form-checklist">
+        {checklist.map((item) => (
+          <span className={`form-checklist__item${item.done ? " form-checklist__item--done" : ""}`} key={item.label}>
+            {item.done ? <CheckCircle2 aria-hidden="true" size={13} /> : <CircleDashed aria-hidden="true" size={13} />}
+            {item.label}
+          </span>
+        ))}
+      </div>
+      <div className="report-submission__actions">
+        <button className="button button--secondary" disabled={pending} name="intent" type="submit" value="draft">
+          <Save aria-hidden="true" size={16} /> Save draft
+        </button>
+        <button aria-describedby={placement === "overview" ? messageId : undefined} className="button button--primary" disabled={pending || !ready} name="intent" type="submit" value="submit">
+          <Send aria-hidden="true" size={16} /> {pending ? "Validating…" : "Submit weekly report"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const restoredSource = (source: ReportDraftInput["sources"]["sales"], label: string): SourceState => ({
   ...source,
   message: `${label} total restored from the saved draft${source.confirmed ? " with its confirmation" : ""}.`,
@@ -209,8 +253,6 @@ export function ReportForm({
     { label: "Staff cost", done: values.staffCost > 0 },
     { label: "Labour confirmed", done: labourSource.confirmed },
   ];
-  const readyToSubmit = checklist.every((item) => item.done);
-
   const resetImports = () => {
     setSalesSource(emptySource());
     setPurchasingSource(emptySource());
@@ -341,6 +383,8 @@ export function ReportForm({
       <input name="pendingCredits" type="hidden" value={values.pendingCredits} />
       <input name="awaitingInvoice" type="hidden" value={values.awaitingInvoice} />
       <input name="manualPurchases" type="hidden" value={JSON.stringify(manualPurchasesPayload)} />
+
+      <ReportSubmissionControls checklist={checklist} pending={pending} placement="overview" />
 
       <section className="form-section">
         <div className="form-section__heading">
@@ -515,18 +559,7 @@ export function ReportForm({
         </div>
       )}
 
-      <div className="form-actions form-actions--sticky">
-        <div aria-label="Submission readiness" className="form-checklist">
-          {checklist.map((item) => (
-            <span className={`form-checklist__item${item.done ? " form-checklist__item--done" : ""}`} key={item.label}>
-              {item.done ? <CheckCircle2 aria-hidden="true" size={13} /> : <CircleDashed aria-hidden="true" size={13} />}
-              {item.label}
-            </span>
-          ))}
-        </div>
-        <button className="button button--secondary" disabled={pending} name="intent" type="submit" value="draft"><Save aria-hidden="true" size={16} /> Save draft</button>
-        <button className="button button--primary" disabled={pending || !readyToSubmit} name="intent" type="submit" value="submit"><Send aria-hidden="true" size={16} /> {pending ? "Validating…" : "Submit for review"}</button>
-      </div>
+      <ReportSubmissionControls checklist={checklist} pending={pending} placement="footer" />
     </form>
   );
 }

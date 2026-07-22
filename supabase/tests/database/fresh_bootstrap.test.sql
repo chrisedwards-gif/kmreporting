@@ -1,6 +1,6 @@
 begin;
 
-select plan(35);
+select plan(37);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -48,6 +48,15 @@ select ok(
 select ok(
   to_regprocedure('public.save_one_to_one(jsonb)') is not null,
   '1-1 draft save RPC exists'
+);
+select ok(
+  to_regprocedure('public.acknowledge_one_to_one(uuid,text)') is not null,
+  'Response-aware 1-1 acknowledgement RPC exists'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.acknowledge_one_to_one(uuid,text)', 'EXECUTE')
+    and not has_function_privilege('anon', 'public.acknowledge_one_to_one(uuid,text)', 'EXECUTE'),
+  'Only authenticated accounts can call the acknowledgement RPC'
 );
 select ok(
   position('isNew' in pg_get_functiondef('public.save_one_to_one(jsonb)'::regprocedure)) > 0,

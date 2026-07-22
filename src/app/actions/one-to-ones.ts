@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireRole } from "@/lib/auth/dal";
+import { requireRole, requireSessionProfile } from "@/lib/auth/dal";
 import { getWeekKpis } from "@/lib/data/one-to-ones";
 import { environment } from "@/lib/env";
 import { deliverReminderWebhook } from "@/lib/notifications/delivery";
@@ -263,14 +263,53 @@ export async function autosaveOneToOne(payload: string): Promise<OneToOneActionS
   return saveOneToOne({ status: "idle", message: "" }, formData);
 }
 
-export async function acknowledgeOneToOne(formData: FormData) {
-  const reviewId = z.string().uuid().parse(formData.get("reviewId"));
-  const response = z.string().max(4000).catch("").parse(formData.get("response") ?? "");
+export async function acknowledgeOneToOne(
+  _previous: OneToOneActionState,
+  formData: FormData,
+): Promise<OneToOneActionState> {
+  const profile = await requireSessionProfile();
+  const parsed = z.object({
+    reviewId: z.string().uuid(),
+    response: z.string().max(4000, "Keep the response below 4,000 characters.").default(""),
+  }).safeParse({
+    reviewId: formData.get("reviewId"),
+    response: formData.get("response") ?? "",
+  });
+  if (!parsed.success) {
+    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the acknowledgement and try again." };
+  }
+  if (environment.isDemo) {
+    return { status: "error", message: "1-1 acknowledgements are read-only in the demo workspace." };
+  }
   const supabase = await createServerSupabaseClient();
-  if (!supabase || environment.isDemo) return;
-  await supabase.rpc("acknowledge_one_to_one", { target_review: reviewId, response });
+  if (!supabase) return { status: "error", message: "The database connection is unavailable. Your comment has not been submitted." };
+  const { error } = await supabase.rpc("acknowledge_one_to_one", {
+    target_review: parsed.data.reviewId,
+    response: parsed.data.response,
+  });
+  if (error) {
+    console.error("1-1 acknowledgement failed", { code: error.code, reviewId: parsed.data.reviewId, actorId: profile.id });
+    const message = error.message.toLowerCase();
+    return {
+      status: "error",
+      message: message.includes("already been acknowledged")
+        ? "This review has already been acknowledged. Refresh to see the recorded response."
+        : message.includes("finalised")
+          ? "Only a finalised review can be acknowledged. Refresh and check its current status."
+          : message.includes("named manager") || message.includes("group management")
+            ? "This review can only be acknowledged by the named Kitchen Manager or group management."
+            : "The acknowledgement could not be recorded. Your comment is still on this page; refresh the review status and try again.",
+    };
+  }
   revalidatePath("/one-to-ones");
-  revalidatePath(`/one-to-ones/${reviewId}`);
+  revalidatePath(`/one-to-ones/${parsed.data.reviewId}`);
+  return {
+    status: "success",
+    message: parsed.data.response.trim()
+      ? "Your acknowledgement and comment have been recorded."
+      : "Your acknowledgement has been recorded.",
+    reviewId: parsed.data.reviewId,
+  };
 }
 
 export async function updateOwnManagerAction(formData: FormData) {
