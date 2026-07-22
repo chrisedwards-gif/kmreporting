@@ -1,25 +1,43 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AlertTriangle, ArrowRight, CalendarDays, MessageSquareText, Siren } from "lucide-react";
 import { CostChart } from "@/components/dashboard/cost-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { Workbench } from "@/components/dashboard/workbench";
-import { requireSessionProfile } from "@/lib/auth/dal";
+import { requireSessionProfile, type SessionProfile } from "@/lib/auth/dal";
 import { getVisibleManagerMessages } from "@/lib/data/manager-home";
 import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
+import type { ReportingBundle } from "@/lib/data/reporting";
 import { getWorkbench } from "@/lib/data/workbench";
+import { MessageSkeleton, WorkbenchSkeleton } from "@/components/ui/page-skeleton";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Group overview" };
+
+async function DashboardWorkbench({ profile, bundle }: { profile: SessionProfile; bundle: ReportingBundle }) {
+  const workbench = await getWorkbench(profile.navigationRole, bundle, { siteIds: profile.siteScopeIds, managerId: profile.scopeManagerId });
+  return (
+    <>
+      {profile.navigationRole === "kitchen_manager" ? <div className="section-kicker">Today’s actions</div> : null}
+      <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
+    </>
+  );
+}
+
+async function DashboardMessages({ profile }: { profile: SessionProfile }) {
+  const messages = await getVisibleManagerMessages(profile);
+  if (!messages.length) return null;
+  return <section aria-label="Messages from management" className="manager-message-stack">{messages.map((message) => {
+    const PriorityIcon = message.priority === "urgent" ? Siren : message.priority === "important" ? AlertTriangle : MessageSquareText;
+    return <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><div className="manager-home-message__icon"><PriorityIcon aria-hidden="true" size={20} /></div><div className="manager-home-message__content"><div className="manager-home-message__top"><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><span className={`manager-home-message__priority manager-home-message__priority--${message.priority}`}>{message.priority}</span></div><h2>{message.title}</h2><p>{message.body}</p></div></article>;
+  })}</section>;
+}
 
 export default async function DashboardPage() {
   const profile = await requireSessionProfile();
   const bundle = await getScopedReportingBundle(profile);
   const { sites, reports, week, expectedSiteCount } = bundle;
-  const [workbench, messages] = await Promise.all([
-    getWorkbench(profile.navigationRole, bundle, { siteIds: profile.siteScopeIds, managerId: profile.scopeManagerId }),
-    getVisibleManagerMessages(profile),
-  ]);
   const totals = sites.reduce((sum, site) => ({ netSales: sum.netSales + site.netSales, cogs: sum.cogs + site.cogs, staffCost: sum.staffCost + site.staffCost, wasteCost: sum.wasteCost + (site.wastePct / 100) * site.netSales }), { netSales: 0, cogs: 0, staffCost: 0, wasteCost: 0 });
   const foodCostPct = totals.netSales ? (totals.cogs / totals.netSales) * 100 : 0;
   const labourPct = totals.netSales ? (totals.staffCost / totals.netSales) * 100 : 0;
@@ -42,22 +60,17 @@ export default async function DashboardPage() {
     <>
       <header className="page-header page-header--personal">
         <div>
-          <p className="page-header__eyebrow">{profile.isAccessPreview ? `${profile.previewSiteName} · Kitchen Manager view` : isManagerHome ? `${siteContext} · today` : "Weekly management summary"}</p>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · today` : "Weekly management summary"}</p>
           <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "The group at a glance."}</h1>
           <p className="page-header__copy">{isManagerHome ? `Here’s what needs your attention today. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} checks need attention.`}</p>
         </div>
         {canCreateReport ? <Link className="button button--primary" href="/reports/new">Start a report <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
 
-      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>You are seeing only {profile.previewSiteName} records, using the same workspace as {profile.previewManagerName ?? "the assigned manager"}. Your Admin capabilities remain active so you can complete work with them.</div> : null}
+      {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode is active. You are seeing only {profile.previewSiteName} records and the same navigation as {profile.previewManagerName ?? "the assigned manager"}; your Admin edit rights remain available.</div> : null}
 
-      {isManagerHome ? <div className="section-kicker">Today’s actions</div> : null}
-      <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
-
-      {messages.length ? <section aria-label="Messages from management" className="manager-message-stack">{messages.map((message) => {
-        const PriorityIcon = message.priority === "urgent" ? Siren : message.priority === "important" ? AlertTriangle : MessageSquareText;
-        return <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><div className="manager-home-message__icon"><PriorityIcon aria-hidden="true" size={20} /></div><div className="manager-home-message__content"><div className="manager-home-message__top"><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><span className={`manager-home-message__priority manager-home-message__priority--${message.priority}`}>{message.priority}</span></div><h2>{message.title}</h2><p>{message.body}</p></div></article>;
-      })}</section> : null}
+      <Suspense fallback={<WorkbenchSkeleton />}><DashboardWorkbench bundle={bundle} profile={profile} /></Suspense>
+      <Suspense fallback={<MessageSkeleton />}><DashboardMessages profile={profile} /></Suspense>
 
       <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />

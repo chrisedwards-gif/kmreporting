@@ -4,7 +4,7 @@ import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getManagerMessageAdminData } from "@/lib/data/manager-home";
 import { formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Team messages" };
+export const metadata = { title: "Management messages" };
 
 export default async function TeamMessagesPage() {
   await requireGroupWorkspaceRole(["admin", "group_manager"]);
@@ -14,7 +14,7 @@ export default async function TeamMessagesPage() {
   return (
     <>
       <header className="page-header">
-        <div><p className="page-header__eyebrow">Manager communication</p><h1 className="page-header__title">Team messages.</h1><p className="page-header__copy">Leave a note for every manager, one kitchen or one person. Schedule it for a future date or keep it visible across a date range.</p></div>
+        <div><p className="page-header__eyebrow">Manager communication</p><h1 className="page-header__title">Management messages.</h1><p className="page-header__copy">Send a management message to every manager, one kitchen or one person. Schedule it for a future date or keep it visible across a date range.</p></div>
       </header>
 
       <div className="dashboard-grid dashboard-grid--balanced">
