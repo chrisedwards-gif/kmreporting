@@ -21,6 +21,10 @@ const numberFromEnv = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const groqApiKey = process.env.GROQ_API_KEY?.trim();
+const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
+const aiProvider = groqApiKey ? "groq" : openaiApiKey ? "openai" : null;
+
 export const environment = {
   // Production must fail closed when Supabase is misconfigured. Demo mode is
   // available only when explicitly requested, or on a non-production build
@@ -52,6 +56,12 @@ export const environment = {
   rotaWeatherLongitude: numberFromEnv(process.env.ROTA_WEATHER_LONGITUDE, -2.2426),
   rotaEventsCity: process.env.ROTA_EVENTS_CITY?.trim() || "Manchester",
   ticketmasterApiKey: process.env.TICKETMASTER_API_KEY?.trim(),
-  openaiApiKey: process.env.OPENAI_API_KEY?.trim(),
-  openaiModel: process.env.OPENAI_MODEL?.trim() || "gpt-5-mini",
+  groqApiKey,
+  openaiApiKey,
+  aiProvider,
+  aiApiKey: groqApiKey || openaiApiKey,
+  aiBaseUrl: groqApiKey ? "https://api.groq.com/openai/v1" : "https://api.openai.com/v1",
+  aiModel: groqApiKey
+    ? process.env.GROQ_MODEL?.trim() || "openai/gpt-oss-20b"
+    : process.env.OPENAI_MODEL?.trim() || "gpt-5-mini",
 };
