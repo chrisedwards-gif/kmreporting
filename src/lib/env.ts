@@ -26,9 +26,6 @@ const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
 const aiProvider = groqApiKey ? "groq" : openaiApiKey ? "openai" : null;
 
 export const environment = {
-  // Production must fail closed when Supabase is misconfigured. Demo mode is
-  // available only when explicitly requested, or on a non-production build
-  // that has no Supabase connection yet.
   isDemo: !isProduction && (demoRequested || !hasSupabaseEnvironment),
   isPreview,
   isProduction,
@@ -62,6 +59,6 @@ export const environment = {
   aiApiKey: groqApiKey || openaiApiKey,
   aiBaseUrl: groqApiKey ? "https://api.groq.com/openai/v1" : "https://api.openai.com/v1",
   aiModel: groqApiKey
-    ? process.env.GROQ_MODEL?.trim() || "openai/gpt-oss-20b"
+    ? process.env.GROQ_MODEL?.trim() || "openai/gpt-oss-120b"
     : process.env.OPENAI_MODEL?.trim() || "gpt-5-mini",
 };
