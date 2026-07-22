@@ -50,6 +50,9 @@ export type OneToOneDetail = OneToOneListItem & {
   kpiSnapshot: Record<string, unknown> | null;
   summary: Record<string, string>;
   scores: Array<{ area: string; score: number | null; evidence: string; developmentNote: string }>;
+  managerResponse: string;
+  acknowledgedAt: string | null;
+  acknowledgedByName: string | null;
 };
 
 export type WeekKpis = {
@@ -228,22 +231,24 @@ export async function getOneToOne(reviewId: string): Promise<OneToOneDetail | nu
   const [{ data: review, error }, { data: scores }] = await Promise.all([
     supabase
       .from("one_to_one_reviews")
-      .select("id, manager_profile_id, assignment_id, site_id, week_commencing, review_date, status, overall_score, wins, kpi_manual, kpi_snapshot, summary")
+      .select("id, manager_profile_id, assignment_id, site_id, week_commencing, review_date, status, overall_score, wins, kpi_manual, kpi_snapshot, summary, manager_response, acknowledged_at, acknowledged_by")
       .eq("id", reviewId)
       .maybeSingle(),
     supabase.from("one_to_one_scores").select("area, score, evidence, development_note").eq("review_id", reviewId),
   ]);
   if (error || !review?.manager_profile_id || !review.assignment_id || !review.site_id) return null;
-  const [{ data: profile }, { data: site }] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", review.manager_profile_id).maybeSingle(),
+  const profileIds = [...new Set([review.manager_profile_id, review.acknowledged_by].filter((id): id is string => Boolean(id)))];
+  const [{ data: profiles }, { data: site }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").in("id", profileIds),
     supabase.from("sites").select("name").eq("id", review.site_id).maybeSingle(),
   ]);
+  const profilesById = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
   return {
     id: review.id,
     managerId: review.manager_profile_id,
     assignmentId: review.assignment_id,
     siteId: review.site_id,
-    managerName: profile?.full_name ?? "Manager",
+    managerName: profilesById.get(review.manager_profile_id) ?? "Manager",
     siteName: site?.name ?? "Kitchen",
     weekCommencing: review.week_commencing,
     reviewDate: review.review_date,
@@ -253,6 +258,9 @@ export async function getOneToOne(reviewId: string): Promise<OneToOneDetail | nu
     kpiManual: (review.kpi_manual ?? {}) as Record<string, string>,
     kpiSnapshot: (review.kpi_snapshot ?? null) as Record<string, unknown> | null,
     summary: (review.summary ?? {}) as Record<string, string>,
+    managerResponse: review.manager_response ?? "",
+    acknowledgedAt: review.acknowledged_at,
+    acknowledgedByName: review.acknowledged_by ? profilesById.get(review.acknowledged_by) ?? "Authorised user" : null,
     scores: (scores ?? []).map((row) => ({
       area: row.area,
       score: row.score === null ? null : Number(row.score),
@@ -271,6 +279,22 @@ export async function getOpenActions(managerId: string): Promise<ManagerAction[]
     .from("manager_actions")
     .select("id, manager_profile_id, site_id, assignment_id, priority, action, success_measure, owner, due_date, status, outcome, source_review_id")
     .eq("manager_profile_id", managerId)
+    .not("status", "in", "(complete,cancelled)")
+    .order("due_date", { ascending: true, nullsFirst: false });
+  if (error) return [];
+  return ((data ?? []) as ActionRow[]).map(mapAction);
+}
+
+/** Load all open actions for a manager workspace in one database round-trip. */
+export async function getOpenActionsForManagers(managerIds: string[]): Promise<ManagerAction[]> {
+  const uniqueManagerIds = [...new Set(managerIds.filter(Boolean))];
+  if (environment.isDemo || uniqueManagerIds.length === 0) return [];
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("manager_actions")
+    .select("id, manager_profile_id, site_id, assignment_id, priority, action, success_measure, owner, due_date, status, outcome, source_review_id")
+    .in("manager_profile_id", uniqueManagerIds)
     .not("status", "in", "(complete,cancelled)")
     .order("due_date", { ascending: true, nullsFirst: false });
   if (error) return [];

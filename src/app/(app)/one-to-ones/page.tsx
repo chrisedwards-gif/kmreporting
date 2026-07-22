@@ -4,7 +4,7 @@ import { PerformanceTrendChart } from "@/components/performance/performance-tren
 import { StatusBadge } from "@/components/ui/status-badge";
 import { requireRole } from "@/lib/auth/dal";
 import { scopeContainsSite, siteIsInScope } from "@/lib/auth/site-scope";
-import { getManagers, getOneToOnes, getOpenActions } from "@/lib/data/one-to-ones";
+import { getManagers, getOneToOnes, getOpenActionsForManagers } from "@/lib/data/one-to-ones";
 import { getPerformanceTrends } from "@/lib/data/performance";
 import { isActionOverdue, scoreRag } from "@/lib/performance/scoring";
 import { getAvailableOneToOneWeek } from "@/lib/reporting/periods";
@@ -24,7 +24,8 @@ export default async function OneToOnesPage({ searchParams }: { searchParams: Pr
   const trends = profile.siteScopeIds === null ? allTrends : allTrends.filter((point) => visibleSiteNames.has(point.siteName));
   const canManage = profile.capabilities.manageGroup;
   const uniqueManagerIds = [...new Set(managers.map((item) => item.id))];
-  const openActionsByManager = new Map(await Promise.all(uniqueManagerIds.map(async (managerId) => [managerId, await getOpenActions(managerId)] as const)));
+  const openActions = await getOpenActionsForManagers(uniqueManagerIds);
+  const openActionsByManager = new Map(uniqueManagerIds.map((managerId) => [managerId, openActions.filter((action) => action.managerId === managerId)]));
   const openDrafts = reviews.filter((review) => ["draft", "in_review", "reopened"].includes(review.status));
   const history = reviews.filter((review) => !["draft", "in_review", "reopened"].includes(review.status));
   const today = new Date().toISOString().slice(0, 10);

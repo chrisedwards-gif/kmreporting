@@ -171,11 +171,7 @@ export async function getReportingBundle(periodId?: string, reportId?: string): 
 
 export async function getAccessibleSites() {
   if (environment.isDemo) {
-    return [
-      { id: "00000000-0000-4000-8000-000000000001", name: "Dough Religion", code: "DR-MCR" },
-      { id: "00000000-0000-4000-8000-000000000002", name: "Choi Wan", code: "CW-MCR" },
-      { id: "00000000-0000-4000-8000-000000000003", name: "Kardia", code: "KAR-MCR" },
-    ];
+    return demoSites.map((site) => ({ id: site.id, name: site.name, code: site.code }));
   }
   const supabase = await createServerSupabaseClient();
   if (!supabase) return [];

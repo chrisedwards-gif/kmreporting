@@ -1,0 +1,21 @@
+@layer vendor, base, uat006, uat008, uat009, uat010, uat011, uat012, uat013, prod, prod004, prod005, prod008, prod009, prod011, prod012, prod013, prod014, prod015;
+
+@import "tailwindcss" layer(vendor);
+@import "./globals.css" layer(base);
+@import "./uat006.css" layer(uat006);
+@import "./uat008.css" layer(uat008);
+@import "./uat009.css" layer(uat009);
+@import "./uat010.css" layer(uat010);
+@import "./uat011.css" layer(uat011);
+@import "./uat012.css" layer(uat012);
+@import "./uat013.css" layer(uat013);
+@import "./prod-fixes.css" layer(prod);
+@import "./prod-fixes-004.css" layer(prod004);
+@import "./prod-fixes-005.css" layer(prod005);
+@import "./prod-fixes-008.css" layer(prod008);
+@import "./prod-fixes-009.css" layer(prod009);
+@import "./prod-fixes-011.css" layer(prod011);
+@import "./prod-fixes-012.css" layer(prod012);
+@import "./prod-fixes-013.css" layer(prod013);
+@import "./prod-fixes-014.css" layer(prod014);
+@import "./prod-fixes-015.css" layer(prod015);

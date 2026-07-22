@@ -2,23 +2,7 @@
 import type { Metadata } from "next";
 import { AuthFragmentGuard } from "@/components/auth-fragment-guard";
 import { ToastProvider } from "@/components/ui/toast-provider";
-import "./globals.css";
-import "./uat006.css";
-import "./uat008.css";
-import "./uat009.css";
-import "./uat010.css";
-import "./uat011.css";
-import "./uat012.css";
-import "./uat013.css";
-import "./prod-fixes.css";
-import "./prod-fixes-004.css";
-import "./prod-fixes-005.css";
-import "./prod-fixes-008.css";
-import "./prod-fixes-009.css";
-import "./prod-fixes-011.css";
-import "./prod-fixes-012.css";
-import "./prod-fixes-013.css";
-import "./prod-fixes-014.css";
+import "./app.css";
 
 export const metadata: Metadata = {
   title: { default: "HOS Kitchen Reports", template: "%s · HOS Kitchen Reports" },
