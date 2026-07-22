@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Sparkles } from "lucide-react";
+import { CalendarPlus, LoaderCircle, Sparkles } from "lucide-react";
 import {
   generateRotaSuggestion,
   saveRotaForecastEvent,
@@ -28,13 +28,34 @@ export function RotaControls({
     saveRotaForecastEvent,
     initialState,
   );
+  const [buildSeconds, setBuildSeconds] = useState(0);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!generating) {
+      setBuildSeconds(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      setBuildSeconds(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [generating]);
 
   useEffect(() => {
     if (generateState.status === "success" || eventState.status === "success") {
       router.refresh();
     }
   }, [eventState.status, generateState.status, router]);
+
+  const buildProgress = buildSeconds < 3
+    ? "Loading sales, team and availability…"
+    : buildSeconds < 8
+      ? "Balancing cover, skills and agreed hours…"
+      : buildSeconds < 20
+        ? "Checking the full week and saving a new version…"
+        : "This is taking longer than expected. Your existing rota remains safe; wait a little longer or refresh and try again.";
 
   return (
     <section className="rota-launchbar panel">
@@ -43,7 +64,7 @@ export function RotaControls({
           <input name="siteId" type="hidden" value={siteId} />
           <input name="weekStart" type="hidden" value={weekStart} />
           <button className="button button--primary" disabled={generating} type="submit">
-            <Sparkles aria-hidden="true" size={16} />
+            {generating ? <LoaderCircle aria-hidden="true" className="rota-copilot__spinner" size={16} /> : <Sparkles aria-hidden="true" size={16} />}
             {generating
               ? "Building the rota…"
               : hasPlan
@@ -55,6 +76,11 @@ export function RotaControls({
           <strong>{hasPlan ? "The current suggestion stays available until the new one is ready." : "We will create a safe starting rota for you."}</strong>
           <small>Uses expected sales, hourly demand, availability, skills and agreed hours.</small>
         </div>
+        {generating ? (
+          <p aria-live="polite" className="form-message" role="status">
+            {buildProgress} {buildSeconds > 0 ? `${buildSeconds}s` : ""}
+          </p>
+        ) : null}
         {generateState.status !== "idle" ? (
           <p
             className={`form-message ${generateState.status === "error" ? "form-message--error" : "form-message--success"}`}
