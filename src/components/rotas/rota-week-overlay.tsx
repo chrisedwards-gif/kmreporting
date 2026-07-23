@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
 import {
-  RotaNoryBuilder,
-  type RotaNoryBuilderProps,
-} from "@/components/rotas/rota-nory-builder";
+  RotaNoryBuilderV2,
+  type RotaNoryBuilderV2Props,
+} from "@/components/rotas/rota-nory-builder-v2";
 import "./rota-nory-accessibility.css";
 
-export type RotaWeekOverlayProps = RotaNoryBuilderProps;
+export type RotaWeekOverlayProps = RotaNoryBuilderV2Props;
 
 export function RotaWeekOverlay(props: RotaWeekOverlayProps) {
-  useEffect(() => {
-    document.querySelectorAll<HTMLElement>(".nory-rota__role-row[role='row']")
-      .forEach((element) => element.setAttribute("role", "presentation"));
-  }, []);
-
-  return <RotaNoryBuilder {...props} />;
+  return <RotaNoryBuilderV2 {...props} />;
 }
