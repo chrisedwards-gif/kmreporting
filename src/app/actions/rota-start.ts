@@ -8,6 +8,7 @@ import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
 import { environment } from "@/lib/env";
 import { buildRotaPlan } from "@/lib/rota/planner";
 import type { RotaPlan } from "@/lib/rota/types";
+import { createRotaWarning } from "@/lib/rota/warnings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type RotaStartActionState = {
@@ -94,14 +95,16 @@ function asBlankDraft(plan: RotaPlan): RotaPlan {
     plannedHours: 0,
     coverage: day.coverage.map((slot) => ({ ...slot, assigned: 0 })),
     shifts: [],
-    warnings: day.coverage.length ? ["This day has not been staffed yet."] : [],
+    warnings: day.coverage.length
+      ? [createRotaWarning("This day has not been staffed yet.", "all")]
+      : [],
   }));
   return {
     ...plan,
     plannedCost: days.reduce((sum, day) => sum + day.plannedCost, 0),
     plannedHours: 0,
     explanation: "A blank manager-built rota draft with forecast, demand and labour guidance preserved.",
-    warnings: ["The rota draft is blank. Add shifts and save before relying on the score."],
+    warnings: [createRotaWarning("The rota draft is blank. Add shifts and save before relying on the score.", "all")],
     days,
   };
 }
