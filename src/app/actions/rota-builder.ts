@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { scopeContainsSite } from "@/lib/auth/site-scope";
+import { encodeRotaMark } from "@/lib/data/rota-builder";
 import { environment } from "@/lib/env";
 import type { RotaPlanMark } from "@/lib/rota/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,7 +33,7 @@ const shiftSchema = z.object({
 const markSchema = z.object({
   staffProfileId: z.string().uuid(),
   businessDate: z.iso.date(),
-  markType: z.enum(["day_off", "unavailable", "leave", "training"]),
+  markType: z.enum(["day_off", "unavailable", "leave", "training", "offsite", "head_office", "other_site"]),
   note: z.string().trim().max(1000).optional().default(""),
 });
 
@@ -228,7 +229,8 @@ export async function saveRotaBuilderDraft(
       if (hours > person.maximumHours + 0.01) warnings.push(`${person.name} is ${(hours - person.maximumHours).toFixed(1)}h above maximum hours.`);
     }
 
-    const marks: RotaPlanMark[] = parsed.data.marks.map((mark) => ({ ...mark }));
+    const marks: RotaPlanMark[] = parsed.data.marks.map((mark) =>
+      encodeRotaMark(mark as RotaPlanMark));
     const { error } = await admin.rpc("save_rota_builder_draft_private", {
       target_organisation: profile.organisationId,
       target_site: parsed.data.siteId,
