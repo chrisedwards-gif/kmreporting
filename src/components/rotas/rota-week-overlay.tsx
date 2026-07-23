@@ -1,6 +1,4 @@
-import "./rota-builder-accessibility.css";
-
 export {
-  RotaWeekBuilder as RotaWeekOverlay,
-  type RotaWeekBuilderProps as RotaWeekOverlayProps,
-} from "@/components/rotas/rota-week-builder";
+  RotaNoryBuilder as RotaWeekOverlay,
+  type RotaNoryBuilderProps as RotaWeekOverlayProps,
+} from "@/components/rotas/rota-nory-builder";
