@@ -9,8 +9,8 @@ import {
   Settings2,
   UsersRound,
 } from "lucide-react";
+import { RotaAiBrief } from "@/components/rotas/rota-ai-brief";
 import { RotaControls } from "@/components/rotas/rota-controls";
-import { RotaCopilot } from "@/components/rotas/rota-copilot";
 import { RotaWeekFeedbackStrip } from "@/components/rotas/rota-week-feedback";
 import { RotaWeekOverlay } from "@/components/rotas/rota-week-overlay";
 import "@/components/rotas/rota-workspace.module.css";
@@ -158,8 +158,8 @@ export default async function RotasPage({
           <h1>Build next week’s rota with the forecast beside you</h1>
           <p>
             The kitchen manager chooses every shift. KM Reporting supplies demand,
-            heat maps, agreed-hours checks, labour guidance, a rota score and AI
-            challenge before the approved week is copied into RotaCloud.
+            heat maps, agreed-hours checks, labour guidance, a live rota score and
+            an optional AI challenge before the week is copied into RotaCloud.
           </p>
         </div>
         <nav aria-label="Rota tools" className="rota-page-header__links">
@@ -270,8 +270,7 @@ export default async function RotasPage({
 
           {plan ? (
             <>
-              <RotaCopilot
-                initialReview={null}
+              <RotaAiBrief
                 plan={plan}
                 signals={signals}
                 staffTargets={staffTargets}
