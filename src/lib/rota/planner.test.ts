@@ -6,10 +6,31 @@ import type { RotaPlanningInput, RotaStaffProfile } from "@/lib/rota/types";
 const weekStart = "2026-07-20";
 
 const profile = (id: string, staffName: string, role: string, overrides: Partial<RotaStaffProfile> = {}): RotaStaffProfile => ({
-  id, employeeRef: id, rotacloudUserId: null, staffName, primaryRole: role, roleTitle: role, skills: [role.toLowerCase()], minimumWeeklyHours: 0,
-  targetWeeklyHours: 40, maximumWeeklyHours: 48, minimumShiftMinutes: 240, maximumShiftMinutes: 720, maximumConsecutiveDays: 6,
-  preferredDays: [1, 2, 3, 4, 5, 6], preferredStart: "10:00", preferredEnd: "22:00", payBasis: "hourly", loadedHourlyRate: 14.1,
-  fixedWeeklyCost: 0, costAllocationPct: 100, ...overrides,
+  id,
+  appProfileId: null,
+  employeeRef: id,
+  rotacloudUserId: null,
+  staffName,
+  primaryRole: role,
+  roleTitle: role,
+  roleRank: role.toLowerCase().includes("manager") ? 200 : 300,
+  displayOrder: 10,
+  organisationWide: false,
+  skills: [role.toLowerCase()],
+  minimumWeeklyHours: 0,
+  targetWeeklyHours: 40,
+  maximumWeeklyHours: 48,
+  minimumShiftMinutes: 240,
+  maximumShiftMinutes: 720,
+  maximumConsecutiveDays: 6,
+  preferredDays: [1, 2, 3, 4, 5, 6],
+  preferredStart: "10:00",
+  preferredEnd: "22:00",
+  payBasis: "hourly",
+  loadedHourlyRate: 14.1,
+  fixedWeeklyCost: 0,
+  costAllocationPct: 100,
+  ...overrides,
 });
 
 function saturdayInput(staff: RotaStaffProfile[]): RotaPlanningInput {
