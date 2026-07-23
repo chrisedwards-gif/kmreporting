@@ -37,11 +37,15 @@ export type StaffAvailabilityDay = {
 
 export type RotaStaffProfile = {
   id: string;
+  appProfileId: string | null;
   employeeRef: string;
   rotacloudUserId: number | null;
   staffName: string;
   primaryRole: string;
   roleTitle: string;
+  roleRank: number;
+  displayOrder: number;
+  organisationWide: boolean;
   skills: string[];
   minimumWeeklyHours: number;
   targetWeeklyHours: number;
@@ -95,7 +99,14 @@ export type SuggestedShift = {
 export type RotaPlanMark = {
   staffProfileId: string;
   businessDate: string;
-  markType: "day_off" | "unavailable" | "leave" | "training";
+  markType:
+    | "day_off"
+    | "unavailable"
+    | "leave"
+    | "training"
+    | "offsite"
+    | "head_office"
+    | "other_site";
   note: string;
 };
 
