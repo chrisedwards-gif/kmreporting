@@ -77,23 +77,32 @@ test("Kitchen Manager can see and unlock weekly submission before reaching the f
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Kitchen Manager can build a salary-safe rota with score and daily learning", async ({ page }) => {
+test("Kitchen Manager builds a ranked salary-safe rota with group locations and daily learning", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: /Build next week.s rota/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ask a senior operator to challenge the plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Build the week with demand, cost and cover/ })).toBeVisible();
   await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Week 30 rota/ })).toBeVisible();
   await expect(page.getByLabel(/Live rota score/i)).toBeVisible();
   await expect(page.getByText("Sales forecast", { exact: true })).toBeVisible();
   await expect(page.getByText("Hourly COL %", { exact: true })).toBeVisible();
+  await expect(page.getByText("Group Chef", { exact: true })).toBeVisible();
+  await expect(page.getByText("Chris Edwards", { exact: true })).toBeVisible();
+  await expect(page.getByText("Scott Hutton", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
   await expect(page.getByText(/Kitchen managers see hourly-team cost only/)).toBeVisible();
   await expect(page.getByText("Allocated salary cost", { exact: true })).toHaveCount(0);
+
+  const chrisRow = page.getByRole("row").filter({ hasText: "Chris Edwards" }).first();
+  await chrisRow.getByRole("button", { name: /Add/ }).first().click();
+  await page.getByRole("button", { name: "Status / location" }).click();
+  await expect(page.getByRole("option", { name: "Head office" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
   await expect(page.getByRole("heading", { name: "Was the cover right?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Add/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask a senior operator to challenge the plan" })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
