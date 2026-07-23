@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CalendarOff,
-  CheckCircle2,
   Coffee,
   Copy,
   Download,
@@ -190,26 +189,26 @@ export function RotaNoryBuilder({
       day.businessDate,
       financeVisibility === "full" ? day.fixedLabourCost : 0,
     ]));
-    const originalFixed = [...originalFixedByDate.values()].reduce((sum, value) => sum + value, 0);
-    const originalHourlyMinutes = plan.days.flatMap((day) => day.shifts).reduce((sum, shift) => {
-      const person = shift.staffProfileId ? staffById.get(shift.staffProfileId) : null;
-      return person?.payBasis === "hourly" ? sum + shift.paidMinutes : sum;
-    }, 0);
-    const blendedHourlyRate = originalHourlyMinutes > 0
-      ? Math.max(0, plan.plannedCost - originalFixed) / (originalHourlyMinutes / 60)
+    const knownHourlyRates = staff
+      .filter((person) => person.payBasis === "hourly" && person.hourlyRate != null && person.hourlyRate > 0)
+      .map((person) => person.hourlyRate as number);
+    const fallbackHourlyRate = knownHourlyRates.length
+      ? knownHourlyRates.reduce((sum, rate) => sum + rate, 0) / knownHourlyRates.length
       : 0;
 
     const dayHoursByDate = new Map<string, number>();
     const dayCostByDate = new Map<string, number>();
     for (const day of days) {
-      const paidHours = day.shifts.filter((shift) => shift.staffProfileId)
-        .reduce((sum, shift) => sum + shift.paidMinutes / 60, 0);
-      const hourlyMinutes = day.shifts.reduce((sum, shift) => {
+      const assigned = day.shifts.filter((shift) => shift.staffProfileId);
+      const paidHours = assigned.reduce((sum, shift) => sum + shift.paidMinutes / 60, 0);
+      const hourlyCost = assigned.reduce((sum, shift) => {
         const person = shift.staffProfileId ? staffById.get(shift.staffProfileId) : null;
-        return person?.payBasis === "hourly" ? sum + shift.paidMinutes : sum;
+        if (person?.payBasis !== "hourly") return sum;
+        const rate = person.hourlyRate ?? fallbackHourlyRate;
+        return sum + rate * shift.paidMinutes / 60;
       }, 0);
       dayHoursByDate.set(day.businessDate, paidHours);
-      dayCostByDate.set(day.businessDate, (originalFixedByDate.get(day.businessDate) ?? 0) + blendedHourlyRate * hourlyMinutes / 60);
+      dayCostByDate.set(day.businessDate, (originalFixedByDate.get(day.businessDate) ?? 0) + hourlyCost);
     }
 
     const openShifts = allShifts.filter((shift) => !shift.staffProfileId);
@@ -663,7 +662,7 @@ export function RotaNoryBuilder({
 
           {summary.roleGroups.map((group) => (
             <Fragment key={group.role}>
-              <div className="nory-rota__role-row" role="row"><strong>{group.role}</strong><span>{hoursLabel(group.hours)} scheduled</span></div>
+              <div className="nory-rota__role-row" role="presentation"><strong>{group.role}</strong><span>{hoursLabel(group.hours)} scheduled</span></div>
               {group.people.map((person) => {
                 const hours = summary.hoursByStaff.get(person.id) ?? 0;
                 const hoursTone = hours > person.maximumHours ? "risk" : hours + .01 < person.minimumHours ? "watch" : Math.abs(hours - person.targetHours) <= 2 ? "good" : "plain";
