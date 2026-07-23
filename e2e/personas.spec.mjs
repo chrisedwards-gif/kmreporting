@@ -91,9 +91,10 @@ test("Kitchen Manager builds a ranked salary-safe rota with group locations", as
   await expect(page.getByLabel(/Live rota score/i)).toBeVisible();
   await expect(page.getByText("Sales forecast", { exact: true })).toBeVisible();
   await expect(page.getByText("Hourly COL %", { exact: true })).toBeVisible();
-  await expect(page.getByText("Group Chef", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Chris Edwards", { exact: true })).toBeVisible();
-  await expect(page.getByText("Scott Hutton", { exact: true })).toBeVisible();
+  const rotaGrid = page.getByLabel("Weekly rota builder");
+  await expect(rotaGrid.getByText("Group Chef", { exact: true }).first()).toBeVisible();
+  await expect(rotaGrid.getByText("Chris Edwards", { exact: true })).toBeVisible();
+  await expect(rotaGrid.getByText("Scott Hutton", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
   await expect(page.getByText(/Kitchen managers see hourly-team cost only/)).toBeVisible();
   await expect(page.getByText("Allocated salary cost", { exact: true })).toHaveCount(0);
