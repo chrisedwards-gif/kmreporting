@@ -12,7 +12,7 @@ export default async function RotaTeamPage() {
   const workspace = await getRotaStaffWorkspace(profile);
   const uniqueStaff = [...new Map(
     [...workspace.staff]
-      .sort((a, b) => Number(b.primarySite) - Number(a.primarySite))
+      .sort((a, b) => Number(a.primarySite) - Number(b.primarySite))
       .map((staff) => [staff.id, staff]),
   ).values()];
   const rotaOrder: RotaOrderPerson[] = uniqueStaff.map((staff) => ({
