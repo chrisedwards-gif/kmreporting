@@ -11,6 +11,7 @@ export type RotaDisplayStaff = {
   targetHours: number;
   maximumHours: number;
   payBasis: "hourly" | "salaried";
+  hourlyRate: number | null;
 };
 
 const privateCostWarning = /(salary|salaried|fixed labour|fixed cost|annual pay)/i;
@@ -24,6 +25,7 @@ export function visibleRotaStaff(staff: RotaStaffProfile[]): RotaDisplayStaff[] 
     targetHours: person.targetWeeklyHours,
     maximumHours: person.maximumWeeklyHours,
     payBasis: person.payBasis,
+    hourlyRate: person.payBasis === "hourly" ? person.loadedHourlyRate : null,
   }));
 }
 
