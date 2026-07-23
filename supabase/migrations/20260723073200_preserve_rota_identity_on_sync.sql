@@ -41,7 +41,7 @@ begin
   end if;
 
   if found then
-    enriched_payload = jsonb_build_object(
+    enriched_payload := jsonb_build_object(
       'appProfileId', existing_staff.app_profile_id,
       'organisationWide', existing_staff.organisation_wide,
       'roleRank', existing_staff.role_rank,
