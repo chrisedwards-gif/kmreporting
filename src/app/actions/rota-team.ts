@@ -32,12 +32,7 @@ const staffSchema = z.object({
   preferredEnd: z.string().optional().default(""),
   payBasis: z.enum(["hourly", "salaried"]),
   hourlyRate: z.string().optional().default(""),
-  annualSalary: z.string().optional().default(""),
   contractedWeeklyHours: z.string().optional().default(""),
-  employerNiRate: z.coerce.number().min(0).max(100),
-  pensionRate: z.coerce.number().min(0).max(100),
-  otherOncostRate: z.coerce.number().min(0).max(100),
-  costAllocationPct: z.coerce.number().min(0).max(100),
   validFrom: z.iso.date(),
   notes: z.string().trim().max(1000).optional().default(""),
 });
@@ -69,11 +64,10 @@ export async function saveRotaStaffProfileV2(
   }
 
   const hourlyRate = Number(values.hourlyRate);
-  const annualSalary = Number(values.annualSalary);
   const contractedHours = Number(values.contractedWeeklyHours);
   if (values.payBasis === "hourly" && !(hourlyRate > 0)) return { status: "error", message: "Enter the hourly pay rate." };
-  if (values.payBasis === "salaried" && (!(annualSalary > 0) || !(contractedHours > 0))) {
-    return { status: "error", message: "Enter annual salary and contracted weekly hours." };
+  if (values.payBasis === "salaried" && !(contractedHours > 0)) {
+    return { status: "error", message: "Enter the contracted weekly hours. Salary cost comes from Labour settings." };
   }
 
   const organisationWide = formData.get("organisationWide") === "true";
@@ -101,12 +95,12 @@ export async function saveRotaStaffProfileV2(
     preferredEnd: values.preferredEnd,
     payBasis: values.payBasis,
     hourlyRate: values.payBasis === "hourly" ? hourlyRate : null,
-    annualSalary: values.payBasis === "salaried" ? annualSalary : null,
+    annualSalary: null,
     contractedWeeklyHours: values.payBasis === "salaried" ? contractedHours : null,
-    employerNiRate: values.employerNiRate / 100,
-    pensionRate: values.pensionRate / 100,
-    otherOncostRate: values.otherOncostRate / 100,
-    costAllocationPct: values.costAllocationPct,
+    employerNiRate: 0,
+    pensionRate: 0,
+    otherOncostRate: 0,
+    costAllocationPct: 100,
     primarySite,
     active: true,
     validFrom: values.validFrom,
@@ -114,7 +108,7 @@ export async function saveRotaStaffProfileV2(
     source: "manual",
   };
 
-  if (environment.isDemo) return { status: "success", message: "Demo profile validated. Live workspaces save the UUID link and private employment details." };
+  if (environment.isDemo) return { status: "success", message: "Demo profile validated. Salaried cost remains sourced from the site Labour settings." };
 
   try {
     const admin = createAdminClient();
@@ -129,7 +123,8 @@ export async function saveRotaStaffProfileV2(
     }
     revalidatePath("/rotas");
     revalidatePath("/rotas/team");
-    return { status: "success", message: `${values.staffName} is linked and available to the rota.` };
+    revalidatePath("/dashboard");
+    return { status: "success", message: `${values.staffName} is linked and available to the rota. Salaried cost remains controlled in Labour settings.` };
   } catch {
     return { status: "error", message: "The secure rota team service is unavailable." };
   }
