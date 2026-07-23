@@ -23,12 +23,24 @@ export type RotaSite = {
   labourTarget: number;
 };
 
+export type RotaAppProfileOption = {
+  id: string;
+  name: string;
+  role: string;
+  siteIds: string[];
+  linkedStaffId: string | null;
+};
+
 export type RotaStaffWorkspaceRow = {
   id: string;
+  appProfileId: string | null;
   employeeRef: string;
   rotacloudUserId: number | null;
   staffName: string;
   primaryRole: string;
+  roleRank: number;
+  displayOrder: number;
+  organisationWide: boolean;
   skills: string[];
   minimumWeeklyHours: number;
   targetWeeklyHours: number;
@@ -74,6 +86,14 @@ export type RotaPlanningWorkspace = {
   minimumRestHours: number;
   intervalMinutes: number;
   salesPerLabourHourTarget: number;
+  rotacloudConfigured: boolean;
+  error: string | null;
+};
+
+export type RotaStaffWorkspace = {
+  sites: RotaSite[];
+  staff: RotaStaffWorkspaceRow[];
+  appProfiles: RotaAppProfileOption[];
   rotacloudConfigured: boolean;
   error: string | null;
 };
@@ -140,9 +160,7 @@ export async function getRotaPlanningWorkspace(input: {
     ]);
 
     const unavailable = [settingsResult.error, rulesResult.error, demandResult.error, hourlyResult.error, eventsResult.error, privateResult.error, planResult.error].find(Boolean);
-    if (unavailable) {
-      return { ...empty, sites, selectedSite, error: "Rota intelligence is waiting for its staging database migration." };
-    }
+    if (unavailable) return { ...empty, sites, selectedSite, error: "Rota intelligence is waiting for its staging database migration." };
 
     const reportIds = (reportsResult.data ?? []).map((report) => report.id);
     const salesResult = reportIds.length
@@ -156,8 +174,6 @@ export async function getRotaPlanningWorkspace(input: {
     }));
     const dailySales = new Map<string, number>();
     for (const row of hourlyRows) dailySales.set(row.businessDate, (dailySales.get(row.businessDate) ?? 0) + row.netSales);
-    // A weekly report's reconciled daily total is authoritative. Hourly EPOS
-    // data fills gaps where that report has not yet been created.
     for (const row of salesResult.data ?? []) dailySales.set(row.business_date, toNumber(row.net_sales));
     const history = [...dailySales].map(([businessDate, netSales]) => ({ businessDate, netSales })).sort((a, b) => a.businessDate.localeCompare(b.businessDate));
     const fallbackDemand = (demandResult.data ?? []).map((row) => ({
@@ -172,7 +188,9 @@ export async function getRotaPlanningWorkspace(input: {
       intervalMinutes: settings?.interval_minutes ?? 60,
       minimumHistoryWeeks: settings?.minimum_history_weeks ?? 4,
     });
-    const staff = ((privateResult.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapPrivateStaff);
+    const staff = ((privateResult.data ?? []) as unknown as Array<Record<string, unknown>>)
+      .map(mapPrivateStaff)
+      .sort((a, b) => a.roleRank - b.roleRank || a.displayOrder - b.displayOrder || a.staffName.localeCompare(b.staffName));
 
     if (isRotaCloudConfigured()) {
       try {
@@ -223,45 +241,126 @@ export async function getRotaPlanningWorkspace(input: {
   }
 }
 
-export async function getRotaStaffWorkspace(profile: SessionProfile): Promise<{ sites: RotaSite[]; staff: RotaStaffWorkspaceRow[]; rotacloudConfigured: boolean; error: string | null }> {
+export async function getRotaStaffWorkspace(profile: SessionProfile): Promise<RotaStaffWorkspace> {
   if (environment.isDemo) {
     const workspace = demoWorkspace(profile, undefined, nextMonday());
-    return { sites: workspace.sites, staff: demoStaffWorkspace(workspace.sites[0]?.id ?? "kardia"), rotacloudConfigured: false, error: null };
+    const staff = demoStaffWorkspace(workspace.sites[0]?.id ?? "kardia");
+    return {
+      sites: workspace.sites,
+      staff,
+      appProfiles: demoAppProfiles(staff),
+      rotacloudConfigured: false,
+      error: null,
+    };
   }
+
   try {
     const admin = createAdminClient();
-    const [{ data: siteRows, error: siteError }, { data, error }] = await Promise.all([
+    const [siteResult, staffResult, profileResult] = await Promise.all([
       admin.from("sites").select("id, code, name, labour_target").eq("organisation_id", profile.organisationId).eq("active", true).order("name"),
       admin.rpc("get_rota_private_workspace", { target_organisation: profile.organisationId }),
+      admin.from("profiles").select("id, full_name, role, active").eq("organisation_id", profile.organisationId).eq("active", true).order("full_name"),
     ]);
-    if (siteError || error) return { sites: [], staff: [], rotacloudConfigured: isRotaCloudConfigured(), error: "The private rota team workspace is waiting for its database migration." };
-    const sites = (siteRows ?? []).map((site) => ({ id: site.id, code: site.code, name: site.name, labourTarget: toNumber(site.labour_target) }));
-    return { sites, staff: ((data ?? []) as unknown as Array<Record<string, unknown>>).map(mapStaffWorkspace), rotacloudConfigured: isRotaCloudConfigured(), error: null };
+
+    if (siteResult.error || staffResult.error || profileResult.error) {
+      return { sites: [], staff: [], appProfiles: [], rotacloudConfigured: isRotaCloudConfigured(), error: "The private rota team workspace is waiting for its database migration." };
+    }
+
+    const staff = ((staffResult.data ?? []) as unknown as Array<Record<string, unknown>>).map(mapStaffWorkspace);
+    const profileIds = (profileResult.data ?? []).map((item) => item.id);
+    const membershipResult = profileIds.length
+      ? await admin.from("site_memberships").select("user_id, site_id").in("user_id", profileIds)
+      : { data: [], error: null };
+    if (membershipResult.error) {
+      return { sites: [], staff: [], appProfiles: [], rotacloudConfigured: isRotaCloudConfigured(), error: "App-account site links could not be loaded." };
+    }
+
+    const linkedByProfile = new Map(staff.filter((item) => item.appProfileId).map((item) => [item.appProfileId!, item.id]));
+    const siteIdsByProfile = new Map<string, string[]>();
+    for (const membership of membershipResult.data ?? []) {
+      siteIdsByProfile.set(membership.user_id, [...(siteIdsByProfile.get(membership.user_id) ?? []), membership.site_id]);
+    }
+
+    const appProfiles: RotaAppProfileOption[] = (profileResult.data ?? []).map((item) => ({
+      id: item.id,
+      name: item.full_name,
+      role: String(item.role),
+      siteIds: siteIdsByProfile.get(item.id) ?? [],
+      linkedStaffId: linkedByProfile.get(item.id) ?? null,
+    }));
+    const sites = (siteResult.data ?? []).map((site) => ({ id: site.id, code: site.code, name: site.name, labourTarget: toNumber(site.labour_target) }));
+
+    return { sites, staff, appProfiles, rotacloudConfigured: isRotaCloudConfigured(), error: null };
   } catch {
-    return { sites: [], staff: [], rotacloudConfigured: isRotaCloudConfigured(), error: "The private rota team workspace could not be loaded." };
+    return { sites: [], staff: [], appProfiles: [], rotacloudConfigured: isRotaCloudConfigured(), error: "The private rota team workspace could not be loaded." };
   }
 }
 
 function mapPrivateStaff(row: Record<string, unknown>): RotaStaffProfile {
   return {
-    id: String(row.id), employeeRef: String(row.employeeRef ?? ""), rotacloudUserId: row.rotacloudUserId == null ? null : Number(row.rotacloudUserId),
-    staffName: String(row.staffName ?? ""), primaryRole: String(row.primaryRole ?? ""), roleTitle: String(row.roleTitle ?? ""), skills: (row.skills ?? []) as string[],
-    minimumWeeklyHours: toNumber(row.minimumWeeklyHours), targetWeeklyHours: toNumber(row.targetWeeklyHours), maximumWeeklyHours: toNumber(row.maximumWeeklyHours),
-    minimumShiftMinutes: toNumber(row.minimumShiftMinutes), maximumShiftMinutes: toNumber(row.maximumShiftMinutes), maximumConsecutiveDays: toNumber(row.maximumConsecutiveDays),
-    preferredDays: (row.preferredDays ?? []) as number[], preferredStart: toTime(row.preferredStart), preferredEnd: toTime(row.preferredEnd),
-    payBasis: row.payBasis as "hourly" | "salaried", loadedHourlyRate: toNumber(row.loadedHourlyRate), fixedWeeklyCost: toNumber(row.fixedWeeklyCost), costAllocationPct: toNumber(row.costAllocationPct),
+    id: String(row.id),
+    appProfileId: row.appProfileId == null ? null : String(row.appProfileId),
+    employeeRef: String(row.employeeRef ?? ""),
+    rotacloudUserId: row.rotacloudUserId == null ? null : Number(row.rotacloudUserId),
+    staffName: String(row.staffName ?? ""),
+    primaryRole: String(row.primaryRole ?? ""),
+    roleTitle: String(row.roleTitle ?? ""),
+    roleRank: toNumber(row.roleRank) || 500,
+    displayOrder: toNumber(row.displayOrder) || 1000,
+    organisationWide: Boolean(row.organisationWide),
+    skills: (row.skills ?? []) as string[],
+    minimumWeeklyHours: toNumber(row.minimumWeeklyHours),
+    targetWeeklyHours: toNumber(row.targetWeeklyHours),
+    maximumWeeklyHours: toNumber(row.maximumWeeklyHours),
+    minimumShiftMinutes: toNumber(row.minimumShiftMinutes),
+    maximumShiftMinutes: toNumber(row.maximumShiftMinutes),
+    maximumConsecutiveDays: toNumber(row.maximumConsecutiveDays),
+    preferredDays: (row.preferredDays ?? []) as number[],
+    preferredStart: toTime(row.preferredStart),
+    preferredEnd: toTime(row.preferredEnd),
+    payBasis: row.payBasis as "hourly" | "salaried",
+    loadedHourlyRate: toNumber(row.loadedHourlyRate),
+    fixedWeeklyCost: toNumber(row.fixedWeeklyCost),
+    costAllocationPct: toNumber(row.costAllocationPct),
   };
 }
 
 function mapStaffWorkspace(row: Record<string, unknown>): RotaStaffWorkspaceRow {
   return {
-    id: String(row.id), employeeRef: String(row.employeeRef ?? ""), rotacloudUserId: row.rotacloudUserId == null ? null : Number(row.rotacloudUserId), staffName: String(row.staffName ?? ""),
-    primaryRole: String(row.primaryRole ?? ""), skills: (row.skills ?? []) as string[], minimumWeeklyHours: toNumber(row.minimumWeeklyHours), targetWeeklyHours: toNumber(row.targetWeeklyHours),
-    maximumWeeklyHours: toNumber(row.maximumWeeklyHours), minimumShiftMinutes: toNumber(row.minimumShiftMinutes), maximumShiftMinutes: toNumber(row.maximumShiftMinutes), maximumConsecutiveDays: toNumber(row.maximumConsecutiveDays),
-    preferredDays: (row.preferredDays ?? []) as number[], preferredStart: toTime(row.preferredStart), preferredEnd: toTime(row.preferredEnd), notes: String(row.notes ?? ""), active: Boolean(row.active),
-    siteId: String(row.siteId), roleTitle: String(row.roleTitle ?? ""), payBasis: row.payBasis as "hourly" | "salaried", hourlyRate: row.hourlyRate == null ? null : toNumber(row.hourlyRate),
-    annualSalary: row.annualSalary == null ? null : toNumber(row.annualSalary), contractedWeeklyHours: row.contractedWeeklyHours == null ? null : toNumber(row.contractedWeeklyHours), employerNiRate: toNumber(row.employerNiRate),
-    pensionRate: toNumber(row.pensionRate), otherOncostRate: toNumber(row.otherOncostRate), costAllocationPct: toNumber(row.costAllocationPct), primarySite: Boolean(row.primarySite), validFrom: String(row.validFrom), validTo: row.validTo == null ? null : String(row.validTo),
+    id: String(row.id),
+    appProfileId: row.appProfileId == null ? null : String(row.appProfileId),
+    employeeRef: String(row.employeeRef ?? ""),
+    rotacloudUserId: row.rotacloudUserId == null ? null : Number(row.rotacloudUserId),
+    staffName: String(row.staffName ?? ""),
+    primaryRole: String(row.primaryRole ?? ""),
+    roleRank: toNumber(row.roleRank) || 500,
+    displayOrder: toNumber(row.displayOrder) || 1000,
+    organisationWide: Boolean(row.organisationWide),
+    skills: (row.skills ?? []) as string[],
+    minimumWeeklyHours: toNumber(row.minimumWeeklyHours),
+    targetWeeklyHours: toNumber(row.targetWeeklyHours),
+    maximumWeeklyHours: toNumber(row.maximumWeeklyHours),
+    minimumShiftMinutes: toNumber(row.minimumShiftMinutes),
+    maximumShiftMinutes: toNumber(row.maximumShiftMinutes),
+    maximumConsecutiveDays: toNumber(row.maximumConsecutiveDays),
+    preferredDays: (row.preferredDays ?? []) as number[],
+    preferredStart: toTime(row.preferredStart),
+    preferredEnd: toTime(row.preferredEnd),
+    notes: String(row.notes ?? ""),
+    active: Boolean(row.active),
+    siteId: String(row.siteId),
+    roleTitle: String(row.roleTitle ?? ""),
+    payBasis: row.payBasis as "hourly" | "salaried",
+    hourlyRate: row.hourlyRate == null ? null : toNumber(row.hourlyRate),
+    annualSalary: row.annualSalary == null ? null : toNumber(row.annualSalary),
+    contractedWeeklyHours: row.contractedWeeklyHours == null ? null : toNumber(row.contractedWeeklyHours),
+    employerNiRate: toNumber(row.employerNiRate),
+    pensionRate: toNumber(row.pensionRate),
+    otherOncostRate: toNumber(row.otherOncostRate),
+    costAllocationPct: toNumber(row.costAllocationPct),
+    primarySite: Boolean(row.primarySite),
+    validFrom: String(row.validFrom),
+    validTo: row.validTo == null ? null : String(row.validTo),
   };
 }
 
@@ -317,17 +416,67 @@ function demoWorkspace(profile: SessionProfile, requestedSiteId: string | undefi
 
 function demoStaff(): RotaStaffProfile[] {
   const rows = [
-    ["Scott Hutton", "Kitchen Manager", "salaried", 17.8, 673, 40, 48, [1, 2, 3, 4, 5]],
-    ["Warren Raisbeck", "Kitchen Manager", "hourly", 16.4, 0, 32, 45, [2, 3, 4, 5, 6]],
-    ["Bhavya Pawar", "Pizzaiolo", "hourly", 14.2, 0, 32, 44, [1, 2, 4, 5, 6]],
-    ["Finlay James", "Pizzaiolo", "hourly", 13.5, 0, 24, 40, [2, 3, 4, 5, 6]],
-    ["Logan Butler", "Pizzaiolo", "hourly", 13.2, 0, 28, 42, [1, 3, 4, 5, 6]],
-    ["Owen Birrell", "Pizzaiolo", "hourly", 14, 0, 32, 44, [1, 2, 3, 5, 0]],
-    ["Beth Redruth", "Pizzaiolo", "hourly", 12.9, 0, 20, 36, [1, 2, 3, 0]],
-  ] as const;
-  return rows.map((row, index) => ({ id: `00000000-0000-4000-8000-${String(1000 + index).padStart(12, "0")}`, employeeRef: `DEMO-${index + 1}`, rotacloudUserId: null, staffName: row[0], primaryRole: row[1], roleTitle: row[1], skills: [row[1].toLowerCase()], minimumWeeklyHours: Math.max(0, row[5] - 8), targetWeeklyHours: row[5], maximumWeeklyHours: row[6], minimumShiftMinutes: 240, maximumShiftMinutes: 720, maximumConsecutiveDays: 5, preferredDays: [...row[7]], preferredStart: "10:00", preferredEnd: "22:00", payBasis: row[2], loadedHourlyRate: row[3], fixedWeeklyCost: row[4], costAllocationPct: 100 }));
+    { name: "Chris Edwards", role: "Group Chef", basis: "salaried" as const, rate: 0, fixed: 1200, target: 42.5, max: 48, days: [1, 2, 3, 4, 5], rank: 100, order: 10, wide: true },
+    { name: "Scott Hutton", role: "Kitchen Manager", basis: "salaried" as const, rate: 0, fixed: 673, target: 40, max: 48, days: [1, 2, 3, 4, 5], rank: 200, order: 10, wide: true },
+    { name: "Warren Raisbeck", role: "Kitchen Manager", basis: "hourly" as const, rate: 16.4, fixed: 0, target: 40, max: 45, days: [2, 3, 4, 5, 6], rank: 200, order: 20, wide: false },
+    { name: "Bhavya Pawar", role: "Pizzaiolo", basis: "hourly" as const, rate: 14.2, fixed: 0, target: 32, max: 44, days: [1, 2, 4, 5, 6], rank: 300, order: 10, wide: false },
+    { name: "Finlay James", role: "Pizzaiolo", basis: "hourly" as const, rate: 13.5, fixed: 0, target: 24, max: 40, days: [2, 3, 4, 5, 6], rank: 300, order: 20, wide: false },
+    { name: "Logan Butler", role: "Pizzaiolo", basis: "hourly" as const, rate: 13.2, fixed: 0, target: 28, max: 42, days: [1, 3, 4, 5, 6], rank: 300, order: 30, wide: false },
+    { name: "Owen Birrell", role: "Pizzaiolo", basis: "hourly" as const, rate: 14, fixed: 0, target: 32, max: 44, days: [1, 2, 3, 5, 0], rank: 300, order: 40, wide: false },
+    { name: "Beth Redruth", role: "Kitchen Team", basis: "hourly" as const, rate: 12.9, fixed: 0, target: 20, max: 36, days: [1, 2, 3, 0], rank: 400, order: 10, wide: false },
+  ];
+  return rows.map((row, index) => ({
+    id: `00000000-0000-4000-8000-${String(1000 + index).padStart(12, "0")}`,
+    appProfileId: index < 3 ? `00000000-0000-4000-9000-${String(2000 + index).padStart(12, "0")}` : null,
+    employeeRef: `DEMO-${index + 1}`,
+    rotacloudUserId: null,
+    staffName: row.name,
+    primaryRole: row.role,
+    roleTitle: row.role,
+    roleRank: row.rank,
+    displayOrder: row.order,
+    organisationWide: row.wide,
+    skills: [row.role.toLowerCase()],
+    minimumWeeklyHours: Math.max(0, row.target - 8),
+    targetWeeklyHours: row.target,
+    maximumWeeklyHours: row.max,
+    minimumShiftMinutes: 240,
+    maximumShiftMinutes: 720,
+    maximumConsecutiveDays: 5,
+    preferredDays: [...row.days],
+    preferredStart: "10:00",
+    preferredEnd: "22:00",
+    payBasis: row.basis,
+    loadedHourlyRate: row.rate,
+    fixedWeeklyCost: row.fixed,
+    costAllocationPct: 100,
+  }));
 }
 
 function demoStaffWorkspace(siteId: string): RotaStaffWorkspaceRow[] {
-  return demoStaff().map((staff) => ({ ...staff, notes: "Demo profile", siteId, hourlyRate: staff.payBasis === "hourly" ? staff.loadedHourlyRate : null, annualSalary: staff.payBasis === "salaried" ? staff.fixedWeeklyCost * 52 : null, contractedWeeklyHours: staff.targetWeeklyHours, employerNiRate: 0, pensionRate: 0, otherOncostRate: 0, primarySite: true, validFrom: "2026-01-01", validTo: null, active: true }));
+  return demoStaff().map((staff) => ({
+    ...staff,
+    notes: "Demo profile",
+    siteId,
+    hourlyRate: staff.payBasis === "hourly" ? staff.loadedHourlyRate : null,
+    annualSalary: staff.payBasis === "salaried" ? staff.fixedWeeklyCost * 52 : null,
+    contractedWeeklyHours: staff.targetWeeklyHours,
+    employerNiRate: 0,
+    pensionRate: 0,
+    otherOncostRate: 0,
+    primarySite: true,
+    validFrom: "2026-01-01",
+    validTo: null,
+    active: true,
+  }));
+}
+
+function demoAppProfiles(staff: RotaStaffWorkspaceRow[]): RotaAppProfileOption[] {
+  return staff.filter((item) => item.appProfileId).map((item) => ({
+    id: item.appProfileId!,
+    name: item.staffName,
+    role: item.roleTitle === "Group Chef" ? "admin" : "kitchen_manager",
+    siteIds: item.organisationWide ? [] : [item.siteId],
+    linkedStaffId: item.id,
+  }));
 }
