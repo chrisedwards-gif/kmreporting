@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StoredRotaPlan } from "@/lib/data/rotas";
-import { visibleRotaPlan } from "@/lib/rota/visibility";
+import type { RotaStaffProfile } from "@/lib/rota/types";
+import { visibleRotaPlan, visibleRotaStaff } from "@/lib/rota/visibility";
 
 const plan = {
   id: "plan-1",
@@ -53,6 +54,29 @@ const plan = {
   }],
 } satisfies StoredRotaPlan;
 
+const staff = (input: Partial<RotaStaffProfile> & Pick<RotaStaffProfile, "id" | "staffName" | "primaryRole" | "roleRank" | "displayOrder">): RotaStaffProfile => ({
+  appProfileId: null,
+  employeeRef: input.id,
+  rotacloudUserId: null,
+  roleTitle: input.primaryRole,
+  organisationWide: false,
+  skills: [],
+  minimumWeeklyHours: 0,
+  targetWeeklyHours: 40,
+  maximumWeeklyHours: 48,
+  minimumShiftMinutes: 240,
+  maximumShiftMinutes: 720,
+  maximumConsecutiveDays: 6,
+  preferredDays: [1, 2, 3, 4, 5],
+  preferredStart: null,
+  preferredEnd: null,
+  payBasis: "hourly",
+  loadedHourlyRate: 14,
+  fixedWeeklyCost: 0,
+  costAllocationPct: 100,
+  ...input,
+});
+
 describe("rota finance visibility", () => {
   it("removes salary allocation and private cost from kitchen-manager plans", () => {
     const visible = visibleRotaPlan(plan, "hourly_only");
@@ -71,5 +95,20 @@ describe("rota finance visibility", () => {
 
   it("leaves the full management plan unchanged", () => {
     expect(visibleRotaPlan(plan, "full")).toBe(plan);
+  });
+
+  it("sorts by rank and person order while retaining the linked account UUID", () => {
+    const visible = visibleRotaStaff([
+      staff({ id: "00000000-0000-4000-8000-000000000003", staffName: "Warren", primaryRole: "Kitchen Manager", roleRank: 200, displayOrder: 20 }),
+      staff({ id: "00000000-0000-4000-8000-000000000001", appProfileId: "00000000-0000-4000-9000-000000000001", staffName: "Chris", primaryRole: "Group Chef", roleRank: 100, displayOrder: 10, organisationWide: true, payBasis: "salaried", loadedHourlyRate: 31, fixedWeeklyCost: 1200 }),
+      staff({ id: "00000000-0000-4000-8000-000000000002", staffName: "Scott", primaryRole: "Kitchen Manager", roleRank: 200, displayOrder: 10, payBasis: "salaried", loadedHourlyRate: 20, fixedWeeklyCost: 700 }),
+    ]);
+
+    expect(visible.map((person) => person.name)).toEqual(["Chris", "Scott", "Warren"]);
+    expect(visible[0].appProfileId).toBe("00000000-0000-4000-9000-000000000001");
+    expect(visible[0].organisationWide).toBe(true);
+    expect(visible[0].hourlyRate).toBeNull();
+    expect(visible[1].hourlyRate).toBeNull();
+    expect(visible[2].hourlyRate).toBe(14);
   });
 });
