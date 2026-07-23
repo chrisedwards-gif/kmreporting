@@ -82,7 +82,7 @@ test("Kitchen Manager can build a salary-safe rota with score and daily learning
   await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: /Build next week.s rota/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Management review before you build or approve" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask a senior operator to challenge the plan" })).toBeVisible();
   await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Week 30 rota/ })).toBeVisible();
