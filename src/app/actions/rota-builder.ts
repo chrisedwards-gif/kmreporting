@@ -7,6 +7,7 @@ import { scopeContainsSite } from "@/lib/auth/site-scope";
 import { encodeRotaMark } from "@/lib/data/rota-builder";
 import { environment } from "@/lib/env";
 import type { RotaPlanMark } from "@/lib/rota/types";
+import { createRotaWarning, prefixRotaWarning } from "@/lib/rota/warnings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type RotaBuilderActionState = {
@@ -207,9 +208,9 @@ export async function saveRotaBuilderDraft(
         const paid = (new Date(shift.shiftEnd).getTime() - new Date(shift.shiftStart).getTime()) / 60_000 - shift.breakMinutes;
         return Boolean(shift.staffProfileId && paid < 360);
       });
-      if (gaps.length) warnings.push(`${gaps.length} time slot${gaps.length === 1 ? " is" : "s are"} below required cover.`);
-      if (openShifts.length) warnings.push(`${openShifts.length} open shift${openShifts.length === 1 ? " needs" : "s need"} assigning.`);
-      if (shortShifts.length) warnings.push(`${shortShifts.length} shift${shortShifts.length === 1 ? " is" : "s are"} under six paid hours.`);
+      if (gaps.length) warnings.push(createRotaWarning(`${gaps.length} time slot${gaps.length === 1 ? " is" : "s are"} below required cover.`, "all"));
+      if (openShifts.length) warnings.push(createRotaWarning(`${openShifts.length} open shift${openShifts.length === 1 ? " needs" : "s need"} assigning.`, "all"));
+      if (shortShifts.length) warnings.push(createRotaWarning(`${shortShifts.length} shift${shortShifts.length === 1 ? " is" : "s are"} under six paid hours.`, "all"));
 
       return {
         businessDate: day.businessDate,
@@ -222,11 +223,12 @@ export async function saveRotaBuilderDraft(
       };
     });
 
-    const warnings = days.flatMap((day) => day.warnings.map((warning) => `${day.businessDate}: ${warning}`));
+    const warnings = days.flatMap((day) =>
+      day.warnings.map((warning) => prefixRotaWarning(`${day.businessDate}: `, warning)));
     for (const person of staff) {
       const hours = plannedHours.get(person.id) ?? 0;
-      if (hours + 0.01 < person.minimumHours) warnings.push(`${person.name} is ${(person.minimumHours - hours).toFixed(1)}h below minimum hours.`);
-      if (hours > person.maximumHours + 0.01) warnings.push(`${person.name} is ${(hours - person.maximumHours).toFixed(1)}h above maximum hours.`);
+      if (hours + 0.01 < person.minimumHours) warnings.push(createRotaWarning(`${person.name} is ${(person.minimumHours - hours).toFixed(1)}h below minimum hours.`, "all"));
+      if (hours > person.maximumHours + 0.01) warnings.push(createRotaWarning(`${person.name} is ${(hours - person.maximumHours).toFixed(1)}h above maximum hours.`, "all"));
     }
 
     const marks: RotaPlanMark[] = parsed.data.marks.map((mark) =>
