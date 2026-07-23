@@ -1,5 +1,6 @@
 import type { StoredRotaPlan } from "@/lib/data/rotas";
 import type { RotaStaffProfile } from "@/lib/rota/types";
+import { visibleRotaWarnings } from "@/lib/rota/warnings";
 
 export type RotaFinanceVisibility = "full" | "hourly_only";
 
@@ -17,8 +18,6 @@ export type RotaDisplayStaff = {
   payBasis: "hourly" | "salaried";
   hourlyRate: number | null;
 };
-
-const privateCostWarning = /(salary|salaried|fixed labour|fixed cost|annual pay)/i;
 
 export function visibleRotaStaff(staff: RotaStaffProfile[]): RotaDisplayStaff[] {
   return staff
@@ -43,7 +42,18 @@ export function visibleRotaPlan(
   plan: StoredRotaPlan,
   visibility: RotaFinanceVisibility,
 ): StoredRotaPlan {
-  if (visibility === "full") return plan;
+  const audience = visibility === "full" ? "management" : "all";
+
+  if (visibility === "full") {
+    return {
+      ...plan,
+      warnings: visibleRotaWarnings(plan.warnings, audience),
+      days: plan.days.map((day) => ({
+        ...day,
+        warnings: visibleRotaWarnings(day.warnings, audience),
+      })),
+    };
+  }
 
   const days = plan.days.map((day) => {
     const evidence = { ...day.evidence };
@@ -60,7 +70,7 @@ export function visibleRotaPlan(
       fixedLabourCost: 0,
       plannedCost: hourlyCost,
       evidence,
-      warnings: day.warnings.filter((warning) => !privateCostWarning.test(warning)),
+      warnings: visibleRotaWarnings(day.warnings, audience),
       shifts: day.shifts.map((shift) => ({
         ...shift,
         privateCost: 0,
@@ -78,7 +88,7 @@ export function visibleRotaPlan(
     plannedCost,
     explanation:
       "Forecast, cover and hours are unchanged. Cost figures in this kitchen-manager view include the hourly team only; salaried pay and salary allocation stay private.",
-    warnings: plan.warnings.filter((warning) => !privateCostWarning.test(warning)),
+    warnings: visibleRotaWarnings(plan.warnings, audience),
     days,
   };
 }
