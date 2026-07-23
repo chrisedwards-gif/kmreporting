@@ -15,6 +15,30 @@ export type RotaBuilderMetadata = {
 };
 
 const emptyMetadata: RotaBuilderMetadata = { marks: [], notes: [] };
+const locationPrefix = /^\[\[location:(offsite|head_office|other_site)\]\]\s*/;
+
+export function decodeRotaMark(markType: string, rawNote: string): Pick<RotaPlanMark, "markType" | "note"> {
+  const match = rawNote.match(locationPrefix);
+  if (markType === "training" && match) {
+    return {
+      markType: match[1] as RotaPlanMark["markType"],
+      note: rawNote.replace(locationPrefix, ""),
+    };
+  }
+  return {
+    markType: markType as RotaPlanMark["markType"],
+    note: rawNote,
+  };
+}
+
+export function encodeRotaMark(mark: RotaPlanMark): RotaPlanMark {
+  if (!["offsite", "head_office", "other_site"].includes(mark.markType)) return mark;
+  return {
+    ...mark,
+    markType: "training",
+    note: `[[location:${mark.markType}]] ${mark.note}`.trim(),
+  };
+}
 
 export async function getRotaBuilderMetadata(input: {
   planId: string;
@@ -48,12 +72,14 @@ export async function getRotaBuilderMetadata(input: {
         shiftEnd: row.shift_end,
         note: String(row.note ?? ""),
       })),
-      marks: (markResult.data ?? []).map((row) => ({
-        staffProfileId: String(row.staff_profile_id),
-        businessDate: String(row.business_date),
-        markType: row.mark_type as RotaPlanMark["markType"],
-        note: String(row.note ?? ""),
-      })),
+      marks: (markResult.data ?? []).map((row) => {
+        const decoded = decodeRotaMark(String(row.mark_type), String(row.note ?? ""));
+        return {
+          staffProfileId: String(row.staff_profile_id),
+          businessDate: String(row.business_date),
+          ...decoded,
+        };
+      }),
     };
   } catch {
     return emptyMetadata;
