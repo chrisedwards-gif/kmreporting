@@ -7,6 +7,7 @@ import {
   CircleAlert,
   MessageSquareText,
   Settings2,
+  SlidersHorizontal,
   UsersRound,
 } from "lucide-react";
 import { RotaAiBrief } from "@/components/rotas/rota-ai-brief";
@@ -107,9 +108,9 @@ export default async function RotasPage({
   const staffTargets = visibleStaff.map((staff) => ({
     id: staff.id,
     name: staff.name,
-    minimumHours: staff.minimumHours,
-    targetHours: staff.targetHours,
-    maximumHours: staff.maximumHours,
+    minimumHours: staff.organisationWide ? 0 : staff.minimumHours,
+    targetHours: staff.organisationWide ? 0 : staff.targetHours,
+    maximumHours: staff.organisationWide ? 100 : staff.maximumHours,
   }));
 
   const priorWeek = addDays(workspace.weekStart, -7);
@@ -120,6 +121,7 @@ export default async function RotasPage({
   const hasHourlyShape = workspace.demand.some(
     (point) => point.source === "hourly_sales",
   );
+  const linkedCount = workspace.staff.filter((staff) => staff.appProfileId).length;
   const readiness = [
     {
       label: "Sales history",
@@ -128,10 +130,10 @@ export default async function RotasPage({
       ready: hasEnoughHistory,
     },
     {
-      label: "Team",
-      value: `${workspace.staff.length} active profile${workspace.staff.length === 1 ? "" : "s"}`,
-      detail: "Availability, skills and agreed hours",
-      ready: workspace.staff.length >= 2,
+      label: "Team identities",
+      value: `${linkedCount} of ${workspace.staff.length} linked`,
+      detail: "Login UUIDs, roles, skills and agreed hours",
+      ready: workspace.staff.length >= 2 && linkedCount > 0,
     },
     {
       label: "Busy periods",
@@ -147,159 +149,66 @@ export default async function RotasPage({
     },
   ];
   const readyCount = readiness.filter((item) => item.ready).length;
-  const canManageTeam =
-    profile.actualRole === "admin" || profile.actualRole === "group_manager";
+  const canManageTeam = profile.actualRole === "admin" || profile.actualRole === "group_manager";
 
   return (
     <>
-      <header className="rota-page-header">
+      <header className="rota-page-header rota-page-header--compact">
         <div>
           <p className="page-header__eyebrow">People and labour</p>
-          <h1>Build next week’s rota with the forecast beside you</h1>
-          <p>
-            The kitchen manager chooses every shift. KM Reporting supplies demand,
-            heat maps, agreed-hours checks, labour guidance, a live rota score and
-            an optional AI challenge before the week is copied into RotaCloud.
-          </p>
+          <h1>Build the week with demand, cost and cover beside every shift.</h1>
+          <p>The grid is the workspace. Supporting setup, AI challenge and optional templates sit below it.</p>
         </div>
         <nav aria-label="Rota tools" className="rota-page-header__links">
-          {site ? (
-            <Link
-              className="button button--secondary"
-              href={`/rotas/feedback?site=${site.id}`}
-            >
-              <MessageSquareText aria-hidden="true" size={16} /> Feedback history
-            </Link>
-          ) : null}
-          {canManageTeam ? (
-            <>
-              <Link className="button button--secondary" href="/rotas/team">
-                <UsersRound aria-hidden="true" size={16} /> Team
-              </Link>
-              <Link
-                className="button button--secondary"
-                href={site ? `/rotas/settings?site=${site.id}` : "/rotas/settings"}
-              >
-                <Settings2 aria-hidden="true" size={16} /> Planner settings
-              </Link>
-            </>
-          ) : null}
+          {site ? <Link className="button button--secondary" href={`/rotas/feedback?site=${site.id}`}><MessageSquareText aria-hidden="true" size={16} /> Feedback history</Link> : null}
+          {canManageTeam ? <><Link className="button button--secondary" href="/rotas/team"><UsersRound aria-hidden="true" size={16} /> Team & order</Link><Link className="button button--secondary" href={site ? `/rotas/settings?site=${site.id}` : "/rotas/settings"}><Settings2 aria-hidden="true" size={16} /> Forecast settings</Link></> : null}
         </nav>
       </header>
 
-      <form className="rota-toolbar panel" method="get">
-        <label className="field">
-          <span className="field__label">Kitchen</span>
-          <select className="field__input" defaultValue={site?.id} name="site">
-            {workspace.sites.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span className="field__label">Week starting</span>
-          <input
-            className="field__input"
-            defaultValue={workspace.weekStart}
-            name="week"
-            type="date"
-          />
-        </label>
-        <button className="button button--secondary" type="submit">
-          <CalendarClock aria-hidden="true" size={16} /> Open week
-        </button>
-        <div className="rota-toolbar__week">
-          <Link
-            aria-label="Previous week"
-            className="icon-button"
-            href={`/rotas?week=${priorWeek}${siteQuery}`}
-          >
-            <ArrowLeft aria-hidden="true" size={16} />
-          </Link>
-          <span>{formatDate(workspace.weekStart)}–{formatDate(addDays(workspace.weekStart, 6))}</span>
-          <Link
-            aria-label="Next week"
-            className="icon-button"
-            href={`/rotas?week=${nextWeek}${siteQuery}`}
-          >
-            <ArrowRight aria-hidden="true" size={16} />
-          </Link>
-        </div>
+      <form className="rota-toolbar panel rota-toolbar--sticky" method="get">
+        <label className="field"><span className="field__label">Kitchen</span><select className="field__input" defaultValue={site?.id} name="site">{workspace.sites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="field"><span className="field__label">Week starting</span><input className="field__input" defaultValue={workspace.weekStart} name="week" type="date" /></label>
+        <button className="button button--secondary" type="submit"><CalendarClock aria-hidden="true" size={16} /> Open week</button>
+        <div className="rota-toolbar__week"><Link aria-label="Previous week" className="icon-button" href={`/rotas?week=${priorWeek}${siteQuery}`}><ArrowLeft aria-hidden="true" size={16} /></Link><span>{formatDate(workspace.weekStart)}–{formatDate(addDays(workspace.weekStart, 6))}</span><Link aria-label="Next week" className="icon-button" href={`/rotas?week=${nextWeek}${siteQuery}`}><ArrowRight aria-hidden="true" size={16} /></Link></div>
       </form>
 
-      {workspace.error ? (
-        <div className="form-message form-message--error" role="alert">
-          {workspace.error}
-        </div>
-      ) : null}
+      {workspace.error ? <div className="form-message form-message--error" role="alert">{workspace.error}</div> : null}
 
       {site ? (
         <>
-          <details className={`rota-setup panel ${readyCount < readiness.length ? "rota-setup--attention" : ""}`}>
-            <summary>
-              {readyCount === readiness.length ? (
-                <CheckCircle2 aria-hidden="true" size={19} />
-              ) : (
-                <CircleAlert aria-hidden="true" size={19} />
-              )}
-              <span>
-                <strong>
-                  {readyCount === readiness.length
-                    ? "Everything needed for the rota builder is ready"
-                    : `${readyCount} of ${readiness.length} planning inputs are ready`}
-                </strong>
-                <small>Open this only when you need to check where the guidance comes from.</small>
-              </span>
-            </summary>
-            <div className="rota-setup__details">
-              {readiness.map((item) => (
-                <div className="rota-setup__item" key={item.label}>
-                  <span>{item.label}</span>
-                  <strong>{item.value}</strong>
-                  <small>{item.detail}</small>
-                </div>
-              ))}
-            </div>
-          </details>
-
-          <RotaControls
-            hasPlan={Boolean(plan)}
-            siteId={site.id}
-            weekStart={workspace.weekStart}
-          />
-
           {plan ? (
             <>
-              <RotaAiBrief
-                plan={plan}
-                signals={signals}
-                staffTargets={staffTargets}
-              />
               <RotaWeekOverlay
                 financeVisibility={financeVisibility}
-                key={`${plan.id}-${plan.plannedHours}-${plan.plannedCost}`}
+                key={`${plan.id}-${plan.plannedHours}-${plan.plannedCost}-${visibleStaff.length}`}
                 marks={builderMetadata.marks}
                 plan={plan}
                 signals={signals}
                 siteId={site.id}
                 staff={visibleStaff}
               />
-              <RotaWeekFeedbackStrip
-                days={plan.days.map((day) => day.businessDate)}
-                feedback={weekFeedback}
-                siteId={site.id}
-              />
+              <RotaWeekFeedbackStrip days={plan.days.map((day) => day.businessDate)} feedback={weekFeedback} siteId={site.id} />
+              <RotaAiBrief plan={plan} signals={signals} staffTargets={staffTargets} />
             </>
           ) : (
-            <section className="panel empty-state">
+            <section className="panel empty-state rota-empty-first">
               <CalendarClock aria-hidden="true" size={30} />
               <h2>No rota draft exists for this week yet</h2>
-              <p>
-                Start a blank forecast-led week, then let the kitchen manager add
-                each shift using the heat map and cover guidance.
-              </p>
+              <p>Start a blank forecast-led week. The grid will open immediately with the full ranked team, sales forecast and demand heat maps.</p>
+              <RotaControls hasPlan={false} siteId={site.id} weekStart={workspace.weekStart} />
             </section>
           )}
+
+          {plan ? (
+            <section className="rota-supporting-tools" aria-labelledby="rota-support-title">
+              <header><SlidersHorizontal aria-hidden="true" size={19} /><div><p className="page-header__eyebrow">Below the working rota</p><h2 id="rota-support-title">Setup, events and optional starting tools</h2><p>These controls support the grid but do not interrupt normal weekly rota building.</p></div></header>
+              <RotaControls hasPlan siteId={site.id} weekStart={workspace.weekStart} />
+              <details className={`rota-setup panel ${readyCount < readiness.length ? "rota-setup--attention" : ""}`}>
+                <summary>{readyCount === readiness.length ? <CheckCircle2 aria-hidden="true" size={19} /> : <CircleAlert aria-hidden="true" size={19} />}<span><strong>{readyCount === readiness.length ? "Planning inputs are ready" : `${readyCount} of ${readiness.length} planning inputs are ready`}</strong><small>Open this only to check where the guidance comes from.</small></span></summary>
+                <div className="rota-setup__details">{readiness.map((item) => <div className="rota-setup__item" key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></div>)}</div>
+              </details>
+            </section>
+          ) : null}
         </>
       ) : null}
     </>
@@ -307,9 +216,5 @@ export default async function RotasPage({
 }
 
 function AccessDenied() {
-  return (
-    <section className="panel empty-state">
-      <h1>Rota planning is not available for this role.</h1>
-    </section>
-  );
+  return <section className="panel empty-state"><h1>Rota planning is not available for this role.</h1></section>;
 }
