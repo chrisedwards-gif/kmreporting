@@ -5,8 +5,10 @@ import { CostChart } from "@/components/dashboard/cost-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { Workbench } from "@/components/dashboard/workbench";
+import { RotaWeekFeedbackStrip } from "@/components/rotas/rota-week-feedback";
 import { requireSessionProfile, type SessionProfile } from "@/lib/auth/dal";
 import { getVisibleManagerMessages } from "@/lib/data/manager-home";
+import { getRotaWeekFeedback } from "@/lib/data/rota-week-feedback";
 import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
 import type { ReportingBundle } from "@/lib/data/reporting";
 import { getWorkbench } from "@/lib/data/workbench";
@@ -15,6 +17,13 @@ import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
 export const metadata = { title: "Group overview" };
 
+const londonToday = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/London",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
+
 async function DashboardWorkbench({ profile, bundle }: { profile: SessionProfile; bundle: ReportingBundle }) {
   const workbench = await getWorkbench(profile.navigationRole, bundle, { siteIds: profile.siteScopeIds, managerId: profile.scopeManagerId });
   return (
@@ -22,6 +31,33 @@ async function DashboardWorkbench({ profile, bundle }: { profile: SessionProfile
       {profile.navigationRole === "kitchen_manager" ? <div className="section-kicker">Today’s actions</div> : null}
       <Workbench allClear={workbench.allClear} clearMessage={workbench.clearMessage} items={workbench.items} />
     </>
+  );
+}
+
+async function DashboardRotaLearning({ profile, bundle }: { profile: SessionProfile; bundle: ReportingBundle }) {
+  if (profile.navigationRole !== "kitchen_manager" || !bundle.sites.length) return null;
+  const today = londonToday();
+  const rows = await Promise.all(bundle.sites.map(async (site) => ({
+    site,
+    feedback: await getRotaWeekFeedback({
+      organisationId: profile.organisationId,
+      siteId: site.id,
+      profileId: profile.id,
+      weekStart: today,
+      weekEnd: today,
+    }),
+  })));
+
+  return (
+    <section aria-label="Tonight’s rota learning" className="stack" style={{ marginBottom: "1rem" }}>
+      <div className="section-kicker">Tonight’s staffing check</div>
+      {rows.map(({ site, feedback }) => (
+        <div key={site.id}>
+          {rows.length > 1 ? <h2 className="panel__title" style={{ marginBottom: ".5rem" }}>{site.name}</h2> : null}
+          <RotaWeekFeedbackStrip days={[today]} feedback={feedback} siteId={site.id} />
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -70,6 +106,7 @@ export default async function DashboardPage() {
       {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode is active. You are seeing only {profile.previewSiteName} records and the same navigation as {profile.previewManagerName ?? "the assigned manager"}; your Admin edit rights remain available.</div> : null}
 
       <Suspense fallback={<WorkbenchSkeleton />}><DashboardWorkbench bundle={bundle} profile={profile} /></Suspense>
+      <Suspense fallback={<MessageSkeleton />}><DashboardRotaLearning bundle={bundle} profile={profile} /></Suspense>
       <Suspense fallback={<MessageSkeleton />}><DashboardMessages profile={profile} /></Suspense>
 
       <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
