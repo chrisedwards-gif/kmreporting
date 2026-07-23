@@ -1,0 +1,453 @@
+.rota-week-shell {
+  overflow: hidden;
+  padding: 0;
+}
+
+.rota-week-shell__header {
+  align-items: flex-start;
+  background: linear-gradient(135deg, #f7faf8 0%, #eef6f2 100%);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.rota-week-shell__header h2 {
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  margin: 4px 0 8px;
+}
+
+.rota-week-shell__header p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 760px;
+}
+
+.rota-week-shell__privacy {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #dce8e2;
+  border-radius: 12px;
+  display: flex;
+  flex: 0 0 310px;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.rota-week-shell__privacy svg {
+  color: #2d7a62;
+  margin-top: 2px;
+}
+
+.rota-week-shell__privacy span {
+  display: grid;
+  gap: 3px;
+}
+
+.rota-week-shell__privacy small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.rota-week-metrics {
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rota-week-metrics article {
+  align-items: center;
+  background: #fff;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: auto 1fr;
+  padding: 16px 18px;
+}
+
+.rota-week-metrics article > svg {
+  color: #2d7a62;
+  grid-row: 1 / span 2;
+}
+
+.rota-week-metrics article span {
+  display: grid;
+}
+
+.rota-week-metrics small,
+.rota-week-metrics em {
+  color: var(--muted);
+  font-size: .78rem;
+  font-style: normal;
+}
+
+.rota-week-metrics strong {
+  font-size: 1.08rem;
+}
+
+.rota-week-metric--risk {
+  background: #fff7f4 !important;
+}
+
+.rota-week-metric--risk > svg,
+.rota-week-metric--risk strong {
+  color: #b84934 !important;
+}
+
+.rota-week-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.rota-week-grid {
+  min-width: 1280px;
+}
+
+.rota-week-row {
+  display: grid;
+  grid-template-columns: 220px repeat(7, minmax(145px, 1fr));
+}
+
+.rota-week-row > * {
+  min-width: 0;
+}
+
+.rota-week-row--header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.rota-week-person {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #e5ebe8;
+  border-right: 1px solid #e5ebe8;
+  display: flex;
+  gap: 10px;
+  left: 0;
+  min-height: 86px;
+  padding: 11px 12px;
+  position: sticky;
+  z-index: 2;
+}
+
+.rota-week-person--header {
+  background: #f7f9f8;
+  min-height: 128px;
+  z-index: 5;
+}
+
+.rota-week-person--header span,
+.rota-week-person__copy {
+  display: grid;
+  gap: 3px;
+}
+
+.rota-week-person__copy small,
+.rota-week-person--header small {
+  color: var(--muted);
+  font-size: .75rem;
+}
+
+.rota-week-avatar {
+  align-items: center;
+  background: #edf4f0;
+  border: 1px solid #d4e4dc;
+  border-radius: 999px;
+  color: #285d4d;
+  display: inline-flex;
+  flex: 0 0 30px;
+  font-size: .75rem;
+  font-weight: 800;
+  height: 30px;
+  justify-content: center;
+}
+
+.rota-week-avatar--open {
+  background: #fff2ed;
+  border-color: #ffd4c6;
+  color: #a44330;
+}
+
+.rota-week-person__hours--warning {
+  color: #9a6410 !important;
+  font-weight: 700;
+}
+
+.rota-week-person__hours--danger {
+  color: #b3382a !important;
+  font-weight: 700;
+}
+
+.rota-week-person__hours--good {
+  color: #267358 !important;
+  font-weight: 700;
+}
+
+.rota-week-day {
+  background: #f7f9f8;
+  border: 0;
+  border-bottom: 1px solid #dde6e1;
+  border-right: 1px solid #dde6e1;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  padding: 12px;
+  text-align: left;
+}
+
+.rota-week-day:hover,
+.rota-week-day--selected {
+  background: #eef7f2;
+  box-shadow: inset 0 -3px #2d7a62;
+}
+
+.rota-week-day__title,
+.rota-week-day__numbers {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.rota-week-day__title small,
+.rota-week-day__numbers small {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.rota-week-day__numbers strong {
+  font-size: .92rem;
+}
+
+.rota-week-day__heat {
+  display: grid;
+  gap: 2px;
+  grid-auto-columns: minmax(3px, 1fr);
+  grid-auto-flow: column;
+  height: 18px;
+}
+
+.rota-week-day__heat-cell {
+  background: rgba(38, 115, 88, var(--heat));
+  border-radius: 2px;
+}
+
+.rota-week-day__heat-cell--risk {
+  background: rgba(196, 68, 45, .7);
+}
+
+.rota-week-day__status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: .7rem;
+  font-weight: 750;
+  justify-self: start;
+  padding: 4px 8px;
+}
+
+.rota-week-day__status--good {
+  background: #e7f5ee;
+  color: #236b52;
+}
+
+.rota-week-day__status--watch {
+  background: #fff3d8;
+  color: #875a08;
+}
+
+.rota-week-day__status--risk {
+  background: #ffe8e1;
+  color: #a43f2d;
+}
+
+.rota-week-role > header {
+  align-items: center;
+  background: #edf1ef;
+  border-bottom: 1px solid #d9e2dd;
+  display: flex;
+  justify-content: space-between;
+  left: 0;
+  padding: 7px 12px;
+  position: sticky;
+}
+
+.rota-week-role > header span {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.rota-week-cell {
+  align-content: start;
+  background: linear-gradient(135deg, rgba(248, 250, 249, .9), rgba(255, 255, 255, .96));
+  border-bottom: 1px solid #e5ebe8;
+  border-right: 1px solid #e5ebe8;
+  display: grid;
+  gap: 7px;
+  min-height: 86px;
+  padding: 7px;
+}
+
+.rota-week-cell--risk {
+  background: repeating-linear-gradient(-45deg, rgba(255, 236, 230, .55), rgba(255, 236, 230, .55) 6px, rgba(255, 255, 255, .9) 6px, rgba(255, 255, 255, .9) 12px);
+}
+
+.rota-week-row--open .rota-week-cell {
+  background: #fff9f6;
+}
+
+.rota-week-shift {
+  background: #fff;
+  border: 1px solid #d8e2dd;
+  border-left: 4px solid #68a98f;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(20, 48, 37, .06);
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+}
+
+.rota-week-shift--open {
+  background: #fff8f5;
+  border-color: #f1b9aa;
+  border-left-color: #e87155;
+}
+
+.rota-week-shift strong {
+  font-size: .82rem;
+}
+
+.rota-week-shift span {
+  color: #30463d;
+  font-size: .72rem;
+}
+
+.rota-week-shift small {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: .68rem;
+  gap: 4px;
+}
+
+.rota-week-shift em {
+  color: #875a08;
+  font-size: .66rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.rota-week-insight {
+  background: #f7faf8;
+  border-top: 1px solid var(--border);
+  padding: 22px 24px 24px;
+}
+
+.rota-week-insight > header {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.rota-week-insight h3 {
+  margin: 3px 0 0;
+}
+
+.rota-week-insight__badge {
+  background: #e7f5ee;
+  border-radius: 999px;
+  color: #236b52;
+  font-size: .76rem;
+  font-weight: 750;
+  padding: 6px 10px;
+}
+
+.rota-week-insight__badge--risk {
+  background: #ffe8e1;
+  color: #a43f2d;
+}
+
+.rota-week-insight__grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rota-week-insight__grid article {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #dfe8e3;
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+}
+
+.rota-week-insight__grid article > svg {
+  color: #2d7a62;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.rota-week-insight__grid span {
+  display: grid;
+  gap: 4px;
+}
+
+.rota-week-insight__grid small {
+  color: var(--muted);
+  font-size: .7rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.rota-week-insight__grid p {
+  color: var(--muted);
+  font-size: .77rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .rota-week-metrics,
+  .rota-week-insight__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rota-week-shell__header {
+    flex-direction: column;
+  }
+
+  .rota-week-shell__privacy {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .rota-week-shell__header,
+  .rota-week-insight {
+    padding: 18px;
+  }
+
+  .rota-week-metrics,
+  .rota-week-insight__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rota-week-row {
+    grid-template-columns: 180px repeat(7, minmax(135px, 1fr));
+  }
+
+  .rota-week-grid {
+    min-width: 1125px;
+  }
+}

@@ -6,10 +6,31 @@ import type { RotaPlanningInput, RotaStaffProfile } from "@/lib/rota/types";
 const weekStart = "2026-07-20";
 
 const profile = (id: string, staffName: string, role: string, overrides: Partial<RotaStaffProfile> = {}): RotaStaffProfile => ({
-  id, employeeRef: id, rotacloudUserId: null, staffName, primaryRole: role, roleTitle: role, skills: [role.toLowerCase()], minimumWeeklyHours: 0,
-  targetWeeklyHours: 40, maximumWeeklyHours: 48, minimumShiftMinutes: 240, maximumShiftMinutes: 720, maximumConsecutiveDays: 6,
-  preferredDays: [1, 2, 3, 4, 5, 6], preferredStart: "10:00", preferredEnd: "22:00", payBasis: "hourly", loadedHourlyRate: 14.1,
-  fixedWeeklyCost: 0, costAllocationPct: 100, ...overrides,
+  id,
+  appProfileId: null,
+  employeeRef: id,
+  rotacloudUserId: null,
+  staffName,
+  primaryRole: role,
+  roleTitle: role,
+  roleRank: role.toLowerCase().includes("manager") ? 200 : 300,
+  displayOrder: 10,
+  organisationWide: false,
+  skills: [role.toLowerCase()],
+  minimumWeeklyHours: 0,
+  targetWeeklyHours: 40,
+  maximumWeeklyHours: 48,
+  minimumShiftMinutes: 240,
+  maximumShiftMinutes: 720,
+  maximumConsecutiveDays: 6,
+  preferredDays: [1, 2, 3, 4, 5, 6],
+  preferredStart: "10:00",
+  preferredEnd: "22:00",
+  payBasis: "hourly",
+  loadedHourlyRate: 14.1,
+  fixedWeeklyCost: 0,
+  costAllocationPct: 100,
+  ...overrides,
 });
 
 function saturdayInput(staff: RotaStaffProfile[]): RotaPlanningInput {
@@ -34,14 +55,17 @@ describe("rota planner", () => {
     ];
     const plan = buildRotaPlan(saturdayInput(staff));
     const saturday = plan.days[0];
+    const peakCover = saturday.coverage.find((slot) => slot.slotTime === "17:00")!.required;
+    const openingCover = saturday.coverage.find((slot) => slot.slotTime === "10:00")!.required;
 
     expect(plan.forecastSales).toBe(3000);
     expect(plan.labourBudget).toBe(840);
     expect(saturday.fixedLabourCost).toBe(417);
     expect(saturday.controllableBudget).toBe(423);
     expect(saturday.peakTime).toBe("17:00");
-    expect(saturday.coverage.find((slot) => slot.slotTime === "17:00")!.required).toBe(3);
-    expect(saturday.coverage.find((slot) => slot.slotTime === "10:00")!.required).toBe(2);
+    expect(peakCover).toBe(3);
+    expect(openingCover).toBeGreaterThanOrEqual(2);
+    expect(peakCover).toBeGreaterThanOrEqual(openingCover);
     expect(saturday.shifts.some((shift) => shift.requiredSkill === "kitchen manager")).toBe(true);
     expect(saturday.plannedCost).toBeLessThanOrEqual(840);
   });

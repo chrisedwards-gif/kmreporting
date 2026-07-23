@@ -39,7 +39,7 @@ test("Admin lands in the group workspace", async ({ page }) => {
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Kitchen Manager sees only their kitchen persona and records", async ({ page }) => {
+test("Kitchen Manager sees their kitchen, actions and nightly staffing check", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await expect(page.getByRole("heading", { name: "Hi, Scott." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Kitchen checks" })).toBeVisible();
@@ -47,6 +47,9 @@ test("Kitchen Manager sees only their kitchen persona and records", async ({ pag
   await expect(page.getByText("Dough Religion", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Management summary" })).toHaveCount(0);
+  await expect(page.getByText("Tonight’s staffing check", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Was the cover right?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Right" })).toBeVisible();
 
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("dialog", { name: "Workspace search" })).toBeVisible();
@@ -77,18 +80,36 @@ test("Kitchen Manager can see and unlock weekly submission before reaching the f
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Rota suggestion is easy to plan, downloadable and kitchen-scoped", async ({ page }) => {
+test("Kitchen Manager builds a ranked salary-safe rota with group locations", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/rotas?week=2026-07-20", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: /Plan next week.s rota/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Plan the week in four simple steps" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Build the week with demand, cost and cover/ })).toBeVisible();
   await expect(page.getByLabel("Kitchen")).toHaveValue("kardia");
   await expect(page.getByRole("option", { name: /Dough Religion/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Rebuild suggestion" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
-  await expect(page.getByLabel("Demand and rota coverage by hour")).toBeVisible();
-  await expect(page.getByText("Shifts and breaks")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Week 30 rota/ })).toBeVisible();
+  await expect(page.getByLabel(/Live rota score/i)).toBeVisible();
+  await expect(page.getByText("Sales forecast", { exact: true })).toBeVisible();
+  await expect(page.getByText("Hourly COL %", { exact: true })).toBeVisible();
+  const rotaGrid = page.getByLabel("Weekly rota builder");
+  await expect(rotaGrid.getByText("Group Chef", { exact: true }).first()).toBeVisible();
+  await expect(rotaGrid.getByText("Chris Edwards", { exact: true })).toBeVisible();
+  await expect(rotaGrid.getByText("Scott Hutton", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV" })).toBeVisible();
+  await expect(page.getByText(/Kitchen managers see hourly-team cost only/)).toBeVisible();
+  await expect(page.getByText("Allocated salary cost", { exact: true })).toHaveCount(0);
+
+  const chrisRow = page.getByRole("row").filter({ hasText: "Chris Edwards" }).first();
+  await chrisRow.getByRole("button", { name: /Add/ }).first().click();
+  await page.getByRole("button", { name: "Status / location" }).click();
+  const locationSelect = page.getByLabel("Status or working location");
+  await expect(locationSelect).toBeVisible();
+  await locationSelect.selectOption("head_office");
+  await expect(locationSelect).toHaveValue("head_office");
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await expect(page.getByRole("heading", { name: "Ask a senior operator to challenge the plan" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Was the cover right?" })).toHaveCount(0);
   await expectNoSeriousAccessibilityViolations(page);
 });
 
