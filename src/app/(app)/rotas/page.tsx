@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { RotaAiBrief } from "@/components/rotas/rota-ai-brief";
 import { RotaControls } from "@/components/rotas/rota-controls";
-import { RotaWeekFeedbackStrip } from "@/components/rotas/rota-week-feedback";
 import { RotaWeekOverlay } from "@/components/rotas/rota-week-overlay";
 import "@/components/rotas/rota-workspace.module.css";
 import { requireSessionProfile } from "@/lib/auth/dal";
@@ -22,7 +21,6 @@ import {
   type RotaBuilderMetadata,
 } from "@/lib/data/rota-builder";
 import { getRotaPlanningWorkspace } from "@/lib/data/rotas";
-import { getRotaWeekFeedback } from "@/lib/data/rota-week-feedback";
 import { environment } from "@/lib/env";
 import { getExternalRotaSignals } from "@/lib/rota/external-signals";
 import { addDays } from "@/lib/rota/forecasting";
@@ -95,15 +93,6 @@ export default async function RotasPage({
         builderMetadata,
       )
     : null;
-  const weekFeedback = plan && site && plan.id !== "demo-plan"
-    ? await getRotaWeekFeedback({
-        organisationId: profile.organisationId,
-        siteId: site.id,
-        profileId: profile.id,
-        weekStart: plan.weekStart,
-        weekEnd: plan.weekEnd,
-      })
-    : [];
   const visibleStaff = visibleRotaStaff(workspace.staff);
   const staffTargets = visibleStaff.map((staff) => ({
     id: staff.id,
@@ -187,7 +176,6 @@ export default async function RotasPage({
                 siteId={site.id}
                 staff={visibleStaff}
               />
-              <RotaWeekFeedbackStrip days={plan.days.map((day) => day.businessDate)} feedback={weekFeedback} siteId={site.id} />
               <RotaAiBrief plan={plan} signals={signals} staffTargets={staffTargets} />
             </>
           ) : (
