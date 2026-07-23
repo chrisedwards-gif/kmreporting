@@ -1,0 +1,66 @@
+name: Rota PR validation
+
+on:
+  push:
+    branches:
+      - agent/rota-overlay-018
+  pull_request:
+    paths:
+      - "src/app/(app)/rotas/**"
+      - "src/app/(app)/dashboard/**"
+      - "src/app/actions/rota-*.ts"
+      - "src/components/rotas/**"
+      - "src/lib/data/rota-*.ts"
+      - "src/lib/data/rotas.ts"
+      - "src/lib/rota/**"
+      - "supabase/migrations/*rota*.sql"
+      - "e2e/personas.spec.mjs"
+      - ".github/workflows/rota-pr-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v3
+        with:
+          version: latest
+      - name: Start fresh local Supabase
+        run: supabase start
+      - name: Rebuild all migrations and seeds from zero
+        run: supabase db reset --local
+      - name: Confirm rota identity and salary functions exist
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 <<'SQL'
+          select to_regclass('public.rota_plan_marks');
+          select exists (
+            select 1 from information_schema.columns
+            where table_schema = 'payroll_private'
+              and table_name = 'rota_staff_profiles'
+              and column_name = 'app_profile_id'
+          );
+          select to_regprocedure('public.get_rota_private_staff(uuid,uuid,date)');
+          select to_regprocedure('public.save_rota_staff_profile_private(uuid,uuid,jsonb)');
+          SQL
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
