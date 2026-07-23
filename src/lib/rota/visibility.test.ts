@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { StoredRotaPlan } from "@/lib/data/rotas";
 import type { RotaStaffProfile } from "@/lib/rota/types";
 import { visibleRotaPlan, visibleRotaStaff } from "@/lib/rota/visibility";
+import { createRotaWarning } from "@/lib/rota/warnings";
+
+const privateWarning = "Committed leadership allocation exceeds the allowance.";
+const operationalWarning = "One shift is unfilled.";
 
 const plan = {
   id: "plan-1",
@@ -19,7 +23,10 @@ const plan = {
   accuracyMape: 8,
   confidence: "high",
   explanation: "Full private labour plan.",
-  warnings: ["Fixed labour cost is included.", "One shift is unfilled."],
+  warnings: [
+    createRotaWarning(privateWarning, "management"),
+    createRotaWarning(operationalWarning, "all"),
+  ],
   days: [{
     businessDate: "2026-07-27",
     forecastSales: 10000,
@@ -37,7 +44,10 @@ const plan = {
       annualSalary: 35000,
       controllableHourlyHours: 120,
     },
-    warnings: ["Salaried cover is included.", "One shift is unfilled."],
+    warnings: [
+      createRotaWarning(privateWarning, "management"),
+      createRotaWarning(operationalWarning, "all"),
+    ],
     shifts: [{
       staffProfileId: "staff-1",
       staffName: "Manager",
@@ -78,7 +88,7 @@ const staff = (input: Partial<RotaStaffProfile> & Pick<RotaStaffProfile, "id" | 
 });
 
 describe("rota finance visibility", () => {
-  it("removes salary allocation and private cost from kitchen-manager plans", () => {
+  it("removes salary allocation, private cost and management-only warnings from kitchen-manager plans", () => {
     const visible = visibleRotaPlan(plan, "hourly_only");
 
     expect(visible.days[0].fixedLabourCost).toBe(0);
@@ -89,12 +99,17 @@ describe("rota finance visibility", () => {
     expect(visible.days[0].shifts[0].privateCost).toBe(0);
     expect(visible.days[0].evidence).not.toHaveProperty("annualSalary");
     expect(visible.days[0].evidence).not.toHaveProperty("salariedCoverageHours");
-    expect(visible.warnings).toEqual(["One shift is unfilled."]);
-    expect(visible.days[0].warnings).toEqual(["One shift is unfilled."]);
+    expect(visible.warnings).toEqual([operationalWarning]);
+    expect(visible.days[0].warnings).toEqual([operationalWarning]);
   });
 
-  it("leaves the full management plan unchanged", () => {
-    expect(visibleRotaPlan(plan, "full")).toBe(plan);
+  it("shows management warnings without exposing their internal tags", () => {
+    const visible = visibleRotaPlan(plan, "full");
+
+    expect(visible.plannedCost).toBe(plan.plannedCost);
+    expect(visible.days[0].fixedLabourCost).toBe(700);
+    expect(visible.warnings).toEqual([privateWarning, operationalWarning]);
+    expect(visible.days[0].warnings).toEqual([privateWarning, operationalWarning]);
   });
 
   it("sorts by rank and person order while retaining the linked account UUID", () => {
