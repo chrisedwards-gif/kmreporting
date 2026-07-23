@@ -59,8 +59,60 @@
   gap: 4px;
 }
 
+.rota-page-header--compact {
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.rota-page-header--compact h1 {
+  max-width: 900px;
+}
+
+.rota-toolbar--sticky {
+  position: sticky;
+  top: 10px;
+  z-index: 12;
+}
+
+.rota-supporting-tools {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.rota-supporting-tools > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.rota-supporting-tools > header > svg {
+  color: #2d7a62;
+  flex: 0 0 auto;
+  margin-top: 5px;
+}
+
+.rota-supporting-tools h2 {
+  margin: 2px 0 4px;
+}
+
+.rota-supporting-tools p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.rota-empty-first .rota-launchbar {
+  margin-top: 18px;
+  width: min(100%, 980px);
+}
+
 @media (max-width: 820px) {
   .nory-rota__linked {
     display: none;
+  }
+
+  .rota-toolbar--sticky {
+    position: static;
   }
 }
