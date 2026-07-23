@@ -63,8 +63,8 @@ export function RotaControls({
           <div className="rota-launchbar__ready">
             <LayoutGrid size={18} />
             <span>
-              <strong>The manager-built draft is ready below.</strong>
-              <small>Add and edit shifts in the grid. Save the draft to refresh its score and AI review.</small>
+              <strong>The manager-built draft is open above.</strong>
+              <small>Use these supporting tools only to add forecast events, reset the week or deliberately replace it with an optional template.</small>
             </span>
           </div>
         )}
@@ -80,10 +80,10 @@ export function RotaControls({
           <summary><Sparkles size={16} /> Optional starting-point tools</summary>
           <div>
             <p>
-              The suggested template is only a rough first draft. It must still be checked and edited by the kitchen manager.
+              The suggested template is only a rough starting point. It is never treated as approved and must still be checked and edited by the kitchen manager.
             </p>
             {hasPlan ? (
-              <p className="rota-launchbar__warning"><TriangleAlert size={15} /> Replacing the week creates a new version and supersedes the current draft.</p>
+              <p className="rota-launchbar__warning"><TriangleAlert size={15} /> Replacing the week creates a new version and supersedes the current manager-built draft.</p>
             ) : null}
             <div className="rota-launchbar__starter-actions">
               {hasPlan ? (
