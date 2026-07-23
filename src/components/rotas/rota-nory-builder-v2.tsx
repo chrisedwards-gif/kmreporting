@@ -30,6 +30,7 @@ import {
 import { saveRotaBuilderDraft } from "@/app/actions/rota-builder";
 import type { StoredRotaPlan } from "@/lib/data/rotas";
 import type { ExternalRotaSignals } from "@/lib/rota/external-signals";
+import { calculateRotaScore } from "@/lib/rota/score";
 import type { RotaPlanMark, SuggestedShift } from "@/lib/rota/types";
 import type { RotaDisplayStaff, RotaFinanceVisibility } from "@/lib/rota/visibility";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -198,19 +199,20 @@ export function RotaNoryBuilderV2({ plan, signals, staff, financeVisibility, sit
     }));
 
     const coverageSlots = [...coverageByDate.values()].flat();
-    const coveredSlots = coverageSlots.filter((slot) => slot.assigned >= slot.required).length;
-    const coveragePoints = coverageSlots.length ? 35 * coveredSlots / coverageSlots.length : 0;
     const plannedCost = [...dayCostByDate.values()].reduce((sum, value) => sum + value, 0);
     const labourPct = plan.forecastSales > 0 ? plannedCost / plan.forecastSales * 100 : 0;
-    const overBudgetRatio = plan.labourBudget > 0 ? Math.max(0, plannedCost - plan.labourBudget) / plan.labourBudget : 1;
-    const costPoints = plannedCost <= 0 ? 0 : 30 * Math.max(0, 1 - overBudgetRatio * 2);
-    const staffedPoints = allShifts.length ? 15 * (allShifts.length - openShifts.length) / allShifts.length : 0;
-    const hoursPoints = siteHourPeople.length ? 20 * siteHourPeople.reduce((sum, person) => {
-      const planned = hoursByStaff.get(person.id) ?? 0;
-      if (planned > person.maximumHours) return sum;
-      return sum + Math.max(0, 1 - Math.abs(planned - person.targetHours) / Math.max(person.targetHours, 1));
-    }, 0) / siteHourPeople.length : 20;
-    const score = Math.max(0, Math.min(100, Math.round(coveragePoints + costPoints + staffedPoints + hoursPoints)));
+    const rotaScore = calculateRotaScore({
+      coverage: coverageSlots,
+      plannedCost,
+      labourBudget: plan.labourBudget,
+      totalShifts: allShifts.length,
+      openShifts: openShifts.length,
+      people: siteHourPeople.map((person) => ({
+        plannedHours: hoursByStaff.get(person.id) ?? 0,
+        targetHours: person.targetHours,
+        maximumHours: person.maximumHours,
+      })),
+    });
 
     const insights: string[] = [];
     if (coverageGaps.length) {
@@ -239,8 +241,8 @@ export function RotaNoryBuilderV2({ plan, signals, staff, financeVisibility, sit
       plannedCost,
       plannedHours: [...dayHoursByDate.values()].reduce((sum, value) => sum + value, 0),
       labourPct,
-      score,
-      scoreParts: { cover: Math.round(coveragePoints), cost: Math.round(costPoints), staffed: Math.round(staffedPoints), hours: Math.round(hoursPoints) },
+      score: rotaScore.score,
+      scoreParts: rotaScore.parts,
       insights: insights.slice(0, 3),
       roleGroups: [...roleMap.entries()].map(([role, value]) => ({
         role,
