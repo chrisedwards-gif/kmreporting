@@ -102,7 +102,10 @@ test("Kitchen Manager builds a ranked salary-safe rota with group locations", as
   const chrisRow = page.getByRole("row").filter({ hasText: "Chris Edwards" }).first();
   await chrisRow.getByRole("button", { name: /Add/ }).first().click();
   await page.getByRole("button", { name: "Status / location" }).click();
-  await expect(page.getByRole("option", { name: "Head office" })).toBeVisible();
+  const locationSelect = page.getByLabel("Status or working location");
+  await expect(locationSelect).toBeVisible();
+  await locationSelect.selectOption("head_office");
+  await expect(locationSelect).toHaveValue("head_office");
   await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect(page.getByRole("heading", { name: "Ask a senior operator to challenge the plan" })).toBeVisible();
