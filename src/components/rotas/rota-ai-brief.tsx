@@ -58,7 +58,6 @@ export function RotaAiBrief({ plan, signals, staffTargets }: Props) {
             time: slot.slotTime,
             assigned: slot.assigned,
             required: slot.required,
-            requiredSkills: slot.requiredSkills ?? [],
           })),
         shifts: day.shifts.map((shift) => ({
           staffName: shift.staffName,
