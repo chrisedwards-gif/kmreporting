@@ -5,8 +5,12 @@ export type RotaFinanceVisibility = "full" | "hourly_only";
 
 export type RotaDisplayStaff = {
   id: string;
+  appProfileId: string | null;
   name: string;
   role: string;
+  roleRank: number;
+  displayOrder: number;
+  organisationWide: boolean;
   minimumHours: number;
   targetHours: number;
   maximumHours: number;
@@ -17,16 +21,22 @@ export type RotaDisplayStaff = {
 const privateCostWarning = /(salary|salaried|fixed labour|fixed cost|annual pay)/i;
 
 export function visibleRotaStaff(staff: RotaStaffProfile[]): RotaDisplayStaff[] {
-  return staff.map((person) => ({
-    id: person.id,
-    name: person.staffName,
-    role: person.roleTitle || person.primaryRole || "Team",
-    minimumHours: person.minimumWeeklyHours,
-    targetHours: person.targetWeeklyHours,
-    maximumHours: person.maximumWeeklyHours,
-    payBasis: person.payBasis,
-    hourlyRate: person.payBasis === "hourly" ? person.loadedHourlyRate : null,
-  }));
+  return staff
+    .map((person) => ({
+      id: person.id,
+      appProfileId: person.appProfileId,
+      name: person.staffName,
+      role: person.roleTitle || person.primaryRole || "Team",
+      roleRank: person.roleRank,
+      displayOrder: person.displayOrder,
+      organisationWide: person.organisationWide,
+      minimumHours: person.minimumWeeklyHours,
+      targetHours: person.targetWeeklyHours,
+      maximumHours: person.maximumWeeklyHours,
+      payBasis: person.payBasis,
+      hourlyRate: person.payBasis === "hourly" ? person.loadedHourlyRate : null,
+    }))
+    .sort((a, b) => a.roleRank - b.roleRank || a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
 }
 
 export function visibleRotaPlan(
