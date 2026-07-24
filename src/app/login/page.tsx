@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChefHat, FlaskConical, LockKeyhole } from "lucide-react";
-import { signIn, uatQuickLogin } from "@/app/actions/auth";
+import { uatQuickLogin } from "@/app/actions/auth";
+import { LoginForm } from "@/components/auth/login-form";
 import { environment } from "@/lib/env";
 
 export const metadata = { title: "Sign in" };
@@ -22,12 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <LockKeyhole aria-hidden="true" color="#eb6b4f" size={24} />
           <h1>Welcome back.</h1>
           <p>Use your assigned account. Your role decides which kitchens and cost data you can access.</p>
-          {error && <div className="privacy-callout login__message">{error}</div>}
-          <form action={signIn} className="login__form">
-            <label className="field"><span className="field__label">Email address</span><input autoComplete="email" className="field__input" name="email" required type="email" /></label>
-            <label className="field"><span className="field__label">Password</span><input autoComplete="current-password" className="field__input" minLength={8} name="password" required type="password" /></label>
-            <button className="button button--primary" type="submit">Sign in securely</button>
-          </form>
+          <LoginForm initialError={error ?? ""} />
           <div className="login__links">
             <Link href="/auth/forgot-password">Forgotten your password?</Link>
           </div>
