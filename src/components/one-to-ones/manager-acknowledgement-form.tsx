@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
-import { acknowledgeOneToOne, type OneToOneActionState } from "@/app/actions/one-to-ones";
+import { acknowledgeOneToOne, type OneToOneActionState } from "@/app/actions/one-to-one-acknowledgement";
 import { ActionToast } from "@/components/ui/action-toast";
 
 const initialState: OneToOneActionState = { status: "idle", message: "" };
