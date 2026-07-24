@@ -8,6 +8,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "hos-kitchen-reports.netlify.app",
+        "main--hos-kitchen-reports.netlify.app",
+      ],
+    },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
