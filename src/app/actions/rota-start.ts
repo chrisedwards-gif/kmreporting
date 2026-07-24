@@ -44,10 +44,8 @@ export async function createBlankRotaDraft(
   if (!workspace.selectedSite || workspace.error) {
     return { status: "error", message: workspace.error ?? "The rota workspace is unavailable." };
   }
-  if (!workspace.history.length) {
-    return { status: "error", message: "Import dated sales before creating a forecast-led rota week." };
-  }
 
+  const hasSalesHistory = workspace.history.length > 0;
   const generated = buildRotaPlan({
     weekStart: workspace.weekStart,
     labourTargetPct: workspace.selectedSite.labourTarget,
@@ -63,10 +61,15 @@ export async function createBlankRotaDraft(
     intervalMinutes: workspace.intervalMinutes,
     salesPerLabourHourTarget: workspace.salesPerLabourHourTarget,
   });
-  const plan = asBlankDraft(generated);
+  const plan = asBlankDraft(generated, hasSalesHistory);
 
   if (environment.isDemo) {
-    return { status: "success", message: "Blank demo week created with forecast and cover guidance." };
+    return {
+      status: "success",
+      message: hasSalesHistory
+        ? "Blank demo week created with forecast and cover guidance."
+        : "Blank demo week created. Sales guidance is marked low-confidence until history is imported.",
+    };
   }
 
   try {
@@ -82,29 +85,43 @@ export async function createBlankRotaDraft(
       return { status: "error", message: "The blank rota week could not be saved." };
     }
     revalidatePath("/rotas");
-    return { status: "success", message: "Blank rota week created. Build the shifts manually using the forecast and heat map." };
+    return {
+      status: "success",
+      message: hasSalesHistory
+        ? "Blank rota week created. Build the shifts manually using the forecast and heat map."
+        : "Blank rota week created. Build shifts normally; forecast and COL guidance will remain low-confidence until sales history is imported.",
+    };
   } catch {
     return { status: "error", message: "The secure rota draft service is unavailable." };
   }
 }
 
-function asBlankDraft(plan: RotaPlan): RotaPlan {
+function asBlankDraft(plan: RotaPlan, hasSalesHistory: boolean): RotaPlan {
+  const noHistoryWarning = hasSalesHistory
+    ? []
+    : [createRotaWarning("No sales history is available. Build the rota manually; forecast, labour allowance and heat-map guidance are provisional until sales data is imported.", "all")];
   const days = plan.days.map((day) => ({
     ...day,
     plannedCost: day.fixedLabourCost,
     plannedHours: 0,
     coverage: day.coverage.map((slot) => ({ ...slot, assigned: 0 })),
     shifts: [],
-    warnings: day.coverage.length
-      ? [createRotaWarning("This day has not been staffed yet.", "all")]
-      : [],
+    warnings: [
+      ...noHistoryWarning,
+      ...(day.coverage.length ? [createRotaWarning("This day has not been staffed yet.", "all")] : []),
+    ],
   }));
   return {
     ...plan,
     plannedCost: days.reduce((sum, day) => sum + day.plannedCost, 0),
     plannedHours: 0,
-    explanation: "A blank manager-built rota draft with forecast, demand and labour guidance preserved.",
-    warnings: [createRotaWarning("The rota draft is blank. Add shifts and save before relying on the score.", "all")],
+    explanation: hasSalesHistory
+      ? "A blank manager-built rota draft with forecast, demand and labour guidance preserved."
+      : "A blank manager-built rota draft using site trading rules and provisional demand guidance. Add sales history later to improve forecasts without blocking rota creation.",
+    warnings: [
+      createRotaWarning("The rota draft is blank. Add shifts and save before relying on the score.", "all"),
+      ...noHistoryWarning,
+    ],
     days,
   };
 }
