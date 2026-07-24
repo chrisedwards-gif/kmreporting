@@ -1,5 +1,6 @@
 "use client";
 
+import { RotaAutosaveAgent } from "@/components/rotas/rota-autosave-agent";
 import {
   RotaNoryBuilderV2,
   type RotaNoryBuilderV2Props,
@@ -9,5 +10,10 @@ import "./rota-nory-accessibility.css";
 export type RotaWeekOverlayProps = RotaNoryBuilderV2Props;
 
 export function RotaWeekOverlay(props: RotaWeekOverlayProps) {
-  return <RotaNoryBuilderV2 {...props} />;
+  return (
+    <>
+      <RotaNoryBuilderV2 {...props} />
+      <RotaAutosaveAgent />
+    </>
+  );
 }
