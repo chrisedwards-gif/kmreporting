@@ -21,6 +21,26 @@ export const formatDate = (value: string) => {
   }).format(date);
 };
 
+export const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/London",
+      timeZoneName: "short",
+    }).formatToParts(date).map(({ type, value: part }) => [type, part]),
+  );
+
+  return `${parts.day} ${parts.month} ${parts.year} at ${parts.hour}:${parts.minute} ${parts.timeZoneName}`;
+};
+
 export const classNames = (...values: Array<string | false | null | undefined>) =>
   values.filter(Boolean).join(" ");
 
