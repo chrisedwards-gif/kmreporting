@@ -14,6 +14,7 @@ import {
   wasteKpi,
   weightedProbationScore,
 } from "@/lib/performance/scoring";
+import { filterPerformanceActionTargets } from "@/lib/performance/action-targets";
 
 describe("performance score RAG", () => {
   it("maps score bands to green, amber and red", () => {
@@ -135,6 +136,18 @@ describe("actions", () => {
     expect(isActionOverdue("2026-07-01", "cancelled", "2026-07-19")).toBe(false);
     expect(isActionOverdue("2026-07-20", "not_started", "2026-07-19")).toBe(false);
     expect(isActionOverdue(null, "not_started", "2026-07-19")).toBe(false);
+  });
+
+  it("keeps action creation inside the selected manager and kitchen scope", () => {
+    const targets = [
+      { assignmentId: "a1", managerId: "scott", managerName: "Scott", siteId: "kardia", siteName: "Kardia" },
+      { assignmentId: null, managerId: "scott", managerName: "Scott", siteId: "dr", siteName: "Dough Religion" },
+      { assignmentId: "a2", managerId: "warren", managerName: "Warren", siteId: "dr", siteName: "Dough Religion" },
+    ];
+
+    expect(filterPerformanceActionTargets(targets, ["kardia", "dr"], "scott")).toEqual(targets.slice(0, 2));
+    expect(filterPerformanceActionTargets(targets, ["dr"], "warren")).toEqual([targets[2]]);
+    expect(filterPerformanceActionTargets(targets, null, null)).toEqual(targets);
   });
 });
 

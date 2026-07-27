@@ -33,6 +33,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 const initialState: ProductDevelopmentActionState = { status: "idle", message: "" };
 
 type ProductEditorProps = {
+  allowGroupWide: boolean;
   item: ProductDevelopmentItem | null;
   owners: ProductDevelopmentOption[];
   sites: ProductDevelopmentOption[];
@@ -50,7 +51,7 @@ const liveControls = (item: ProductDevelopmentItem) => [
   { label: "Finished-product photo", complete: item.evidence.some((file) => file.evidenceType === "finished_photo" && file.mimeType.startsWith("image/")) },
 ];
 
-function ProductEditor({ item, owners, sites, onClose }: ProductEditorProps) {
+function ProductEditor({ allowGroupWide, item, owners, sites, onClose }: ProductEditorProps) {
   const router = useRouter();
   const [state, action, pending] = useActionState(saveProductDevelopmentItem, initialState);
   const editing = Boolean(item);
@@ -91,7 +92,7 @@ function ProductEditor({ item, owners, sites, onClose }: ProductEditorProps) {
               <label className="field"><span className="field__label">Status</span><select className="field__input" defaultValue={item?.status ?? "idea"} name="status">{PRODUCT_STATUSES.map((status) => <option key={status} value={status}>{productStatusLabel(status)}</option>)}</select></label>
             </div>
             <div className="form-grid form-grid--two">
-              <label className="field"><span className="field__label">Kitchen / concept</span><select className="field__input" defaultValue={item?.siteId ?? ""} name="siteId"><option value="">Group-wide</option>{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+              <label className="field"><span className="field__label">Kitchen / concept</span><select className="field__input" defaultValue={item?.siteId ?? sites[0]?.id ?? ""} name="siteId" required={!allowGroupWide}>{allowGroupWide ? <option value="">Group-wide</option> : null}{sites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>{!allowGroupWide ? <span className="field__hint">Only kitchens assigned to your account are available.</span> : null}</label>
               <label className="field"><span className="field__label">Owner</span><select className="field__input" defaultValue={item?.ownerProfileId ?? ""} name="ownerProfileId"><option value="">Unassigned</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}</select></label>
             </div>
             <div className="form-grid form-grid--two">
@@ -135,11 +136,13 @@ function ProductEditor({ item, owners, sites, onClose }: ProductEditorProps) {
 }
 
 export function ProductDevelopmentBoard({
+  allowGroupWide = true,
   items,
   owners,
   sites,
   canEdit = true,
 }: {
+  allowGroupWide?: boolean;
   items: ProductDevelopmentItem[];
   owners: ProductDevelopmentOption[];
   sites: ProductDevelopmentOption[];
@@ -175,7 +178,7 @@ export function ProductDevelopmentBoard({
 
   return (
     <>
-      {canEdit ? <div className="page-header__actions"><button className="button button--primary" onClick={() => setEditorItem(null)} type="button"><Plus aria-hidden="true" size={16} /> New product</button></div> : null}
+      {canEdit ? <div className="page-header__actions"><button className="button button--primary" disabled={!allowGroupWide && !sites.length} onClick={() => setEditorItem(null)} type="button"><Plus aria-hidden="true" size={16} /> New product</button></div> : null}
       <div className={`product-board${moving ? " product-board--moving" : ""}`}>
         {activeStatuses.map((status) => {
           const statusItems = items.filter((item) => item.status === status);
@@ -225,7 +228,7 @@ export function ProductDevelopmentBoard({
           );
         })}
       </div>
-      {currentEditorItem !== undefined ? <ProductEditor item={currentEditorItem} key={currentEditorItem?.id ?? "new"} onClose={() => setEditorItem(undefined)} owners={owners} sites={sites} /> : null}
+      {currentEditorItem !== undefined ? <ProductEditor allowGroupWide={allowGroupWide} item={currentEditorItem} key={currentEditorItem?.id ?? "new"} onClose={() => setEditorItem(undefined)} owners={owners} sites={sites} /> : null}
     </>
   );
 }

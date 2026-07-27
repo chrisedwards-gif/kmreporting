@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/dal";
+import { environment } from "@/lib/env";
 import { PRODUCT_STATUSES } from "@/lib/product-development/calculations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -67,6 +68,9 @@ export async function saveProductDevelopmentItem(
   formData: FormData,
 ): Promise<ProductDevelopmentActionState> {
   await requireRole(["admin", "group_manager", "kitchen_manager"]);
+  if (environment.isDemo) {
+    return { status: "error", message: "Product development is read-only in the test workspace." };
+  }
   const parsed = productSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the product details." };
