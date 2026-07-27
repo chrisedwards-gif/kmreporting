@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
+import { environment } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ProductStatus } from "@/lib/product-development/calculations";
 
@@ -85,6 +86,12 @@ export async function getProductDevelopmentOptions(): Promise<{
   sites: ProductDevelopmentOption[];
   owners: ProductDevelopmentOption[];
 }> {
+  if (environment.isDemo) {
+    return {
+      sites: [{ id: "kardia", name: "Kardia" }],
+      owners: [{ id: "demo-manager-kardia", name: "Scott Hutton" }],
+    };
+  }
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { sites: [], owners: [] };
   const [{ data: sites }, { data: owners }] = await Promise.all([

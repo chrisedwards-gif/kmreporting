@@ -43,6 +43,7 @@ test("Kitchen Manager sees their kitchen, actions and nightly staffing check", a
   await switchPersona(page, "kitchen_manager");
   await expect(page.getByRole("heading", { name: "Hi, Scott." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Kitchen checks" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Product development" })).toBeVisible();
   await expect(page.getByText("Kardia", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Dough Religion", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
@@ -56,6 +57,29 @@ test("Kitchen Manager sees their kitchen, actions and nightly staffing check", a
   await expect(page.getByRole("link", { name: "Start weekly report" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await page.keyboard.press("Escape");
+  await expectNoSeriousAccessibilityViolations(page);
+});
+
+test("Kitchen Manager can start a site-scoped product and add an action", async ({ page }) => {
+  await switchPersona(page, "kitchen_manager");
+  await page.goto("/product-development", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Product development." })).toBeVisible();
+  await page.getByRole("button", { name: "New product" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByLabel("Kitchen / concept")).toHaveValue("kardia");
+  await expect(page.getByRole("option", { name: "Group-wide" })).toHaveCount(0);
+  await page.getByLabel("Close", { exact: true }).click();
+
+  await page.goto("/performance/actions", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Today’s actions." })).toBeVisible();
+  await page.getByRole("button", { name: "New action" }).click();
+  const actionDialog = page.getByRole("dialog", { name: "Add an action" });
+  await expect(actionDialog).toBeVisible();
+  await expect(actionDialog.getByText("Scott Hutton", { exact: true })).toBeVisible();
+  await expect(actionDialog).toContainText("Kardia");
+  await expect(actionDialog.getByRole("textbox", { name: "Action", exact: true })).toBeVisible();
+  await expect(actionDialog.getByRole("button", { name: "Add action", exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 

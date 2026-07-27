@@ -1,6 +1,6 @@
 begin;
 
-select plan(37);
+select plan(39);
 
 select has_table('public', 'organisations', 'Base organisation table exists');
 select has_table('public', 'weekly_reports', 'Weekly reporting schema exists');
@@ -48,6 +48,15 @@ select ok(
 select ok(
   to_regprocedure('public.save_one_to_one(jsonb)') is not null,
   '1-1 draft save RPC exists'
+);
+select ok(
+  to_regprocedure('public.create_manager_action(jsonb)') is not null,
+  'Standalone manager action RPC exists'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.create_manager_action(jsonb)', 'EXECUTE')
+    and not has_function_privilege('anon', 'public.create_manager_action(jsonb)', 'EXECUTE'),
+  'Only authenticated accounts can call the standalone action RPC'
 );
 select ok(
   to_regprocedure('public.acknowledge_one_to_one(uuid,text)') is not null,
