@@ -37,6 +37,7 @@ export type KitchenCheckRunSummary = {
   answeredCount: number;
   requiredCount: number;
   issueCount: number;
+  completedByName: string | null;
   submittedAt: string | null;
   updatedAt: string;
 };
@@ -116,6 +117,7 @@ type RunRow = {
   answered_count: number;
   required_count: number;
   issue_count: number;
+  completed_by: string | null;
   submitted_at: string | null;
   updated_at: string;
 };
@@ -136,7 +138,7 @@ export async function getKitchenCheckDashboard(): Promise<{
       .order("cadence"),
     supabase
       .from("kitchen_check_runs")
-      .select("id, template_id, site_id, cadence, period_start, period_end, status, percentage, result, critical_fail, answered_count, required_count, issue_count, submitted_at, updated_at")
+      .select("id, template_id, site_id, cadence, period_start, period_end, status, percentage, result, critical_fail, answered_count, required_count, issue_count, completed_by, submitted_at, updated_at")
       .order("period_start", { ascending: false })
       .limit(120),
   ]);
@@ -146,11 +148,14 @@ export async function getKitchenCheckDashboard(): Promise<{
   const runRows = (runs ?? []) as RunRow[];
   const siteIds = [...new Set([...templateRows.map((item) => item.site_id), ...runRows.map((item) => item.site_id)])];
   const templateIds = templateRows.map((item) => item.id);
-  const [{ data: sites }, { data: items }] = await Promise.all([
+  const completedByIds = [...new Set(runRows.flatMap((item) => item.completed_by ? [item.completed_by] : []))];
+  const [{ data: sites }, { data: items }, { data: completedByProfiles }] = await Promise.all([
     siteIds.length ? supabase.from("sites").select("id, name").in("id", siteIds) : Promise.resolve({ data: [] }),
     templateIds.length ? supabase.from("kitchen_check_items").select("template_id").in("template_id", templateIds) : Promise.resolve({ data: [] }),
+    completedByIds.length ? supabase.from("profiles").select("id, full_name").in("id", completedByIds) : Promise.resolve({ data: [] }),
   ]);
   const siteNames = new Map((sites ?? []).map((site) => [site.id, site.name]));
+  const completedByNames = new Map((completedByProfiles ?? []).map((profile) => [profile.id, profile.full_name]));
   const counts = new Map<string, number>();
   for (const item of items ?? []) counts.set(item.template_id, (counts.get(item.template_id) ?? 0) + 1);
   const templatesById = new Map(templateRows.map((item) => [item.id, item]));
@@ -184,6 +189,7 @@ export async function getKitchenCheckDashboard(): Promise<{
       answeredCount: run.answered_count,
       requiredCount: run.required_count,
       issueCount: run.issue_count,
+      completedByName: run.completed_by ? completedByNames.get(run.completed_by) ?? null : null,
       submittedAt: run.submitted_at,
       updatedAt: run.updated_at,
     })),
@@ -196,7 +202,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
 
   const { data: run, error } = await supabase
     .from("kitchen_check_runs")
-    .select("id, template_id, template_version, site_id, cadence, period_start, period_end, status, percentage, result, critical_fail, answered_count, required_count, issue_count, submitted_at, updated_at, review_notes")
+    .select("id, template_id, template_version, site_id, cadence, period_start, period_end, status, percentage, result, critical_fail, answered_count, required_count, issue_count, completed_by, submitted_at, updated_at, review_notes")
     .eq("id", runId)
     .maybeSingle();
   if (error || !run) return null;
@@ -231,12 +237,15 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
   if (!template) return null;
 
   const ownerIds = [...new Set((assignments ?? []).map((item) => item.manager_profile_id))];
+  const profileIds = [...new Set([...ownerIds, ...(run.completed_by ? [run.completed_by] : [])])];
   const [{ data: profiles }, evidenceByRun] = await Promise.all([
-    ownerIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", ownerIds)
+    profileIds.length
+      ? supabase.from("profiles").select("id, full_name").in("id", profileIds)
       : Promise.resolve({ data: [] }),
     getEvidenceFiles("kitchen_check_run", [run.id]),
   ]);
+  const profileNames = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
+  const ownerIdSet = new Set(ownerIds);
 
   const itemRows: KitchenCheckItem[] = (items ?? []).map((item) => ({
     id: item.id,
@@ -266,6 +275,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
     answeredCount: run.answered_count,
     requiredCount: run.required_count,
     issueCount: run.issue_count,
+    completedByName: run.completed_by ? profileNames.get(run.completed_by) ?? null : null,
     submittedAt: run.submitted_at,
     updatedAt: run.updated_at,
     templateVersion: run.template_version,
@@ -291,7 +301,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
       dueDate: response.action_due_date ?? "",
       managerActionId: response.manager_action_id,
     })),
-    owners: (profiles ?? []).map((profile) => ({ id: profile.id, name: profile.full_name })),
+    owners: (profiles ?? []).filter((profile) => ownerIdSet.has(profile.id)).map((profile) => ({ id: profile.id, name: profile.full_name })),
     reviewNotes: run.review_notes,
     evidence: evidenceByRun[run.id] ?? [],
   };

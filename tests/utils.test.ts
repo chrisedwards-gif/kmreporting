@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, safeInternalPath } from "@/lib/utils";
+import { formatDate, formatDateTime, safeInternalPath } from "@/lib/utils";
 
 describe("shared formatters", () => {
   it("formats reporting dates without shifting the day", () => {
@@ -12,6 +12,14 @@ describe("shared formatters", () => {
 
   it("fails safely for an invalid date value", () => {
     expect(formatDate("not-a-date")).toBe("—");
+  });
+
+  it("formats completion timestamps in the kitchen's London timezone", () => {
+    expect(formatDateTime("2026-07-18T20:16:00.000Z")).toBe("18 Jul 2026 at 21:16 BST");
+  });
+
+  it("fails safely for an invalid timestamp", () => {
+    expect(formatDateTime("not-a-date")).toBe("—");
   });
 });
 
