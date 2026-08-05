@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
+import { selectKitchenCheckOwners } from "@/lib/kitchen-checks/owners";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type KitchenCheckCadence = "daily" | "weekly";
@@ -207,7 +208,16 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
     .maybeSingle();
   if (error || !run) return null;
 
-  const [{ data: template }, { data: site }, { data: sections }, { data: items }, { data: responses }, { data: assignments }] = await Promise.all([
+  const [
+    { data: template },
+    { data: site },
+    { data: sections },
+    { data: items },
+    { data: responses },
+    { data: assignments },
+    { data: memberships },
+    { data: authData },
+  ] = await Promise.all([
     supabase
       .from("kitchen_check_templates")
       .select("name, description, require_actions, pass_threshold, watch_threshold")
@@ -232,20 +242,48 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
       .from("site_manager_assignments")
       .select("manager_profile_id")
       .eq("site_id", run.site_id)
-      .is("ends_on", null),
+      .lte("starts_on", run.period_end)
+      .or(`ends_on.is.null,ends_on.gte.${run.period_start}`),
+    supabase
+      .from("site_memberships")
+      .select("user_id")
+      .eq("site_id", run.site_id),
+    supabase.auth.getUser(),
   ]);
   if (!template) return null;
 
-  const ownerIds = [...new Set((assignments ?? []).map((item) => item.manager_profile_id))];
-  const profileIds = [...new Set([...ownerIds, ...(run.completed_by ? [run.completed_by] : [])])];
+  const assignedOwnerIds = [...new Set((assignments ?? []).map((item) => item.manager_profile_id))];
+  const memberOwnerIds = [...new Set((memberships ?? []).map((item) => item.user_id))];
+  const savedOwnerIds = [...new Set((responses ?? []).flatMap((response) => (
+    response.action_owner_profile_id ? [response.action_owner_profile_id] : []
+  )))];
+  const actorProfileId = authData.user?.id ?? null;
+  const profileIds = [...new Set([
+    ...assignedOwnerIds,
+    ...memberOwnerIds,
+    ...savedOwnerIds,
+    ...(actorProfileId ? [actorProfileId] : []),
+    ...(run.completed_by ? [run.completed_by] : []),
+  ])];
   const [{ data: profiles }, evidenceByRun] = await Promise.all([
     profileIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", profileIds)
+      ? supabase.from("profiles").select("id, full_name, role, active").in("id", profileIds)
       : Promise.resolve({ data: [] }),
     getEvidenceFiles("kitchen_check_run", [run.id]),
   ]);
   const profileNames = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
-  const ownerIdSet = new Set(ownerIds);
+  const owners = selectKitchenCheckOwners({
+    profiles: (profiles ?? []).map((profile) => ({
+      id: profile.id,
+      fullName: profile.full_name,
+      role: profile.role,
+      active: profile.active,
+    })),
+    assignedProfileIds: assignedOwnerIds,
+    memberProfileIds: memberOwnerIds,
+    savedOwnerProfileIds: savedOwnerIds,
+    actorProfileId,
+  });
 
   const itemRows: KitchenCheckItem[] = (items ?? []).map((item) => ({
     id: item.id,
@@ -301,7 +339,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
       dueDate: response.action_due_date ?? "",
       managerActionId: response.manager_action_id,
     })),
-    owners: (profiles ?? []).filter((profile) => ownerIdSet.has(profile.id)).map((profile) => ({ id: profile.id, name: profile.full_name })),
+    owners,
     reviewNotes: run.review_notes,
     evidence: evidenceByRun[run.id] ?? [],
   };
