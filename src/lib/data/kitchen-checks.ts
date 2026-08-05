@@ -1,6 +1,8 @@
 import "server-only";
 
+import { getSessionProfile } from "@/lib/auth/dal";
 import { getEvidenceFiles, type EvidenceFile } from "@/lib/data/evidence";
+import { resolveKitchenCheckOwners } from "@/lib/data/kitchen-check-owners";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type KitchenCheckCadence = "daily" | "weekly";
@@ -200,6 +202,8 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
   const supabase = await createServerSupabaseClient();
   if (!supabase) return null;
 
+  const sessionProfile = await getSessionProfile();
+
   const { data: run, error } = await supabase
     .from("kitchen_check_runs")
     .select("id, template_id, template_version, site_id, cadence, period_start, period_end, status, percentage, result, critical_fail, answered_count, required_count, issue_count, completed_by, submitted_at, updated_at, review_notes")
@@ -207,7 +211,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
     .maybeSingle();
   if (error || !run) return null;
 
-  const [{ data: template }, { data: site }, { data: sections }, { data: items }, { data: responses }, { data: assignments }] = await Promise.all([
+  const [{ data: template }, { data: site }, { data: sections }, { data: items }, { data: responses }, { data: assignments }, { data: memberships }] = await Promise.all([
     supabase
       .from("kitchen_check_templates")
       .select("name, description, require_actions, pass_threshold, watch_threshold")
@@ -233,11 +237,17 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
       .select("manager_profile_id")
       .eq("site_id", run.site_id)
       .is("ends_on", null),
+    supabase
+      .from("site_memberships")
+      .select("user_id")
+      .eq("site_id", run.site_id),
   ]);
   if (!template) return null;
 
-  const ownerIds = [...new Set((assignments ?? []).map((item) => item.manager_profile_id))];
-  const profileIds = [...new Set([...ownerIds, ...(run.completed_by ? [run.completed_by] : [])])];
+  const assignmentIds = (assignments ?? []).map((item) => item.manager_profile_id);
+  const membershipIds = (memberships ?? []).map((item) => item.user_id);
+  const savedOwnerIds = [...new Set((responses ?? []).flatMap((response) => response.action_owner_profile_id ? [response.action_owner_profile_id] : []))];
+  const profileIds = [...new Set([...assignmentIds, ...membershipIds, ...savedOwnerIds, ...(run.completed_by ? [run.completed_by] : [])])];
   const [{ data: profiles }, evidenceByRun] = await Promise.all([
     profileIds.length
       ? supabase.from("profiles").select("id, full_name").in("id", profileIds)
@@ -245,7 +255,10 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
     getEvidenceFiles("kitchen_check_run", [run.id]),
   ]);
   const profileNames = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name]));
-  const ownerIdSet = new Set(ownerIds);
+  const currentUser = sessionProfile && (!sessionProfile.siteScopeIds || sessionProfile.siteScopeIds.includes(run.site_id))
+    ? { id: sessionProfile.id, name: sessionProfile.fullName }
+    : null;
+  const owners = resolveKitchenCheckOwners({ assignmentIds, membershipIds, savedOwnerIds, currentUser, profileNames });
 
   const itemRows: KitchenCheckItem[] = (items ?? []).map((item) => ({
     id: item.id,
@@ -301,7 +314,7 @@ export async function getKitchenCheckRun(runId: string): Promise<KitchenCheckDet
       dueDate: response.action_due_date ?? "",
       managerActionId: response.manager_action_id,
     })),
-    owners: (profiles ?? []).filter((profile) => ownerIdSet.has(profile.id)).map((profile) => ({ id: profile.id, name: profile.full_name })),
+    owners,
     reviewNotes: run.review_notes,
     evidence: evidenceByRun[run.id] ?? [],
   };
