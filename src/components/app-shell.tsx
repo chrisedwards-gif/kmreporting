@@ -42,7 +42,7 @@ const groupNavigation: NavSection[] = [
   {
     heading: "People",
     items: [
-      { href: "/people", label: "People & 1-1s", icon: UsersRound, roles: ["admin", "group_manager"] },
+      { href: "/people", label: "People", icon: UsersRound, roles: ["admin", "group_manager"] },
       { href: "/performance/actions", label: "Action log", icon: ListChecks, roles: ["admin", "group_manager"] },
       { href: "/admin", label: "Administration", icon: Settings2, roles: ["admin", "group_manager"] },
     ],
