@@ -3,6 +3,7 @@ import { ArrowRight, ListChecks, UsersRound } from "lucide-react";
 import { CreateManagerForm } from "@/components/performance/manager-admin";
 import { requireGroupWorkspaceRole } from "@/lib/auth/dal";
 import { getManagerAdminRecords } from "@/lib/data/performance";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata = { title: "People" };
 
@@ -10,6 +11,18 @@ export default async function PeoplePage() {
   const profile = await requireGroupWorkspaceRole(["admin", "group_manager"]);
   const people = await getManagerAdminRecords();
   const activePeople = people.filter((person) => person.active);
+  let sites: Array<{ id: string; name: string }> = [];
+
+  if (profile.actualRole === "admin") {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("sites")
+      .select("id, name")
+      .eq("organisation_id", profile.organisationId)
+      .eq("active", true)
+      .order("name");
+    sites = data ?? [];
+  }
 
   return (
     <>
@@ -25,7 +38,7 @@ export default async function PeoplePage() {
         </div>
       </header>
 
-      {profile.actualRole === "admin" ? <CreateManagerForm /> : null}
+      {profile.actualRole === "admin" ? <CreateManagerForm sites={sites} /> : null}
 
       <section className="panel">
         <div className="panel__header">
