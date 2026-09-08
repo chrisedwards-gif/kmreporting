@@ -8,6 +8,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ManagerActionState = { status: "idle" | "success" | "error"; message: string };
 
+type KitchenAssignmentResult = {
+  error?: string;
+  siteName?: string;
+  assistant?: boolean;
+};
+
 const managerSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the manager's name.").max(120),
   email: z.email("Enter a valid work email.").transform((value) => value.toLowerCase()),
@@ -52,7 +58,7 @@ async function assignPersonToKitchen({
   siteId: string;
   roleTitle: string;
   employmentStartDate: string;
-}) {
+}): Promise<KitchenAssignmentResult> {
   const { data: site, error: siteError } = await admin
     .from("sites")
     .select("id, name")
@@ -183,7 +189,7 @@ export async function createManager(
         employmentStartDate: parsed.data.employmentStartDate,
       });
       if (assignment.error) return { status: "error", message: assignment.error };
-      kitchenMessage = ` ${parsed.data.fullName} now has ${assignment.siteName} reporting access${assignment.assistant ? " and their own weekly 1-1 assignment" : ""}.`;
+      kitchenMessage = ` ${parsed.data.fullName} now has ${assignment.siteName ?? "kitchen"} reporting access${assignment.assistant ? " and their own weekly 1-1 assignment" : ""}.`;
     }
 
     await admin.from("audit_log").insert({
