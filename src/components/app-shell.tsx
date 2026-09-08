@@ -5,21 +5,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   BarChart3,
-  Beaker,
-  BookOpenCheck,
-  CalendarDays,
-  CalendarClock,
   ChefHat,
-  ClipboardCheck,
   ClipboardList,
   FileCheck2,
-  GraduationCap,
+  ListChecks,
   LockKeyhole,
   LogOut,
   Menu,
   Settings2,
   ShieldCheck,
-  Trash2,
   UsersRound,
   X,
 } from "lucide-react";
@@ -36,15 +30,20 @@ type NavSection = { heading?: string; items: NavItem[] };
 
 const groupNavigation: NavSection[] = [
   {
+    heading: "Reporting",
     items: [
       { href: "/dashboard", label: "Overview", icon: BarChart3 },
       { href: "/reports", label: "Weekly reports", icon: ClipboardList },
-      { href: "/rotas", label: "Rota intelligence", icon: CalendarClock, roles: ["admin", "group_manager"] },
-      { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
-      { href: "/workspace", label: "Kitchen workspace", icon: ChefHat, roles: ["admin", "group_manager"] },
-      { href: "/people", label: "People & performance", icon: UsersRound, roles: ["admin", "group_manager"] },
+      { href: "/approvals", label: "Report approvals", icon: ShieldCheck, roles: ["admin", "group_manager"] },
       { href: "/summary", label: "Management summary", icon: FileCheck2, roles: ["admin", "group_manager", "finance", "viewer"] },
       { href: "/costs", label: "Cost control", icon: LockKeyhole, roles: ["admin", "group_manager", "finance"] },
+    ],
+  },
+  {
+    heading: "People",
+    items: [
+      { href: "/people", label: "People & 1-1s", icon: UsersRound, roles: ["admin", "group_manager"] },
+      { href: "/performance/actions", label: "Action log", icon: ListChecks, roles: ["admin", "group_manager"] },
       { href: "/admin", label: "Administration", icon: Settings2, roles: ["admin", "group_manager"] },
     ],
   },
@@ -52,23 +51,17 @@ const groupNavigation: NavSection[] = [
 
 const kitchenManagerNavigation: NavSection[] = [
   {
-    heading: "Today",
+    heading: "Weekly reporting",
     items: [
-      { href: "/dashboard", label: "Overview & actions", icon: BarChart3 },
+      { href: "/dashboard", label: "Overview", icon: BarChart3 },
       { href: "/reports", label: "Weekly reports", icon: ClipboardList },
-      { href: "/rotas", label: "Rota suggestion", icon: CalendarClock },
     ],
   },
   {
-    heading: "Run the kitchen",
+    heading: "People",
     items: [
-      { href: "/checks", label: "Kitchen checks", icon: ClipboardCheck },
-      { href: "/waste", label: "Daily waste log", icon: Trash2 },
-      { href: "/sops", label: "SOPs & systems", icon: BookOpenCheck },
-      { href: "/calendar", label: "Kitchen calendar", icon: CalendarDays },
       { href: "/one-to-ones", label: "My 1-1s", icon: UsersRound },
-      { href: "/training", label: "Team training", icon: GraduationCap },
-      { href: "/product-development", label: "Product development", icon: Beaker },
+      { href: "/performance/actions", label: "Action log", icon: ListChecks },
     ],
   },
 ];
@@ -104,7 +97,7 @@ export function AppShell({ children, isDemo, isPreview, previewSites, user }: {
     <div className={classNames("app-shell", user.isAccessPreview && "app-shell--access-preview")}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside className={classNames("app-shell__sidebar", navOpen && "app-shell__sidebar--open")}>
-        <div className="app-shell__brand"><div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div><div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly operations</span></div></div>
+        <div className="app-shell__brand"><div className="app-shell__brand-mark"><ChefHat aria-hidden="true" size={25} /></div><div className="app-shell__brand-copy"><strong>HOS Kitchen Reports</strong><span>Weekly intelligence</span></div></div>
         <nav aria-label="Main navigation" className="app-shell__nav">
           {sections.map((section, index) => {
             const visibleItems = section.items.filter((item) => !item.roles || item.roles.includes(user.navigationRole));
