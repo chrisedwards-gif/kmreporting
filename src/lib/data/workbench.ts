@@ -1,6 +1,5 @@
 import { siteIsInScope } from "@/lib/auth/site-scope";
 import type { ReportingBundle } from "@/lib/data/reporting";
-import { getKitchenCheckDashboard } from "@/lib/data/kitchen-checks";
 import { getManagers, getOneToOnes } from "@/lib/data/one-to-ones";
 import { getPerformanceActions } from "@/lib/data/performance";
 import { isActionOverdue } from "@/lib/performance/scoring";
@@ -20,11 +19,6 @@ export type WorkbenchItem = {
 type WorkbenchResult = { items: WorkbenchItem[]; allClear: boolean; clearMessage: string };
 type WorkbenchScope = { siteIds?: readonly string[] | null; managerId?: string | null };
 
-const sundayFor = (dateText: string) => {
-  const date = new Date(`${dateText}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
-  return date.toISOString().slice(0, 10);
-};
 const plural = (count: number, singular: string, pluralForm = `${singular}s`) => count === 1 ? singular : pluralForm;
 
 export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope: WorkbenchScope = {}): Promise<WorkbenchResult> {
@@ -49,19 +43,13 @@ export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const currentSunday = sundayFor(today);
   const items: WorkbenchItem[] = [];
-  const [rawCheckboard, rawActions, managers, rawReviews] = await Promise.all([
-    getKitchenCheckDashboard(),
+  const [rawActions, managers, rawReviews] = await Promise.all([
     getPerformanceActions(),
     isGroup ? getManagers() : Promise.resolve([]),
     getOneToOnes(scope.managerId ?? undefined),
   ]);
   const siteAllowed = (siteId: string | null) => siteIsInScope(scope.siteIds ?? null, siteId);
-  const checkboard = {
-    templates: rawCheckboard.templates.filter((item) => siteAllowed(item.siteId)),
-    runs: rawCheckboard.runs.filter((item) => siteAllowed(item.siteId)),
-  };
   const actions = rawActions.filter((action) => siteAllowed(action.siteId) && (!scope.managerId || action.managerId === scope.managerId));
   const reviews = rawReviews.filter((review) => siteAllowed(review.siteId) && (!scope.managerId || review.managerId === scope.managerId));
 
@@ -74,19 +62,6 @@ export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope
 
   if (reportsDue.length) items.push({ key: "reports", tone: "attention", count: reportsDue.length, title: `${plural(reportsDue.length, "report")} not submitted`, detail: `${reportsDue.map((site) => site.name).join(", ")} · w/c ${formatDate(bundle.week.start)}`, href: isGroup ? "/reports" : "/reports/new", cta: isGroup ? "Open reports" : "Finish report" });
   if (isGroup && awaitingApproval.length) items.push({ key: "approvals", tone: "warn", count: awaitingApproval.length, title: `${plural(awaitingApproval.length, "report")} waiting for approval`, detail: awaitingApproval.map((report) => report.siteName).join(", "), href: "/approvals", cta: "Open approvals" });
-
-  const existingRunKeys = new Set(checkboard.runs.map((run) => `${run.templateId}:${run.periodStart}`));
-  const openRunKeys = new Set(checkboard.runs.filter((run) => run.status === "draft" || run.status === "reopened").map((run) => `${run.templateId}:${run.periodStart}`));
-  for (const template of checkboard.templates) {
-    const expectedStart = template.cadence === "daily" ? today : currentSunday;
-    const key = `${template.id}:${expectedStart}`;
-    if (!existingRunKeys.has(key)) openRunKeys.add(key);
-  }
-  if (openRunKeys.size) items.push({ key: "checks", tone: "warn", count: openRunKeys.size, title: `${plural(openRunKeys.size, "kitchen check")} due or open`, detail: "Current daily and weekly checks still need completion", href: "/checks", cta: "Open checks" });
-  if (isGroup) {
-    const submittedChecks = checkboard.runs.filter((run) => run.status === "submitted");
-    if (submittedChecks.length) items.push({ key: "check-review", tone: "warn", count: submittedChecks.length, title: `${plural(submittedChecks.length, "check")} waiting for review`, detail: submittedChecks.map((run) => run.siteName).join(", "), href: "/checks", cta: "Review checks" });
-  }
 
   const openActions = actions.filter((action) => !["complete", "cancelled"].includes(action.status));
   const overdueActions = openActions.filter((action) => isActionOverdue(action.dueDate, action.status, today));
@@ -107,6 +82,6 @@ export async function getWorkbench(role: AppRole, bundle: ReportingBundle, scope
   return {
     items,
     allClear,
-    clearMessage: isGroup ? "Reports are submitted, checks are clear, approvals are handled and this week’s 1-1s are complete." : "Your report and checks are complete, with no overdue actions or 1-1 acknowledgement waiting.",
+    clearMessage: isGroup ? "Weekly reports are submitted, approvals are handled and this week’s 1-1s are complete." : "Your weekly report is complete, with no overdue actions or 1-1 acknowledgement waiting.",
   };
 }
