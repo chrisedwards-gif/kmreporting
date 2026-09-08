@@ -12,6 +12,7 @@ const managerSchema = z.object({
   fullName: z.string().trim().min(2, "Enter the manager's name.").max(120),
   email: z.email("Enter a valid work email.").transform((value) => value.toLowerCase()),
   roleTitle: z.string().trim().min(2).max(120).default("Kitchen Manager"),
+  siteId: z.union([z.string().uuid(), z.literal("")]).default(""),
   employmentStartDate: z.string().default(""),
   probationEndDate: z.string().default(""),
   focusAreas: z.string().max(2000).default(""),
@@ -27,6 +28,83 @@ const updateSchema = z.object({
 });
 
 const focusAreasFromText = (value: string) => [...new Set(value.split(/\n|,/).map((item) => item.trim()).filter(Boolean))].slice(0, 30);
+
+function reportingWeekStart(value?: string) {
+  const input = value || new Date().toISOString().slice(0, 10);
+  const date = new Date(`${input}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+  return date.toISOString().slice(0, 10);
+}
+
+async function assignPersonToKitchen({
+  admin,
+  organisationId,
+  actorId,
+  profileId,
+  siteId,
+  roleTitle,
+  employmentStartDate,
+}: {
+  admin: ReturnType<typeof createAdminClient>;
+  organisationId: string;
+  actorId: string;
+  profileId: string;
+  siteId: string;
+  roleTitle: string;
+  employmentStartDate: string;
+}) {
+  const { data: site, error: siteError } = await admin
+    .from("sites")
+    .select("id, name")
+    .eq("id", siteId)
+    .eq("organisation_id", organisationId)
+    .eq("active", true)
+    .maybeSingle();
+  if (siteError || !site) return { error: "That kitchen could not be found." };
+
+  const { error: membershipError } = await admin
+    .from("site_memberships")
+    .upsert({ user_id: profileId, site_id: siteId, can_submit: true }, { onConflict: "user_id,site_id" });
+  if (membershipError) return { error: "The person was created, but kitchen reporting access could not be saved." };
+
+  const isAssistant = /assistant/i.test(roleTitle);
+  const { data: existingAssignment } = await admin
+    .from("site_manager_assignments")
+    .select("id, assignment_role")
+    .eq("site_id", siteId)
+    .eq("manager_profile_id", profileId)
+    .is("ends_on", null)
+    .maybeSingle();
+
+  if (!existingAssignment) {
+    let assignmentRole: "primary" | "assistant" = "assistant";
+    if (!isAssistant) {
+      const { data: currentPrimary } = await admin
+        .from("site_manager_assignments")
+        .select("id")
+        .eq("site_id", siteId)
+        .eq("assignment_role", "primary")
+        .is("ends_on", null)
+        .maybeSingle();
+      assignmentRole = currentPrimary ? "assistant" : "primary";
+    }
+
+    const { error: assignmentError } = await admin.from("site_manager_assignments").insert({
+      organisation_id: organisationId,
+      site_id: siteId,
+      manager_profile_id: profileId,
+      starts_on: reportingWeekStart(employmentStartDate),
+      ends_on: null,
+      assigned_by: actorId,
+      assignment_role: assignmentRole,
+    });
+    if (assignmentError) {
+      return { error: assignmentError.message.includes("assignment_role") ? "Apply the assistant-manager assignment migration before assigning this person." : assignmentError.message };
+    }
+  }
+
+  return { siteName: site.name, assistant: isAssistant };
+}
 
 export async function createManager(
   _previous: ManagerActionState,
@@ -54,16 +132,10 @@ export async function createManager(
       const { data: authRecord, error: authError } = await admin.auth.admin.getUserById(profileId);
       const authEmail = authRecord.user?.email?.toLowerCase() ?? "";
       if (authError || !authRecord.user || authEmail !== parsed.data.email) {
-        return {
-          status: "error",
-          message: "This profile is not linked to the same login email in Supabase Auth. It has been left unchanged to protect the existing person's identity.",
-        };
+        return { status: "error", message: "This profile is not linked to the same login email in Supabase Auth. It has been left unchanged to protect the existing person's identity." };
       }
       if ((existing.full_name ?? "").trim().toLowerCase() !== parsed.data.fullName.trim().toLowerCase()) {
-        return {
-          status: "error",
-          message: `That email already belongs to ${existing.full_name}. Create a new person with their own email instead of reusing an existing login.`,
-        };
+        return { status: "error", message: `That email already belongs to ${existing.full_name}. Create a new person with their own email instead of reusing an existing login.` };
       }
     } else {
       const origin = await getRequestOrigin();
@@ -97,7 +169,22 @@ export async function createManager(
       focus_areas: focusAreasFromText(parsed.data.focusAreas),
       updated_at: new Date().toISOString(),
     });
-    if (detailError) return { status: "error", message: "The profile was created, but its manager details could not be saved. Apply migration 013." };
+    if (detailError) return { status: "error", message: "The profile was created, but its employment details could not be saved." };
+
+    let kitchenMessage = "";
+    if (parsed.data.siteId) {
+      const assignment = await assignPersonToKitchen({
+        admin,
+        organisationId: profile.organisationId,
+        actorId: profile.id,
+        profileId,
+        siteId: parsed.data.siteId,
+        roleTitle: parsed.data.roleTitle,
+        employmentStartDate: parsed.data.employmentStartDate,
+      });
+      if (assignment.error) return { status: "error", message: assignment.error };
+      kitchenMessage = ` ${parsed.data.fullName} now has ${assignment.siteName} reporting access${assignment.assistant ? " and their own weekly 1-1 assignment" : ""}.`;
+    }
 
     await admin.from("audit_log").insert({
       organisation_id: profile.organisationId,
@@ -105,13 +192,12 @@ export async function createManager(
       action: "manager.created",
       entity_type: "profile",
       entity_id: profileId,
-      detail: { invited, email: parsed.data.email, roleTitle: parsed.data.roleTitle },
+      detail: { invited, email: parsed.data.email, roleTitle: parsed.data.roleTitle, siteId: parsed.data.siteId || null },
     });
-    revalidatePath("/performance/managers");
-    revalidatePath("/settings/sites");
-    return { status: "success", message: invited ? "Person created and invitation sent. Assign them to a kitchen from Sites & access." : "Existing manager account already matched this identity. Assign them to a kitchen from Sites & access." };
+    for (const path of ["/people", "/performance/managers", "/one-to-ones", "/settings/sites", "/reports/new"]) revalidatePath(path);
+    return { status: "success", message: `${invited ? "Person created and invitation sent." : "Existing person matched this login."}${kitchenMessage}` };
   } catch {
-    return { status: "error", message: "Manager administration requires the server-side Supabase secret in Vercel." };
+    return { status: "error", message: "People administration requires the server-side Supabase secret in Netlify." };
   }
 }
 
@@ -139,19 +225,17 @@ export async function updateManager(
     }
 
     if (parsed.data.active === "false") {
-      const { data: currentAssignment } = await admin
+      const { data: currentAssignments } = await admin
         .from("site_manager_assignments")
         .select("id")
         .eq("manager_profile_id", parsed.data.profileId)
         .is("ends_on", null)
-        .maybeSingle();
-      if (currentAssignment) return { status: "error", message: "Replace this manager's current kitchen assignment before deactivating their account." };
+        .limit(1);
+      if (currentAssignments?.length) return { status: "error", message: "End this person's current kitchen assignment before deactivating their account." };
     }
 
-    const { error: profileError } = await admin.from("profiles").update({
-      active: parsed.data.active === "true",
-    }).eq("id", parsed.data.profileId).eq("organisation_id", actor.organisationId);
-    if (profileError) return { status: "error", message: "The manager profile could not be updated." };
+    const { error: profileError } = await admin.from("profiles").update({ active: parsed.data.active === "true" }).eq("id", parsed.data.profileId).eq("organisation_id", actor.organisationId);
+    if (profileError) return { status: "error", message: "The person profile could not be updated." };
 
     const { error: detailError } = await admin.from("manager_details").upsert({
       profile_id: parsed.data.profileId,
@@ -162,21 +246,12 @@ export async function updateManager(
       focus_areas: focusAreasFromText(parsed.data.focusAreas),
       updated_at: new Date().toISOString(),
     });
-    if (detailError) return { status: "error", message: "The manager details could not be updated. Apply migration 013." };
+    if (detailError) return { status: "error", message: "The employment details could not be updated." };
 
-    await admin.from("audit_log").insert({
-      organisation_id: actor.organisationId,
-      actor_id: actor.id,
-      action: "manager.updated",
-      entity_type: "profile",
-      entity_id: parsed.data.profileId,
-      detail: { active: parsed.data.active === "true", roleTitle: parsed.data.roleTitle },
-    });
-    revalidatePath("/performance/managers");
-    revalidatePath("/performance/probation");
-    revalidatePath("/one-to-ones");
+    await admin.from("audit_log").insert({ organisation_id: actor.organisationId, actor_id: actor.id, action: "manager.updated", entity_type: "profile", entity_id: parsed.data.profileId, detail: { active: parsed.data.active === "true", roleTitle: parsed.data.roleTitle } });
+    for (const path of ["/people", "/performance/managers", "/performance/probation", "/one-to-ones"]) revalidatePath(path);
     return { status: "success", message: "Employment and performance details saved against the canonical login UUID." };
   } catch {
-    return { status: "error", message: "The manager details could not be updated." };
+    return { status: "error", message: "The person details could not be updated." };
   }
 }
