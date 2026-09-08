@@ -17,8 +17,12 @@ const managerSchema = z.object({
   focusAreas: z.string().max(2000).default(""),
 });
 
-const updateSchema = managerSchema.extend({
+const updateSchema = z.object({
   profileId: z.string().uuid(),
+  roleTitle: z.string().trim().min(2).max(120).default("Kitchen Manager"),
+  employmentStartDate: z.string().default(""),
+  probationEndDate: z.string().default(""),
+  focusAreas: z.string().max(2000).default(""),
   active: z.enum(["true", "false"]),
 });
 
@@ -36,7 +40,7 @@ export async function createManager(
     const admin = createAdminClient();
     const { data: existing } = await admin
       .from("profiles")
-      .select("id, role")
+      .select("id, role, full_name, notification_email")
       .eq("organisation_id", profile.organisationId)
       .eq("notification_email", parsed.data.email)
       .maybeSingle();
@@ -46,7 +50,22 @@ export async function createManager(
 
     let profileId = existing?.id;
     let invited = false;
-    if (!profileId) {
+    if (profileId) {
+      const { data: authRecord, error: authError } = await admin.auth.admin.getUserById(profileId);
+      const authEmail = authRecord.user?.email?.toLowerCase() ?? "";
+      if (authError || !authRecord.user || authEmail !== parsed.data.email) {
+        return {
+          status: "error",
+          message: "This profile is not linked to the same login email in Supabase Auth. It has been left unchanged to protect the existing person's identity.",
+        };
+      }
+      if ((existing.full_name ?? "").trim().toLowerCase() !== parsed.data.fullName.trim().toLowerCase()) {
+        return {
+          status: "error",
+          message: `That email already belongs to ${existing.full_name}. Create a new person with their own email instead of reusing an existing login.`,
+        };
+      }
+    } else {
       const origin = await getRequestOrigin();
       const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
         data: { full_name: parsed.data.fullName },
@@ -86,11 +105,11 @@ export async function createManager(
       action: "manager.created",
       entity_type: "profile",
       entity_id: profileId,
-      detail: { invited, email: parsed.data.email },
+      detail: { invited, email: parsed.data.email, roleTitle: parsed.data.roleTitle },
     });
     revalidatePath("/performance/managers");
     revalidatePath("/settings/sites");
-    return { status: "success", message: invited ? "Manager created and invitation sent. Assign them to a kitchen from Sites & access." : "Existing manager profile updated. Assign them to a kitchen from Sites & access." };
+    return { status: "success", message: invited ? "Person created and invitation sent. Assign them to a kitchen from Sites & access." : "Existing manager account already matched this identity. Assign them to a kitchen from Sites & access." };
   } catch {
     return { status: "error", message: "Manager administration requires the server-side Supabase secret in Vercel." };
   }
@@ -106,6 +125,19 @@ export async function updateManager(
 
   try {
     const admin = createAdminClient();
+    const { data: canonical, error: canonicalError } = await admin
+      .from("profiles")
+      .select("id, full_name, notification_email")
+      .eq("id", parsed.data.profileId)
+      .eq("organisation_id", actor.organisationId)
+      .maybeSingle();
+    if (canonicalError || !canonical) return { status: "error", message: "The canonical person record could not be found." };
+
+    const { data: authRecord, error: authError } = await admin.auth.admin.getUserById(parsed.data.profileId);
+    if (authError || !authRecord.user || authRecord.user.email?.toLowerCase() !== canonical.notification_email?.toLowerCase()) {
+      return { status: "error", message: "This person's app profile and login identity do not match. No changes were made." };
+    }
+
     if (parsed.data.active === "false") {
       const { data: currentAssignment } = await admin
         .from("site_manager_assignments")
@@ -117,8 +149,6 @@ export async function updateManager(
     }
 
     const { error: profileError } = await admin.from("profiles").update({
-      full_name: parsed.data.fullName,
-      notification_email: parsed.data.email,
       active: parsed.data.active === "true",
     }).eq("id", parsed.data.profileId).eq("organisation_id", actor.organisationId);
     if (profileError) return { status: "error", message: "The manager profile could not be updated." };
@@ -140,12 +170,12 @@ export async function updateManager(
       action: "manager.updated",
       entity_type: "profile",
       entity_id: parsed.data.profileId,
-      detail: { active: parsed.data.active === "true" },
+      detail: { active: parsed.data.active === "true", roleTitle: parsed.data.roleTitle },
     });
     revalidatePath("/performance/managers");
     revalidatePath("/performance/probation");
     revalidatePath("/one-to-ones");
-    return { status: "success", message: "Manager details saved against the canonical login UUID." };
+    return { status: "success", message: "Employment and performance details saved against the canonical login UUID." };
   } catch {
     return { status: "error", message: "The manager details could not be updated." };
   }
