@@ -14,44 +14,27 @@ export type SessionProfile = {
   id: string;
   organisationId: string;
   fullName: string;
-  /** Canonical database role used by route guards and server actions. */
   role: AppRole;
   actualRole: AppRole;
-  /** Workspace role used only for navigation and view-specific presentation. */
   navigationRole: AppRole;
-  /** True when an Admin is inspecting a kitchen-scoped manager workspace. */
   isAccessPreview: boolean;
   previewSiteId: string | null;
   previewSiteName: string | null;
   previewManagerId: string | null;
   previewManagerName: string | null;
-  /**
-   * Null means group scope. A populated array is the complete operational site
-   * boundary for this request. Admin kitchen mode and Kitchen Manager accounts
-   * both use this same boundary, so cross-kitchen data cannot leak through a
-   * page that forgot to inspect previewSiteId.
-   */
   siteScopeIds: string[] | null;
-  /** The manager identity whose personal workspace is being shown. */
   scopeManagerId: string | null;
-  /** Centralised write powers derived from actualRole only. */
   capabilities: Capabilities;
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const demoKardiaId = "kardia";
 
-/**
- * Do not wrap session/auth state in React cache. The profile contains cookies,
- * identity and data scope; it must be resolved fresh for every request.
- */
 export const getSessionProfile = async (): Promise<SessionProfile | null> => {
   if (environment.isDemo) {
     const cookieStore = await cookies();
     const requestedPersona = cookieStore.get(demoPersonaCookieName)?.value;
-    const actualRole: AppRole = requestedPersona === "kitchen_manager" || requestedPersona === "viewer" || requestedPersona === "admin"
-      ? requestedPersona
-      : "admin";
+    const actualRole: AppRole = requestedPersona === "kitchen_manager" || requestedPersona === "viewer" || requestedPersona === "admin" ? requestedPersona : "admin";
     const isKitchenManager = actualRole === "kitchen_manager";
     return {
       id: isKitchenManager ? "demo-manager-kardia" : `demo-${actualRole}`,
@@ -109,6 +92,7 @@ export const getSessionProfile = async (): Promise<SessionProfile | null> => {
           .from("site_manager_assignments")
           .select("manager_profile_id")
           .eq("site_id", site.id)
+          .eq("assignment_role", "primary")
           .is("ends_on", null)
           .order("starts_on", { ascending: false })
           .limit(1)
@@ -176,7 +160,6 @@ export async function requireActualRole(allowed: AppRole[]) {
   return profile;
 }
 
-/** Group-only pages must not remain directly reachable during Admin kitchen mode. */
 export async function requireGroupWorkspaceRole(allowed: AppRole[]) {
   const profile = await requireRole(allowed);
   if (profile.isAccessPreview) redirect("/dashboard");
