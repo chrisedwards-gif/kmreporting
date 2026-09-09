@@ -47,7 +47,7 @@ const requiredSources: SourceInstruction[] = [
     path: "Reports → Hours & Costs → Daily Totals",
     format: "CSV",
     kitchenFilters: "Location = this kitchen · exact reporting week · keep hours and costs visible.",
-    groupFilters: "Use All Locations only when the CSV retains a separate hours/cost breakdown per location. Otherwise export each RotaCloud kitchen separately. Kitchens that do not use RotaCloud are excluded automatically.",
+    groupFilters: "Location = All Locations only when the CSV retains a separate hours/cost breakdown per location. Otherwise export each RotaCloud kitchen separately. Kitchens that do not use RotaCloud are excluded automatically.",
     purpose: "Weekly wage cost and paid hours by kitchen.",
   },
 ];
@@ -65,7 +65,7 @@ export function WeeklySourceChecklist({ audience }: { audience: Audience }) {
             ? "These are the four source types the workflow understands. Each kitchen only needs the sources that actually apply to it; configured exceptions are not flagged as missing."
             : "Use only your kitchen and the exact Sunday–Saturday week. Download these four reports, then drop them into the uploader together."}</p>
         </div>
-        <span className={styles["source-checklist__required-count"]}>{group ? "4 source types" : "4 required"}</span>
+        <span className={styles["source-checklist__required-count"]}>4 required</span>
       </div>
 
       <div className={styles["source-checklist__grid"]}>
