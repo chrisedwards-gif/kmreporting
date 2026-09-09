@@ -42,21 +42,22 @@ test("Admin lands in the group workspace", async ({ page }) => {
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Admin upload route defaults to one HOS-wide Group Chef master pack", async ({ page }) => {
+test("Admin upload route shows exact Group Chef report downloads", async ({ page }) => {
   await switchPersona(page, "admin");
   await page.goto("/reports/new", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/reports\/group$/);
 
   await expect(page.getByRole("heading", { name: "Master weekly pack." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Upload your HOS-wide exports once." })).toBeVisible();
-  await expect(page.getByText("What do I upload as Group Chef?", { exact: true })).toBeVisible();
-  await expect(page.getByText("Access / StockLink — sales", { exact: true })).toBeVisible();
-  await expect(page.getByText("Procure Wizard — Goods Delivered", { exact: true })).toBeVisible();
-  await expect(page.getByText("Procure Wizard — Credits Overview", { exact: true })).toBeVisible();
-  await expect(page.getByText("RotaCloud — labour", { exact: true })).toBeVisible();
-  await expect(page.getByText("Group export", { exact: true })).toHaveCount(4);
-  await expect(page.getByText("Usually 3–4 HOS-wide files", { exact: true })).toBeVisible();
-  await expect(page.getByText("One file can cover all five kitchens — no kitchen selector needed.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Download the reports below, then upload them once." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Group Chef weekly downloads" })).toBeVisible();
+  await expect(page.getByText("Sales Reports → End Of Week Report", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reporting → Goods Purchased", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reporting → Credits Overview", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reports → Hours & Costs → Daily Totals", { exact: true })).toBeVisible();
+  await expect(page.getByText("4 required", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Site = All Sites/).first()).toBeVisible();
+  await expect(page.getByText(/Location = All Locations/)).toBeVisible();
+  await expect(page.getByText(/Do not substitute Sales Summary Report/)).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
@@ -105,13 +106,20 @@ test("Kitchen Manager can start a site-scoped product and add an action", async 
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Kitchen Manager sees the upload-first weekly reporting workflow", async ({ page }) => {
+test("Kitchen Manager sees exact weekly report download instructions", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/reports/new", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "Upload the week once." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Drop the whole week in once." })).toBeVisible();
-  await expect(page.getByText("Drop all weekly reports here", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Download four reports, then upload them together." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kitchen Manager weekly downloads" })).toBeVisible();
+  await expect(page.getByText("Sales Reports → End Of Week Report", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reporting → Goods Purchased", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reporting → Credits Overview", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reports → Hours & Costs → Daily Totals", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Site = this kitchen/).first()).toBeVisible();
+  await expect(page.getByText(/Location = this kitchen/)).toBeVisible();
+  await expect(page.getByText("Drop the four required reports here", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Upload & build draft/ })).toBeDisabled();
   await expect(page.getByText("No exports available? Enter the week manually", { exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
