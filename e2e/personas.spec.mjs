@@ -36,6 +36,7 @@ test("Admin lands in the group workspace", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Administration" })).toBeVisible();
   await expect(page.getByText("Dough Religion", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Kardia", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Decision intelligence", { exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
@@ -49,6 +50,8 @@ test("Kitchen Manager sees their scoped kitchen and reporting actions", async ({
   await expect(page.getByText("Dough Religion", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Management summary" })).toHaveCount(0);
+  await expect(page.getByText("Decision intelligence", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Observed opportunity", { exact: true })).toHaveCount(0);
 
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("dialog", { name: "Workspace search" })).toBeVisible();
@@ -145,6 +148,8 @@ test("Viewer lands on reporting insight with no operational controls", async ({ 
   await expect(page.getByRole("link", { name: "Management summary", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Kitchen checks" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
+  await expect(page.getByText("Decision intelligence", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Observed opportunity", { exact: true })).toHaveCount(0);
   await expect(page.getByText("No operational actions are assigned to this access role.")).toHaveCount(0);
   await expectNoSeriousAccessibilityViolations(page);
 });
