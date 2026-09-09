@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, LineChart, Plus } from "lucide-react";
+import { ArrowRight, FileUp, LineChart, Plus } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PeriodSelector } from "@/components/reports/period-selector";
 import { requireSessionProfile } from "@/lib/auth/dal";
@@ -19,6 +19,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const bundle = await getScopedReportingBundle(profile, selectedPeriod);
   const reports = bundle.reports;
   const canCreateReport = profile.capabilities.editReports;
+  const isGroupRole = !profile.isAccessPreview && (profile.actualRole === "admin" || profile.actualRole === "group_manager");
 
   return (
     <>
@@ -26,15 +27,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <div>
           <p className="page-header__eyebrow">{profile.siteScopeIds ? `${profile.previewSiteName ?? (profile.siteScopeIds.length > 1 ? "Assigned kitchens" : "Your kitchen")} · scoped reporting` : "All kitchens"}</p>
           <h1 className="page-header__title">Weekly reports.</h1>
-          <p className="page-header__copy">One submission per kitchen, rolled into one controlled group view.</p>
+          <p className="page-header__copy">{isGroupRole ? "Track the individual KM submissions here. Your own independent HOS-wide exports live in Master Pack and never overwrite these reports." : "One submission per kitchen, rolled into one controlled group view."}</p>
         </div>
         <div className="page-header__actions">
           <PeriodSelector periods={periods} selected={selectedPeriod} />
           <Link className="button button--secondary" href="/insights"><LineChart aria-hidden="true" size={16} /> Compare history</Link>
-          {canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> New report</Link> : null}
+          {isGroupRole ? <Link className="button button--primary" href="/reports/group"><FileUp aria-hidden="true" size={16} /> Group Master Pack</Link> : canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> New report</Link> : null}
         </div>
       </header>
       {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode for {profile.previewSiteName}. Full reporting controls are retained; only this kitchen’s reports are loaded.</div> : null}
+      {isGroupRole ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>KM side = one kitchen report each. Group Chef side = one HOS-wide master upload. Use the button above for your files.</div> : null}
       <div className="report-list">
         {reports.map((report) => {
           const canContinueDraft = report.status === "draft" && canCreateReport;
@@ -52,7 +54,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </Link>
           );
         })}
-        {!reports.length ? <section className="panel empty-state"><h2>No reports for this week.</h2><p>{canCreateReport ? "Start the first report for a kitchen in your current scope or select another reporting period." : "Select another reporting period to view historical reports."}</p>{canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> Start a report</Link> : null}</section> : null}
+        {!reports.length ? <section className="panel empty-state"><h2>No KM reports for this week.</h2><p>{isGroupRole ? "You can still upload your HOS-wide master data now; the comparison will populate as the KMs submit." : canCreateReport ? "Start the first report for a kitchen in your current scope or select another reporting period." : "Select another reporting period to view historical reports."}</p>{isGroupRole ? <Link className="button button--primary" href="/reports/group"><FileUp aria-hidden="true" size={16} /> Upload Group Master Pack</Link> : canCreateReport ? <Link className="button button--primary" href={selectedPeriod ? `/reports/new?period=${selectedPeriod}` : "/reports/new"}><Plus aria-hidden="true" size={16} /> Start a report</Link> : null}</section> : null}
       </div>
     </>
   );
