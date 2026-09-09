@@ -59,6 +59,7 @@ export default async function DashboardPage() {
   const hasSales = totals.netSales > 0;
   const canCreateReport = profile.capabilities.editReports;
   const isManagerHome = profile.navigationRole === "kitchen_manager";
+  const canViewDecisionIntelligence = !profile.isAccessPreview && (profile.actualRole === "admin" || profile.actualRole === "group_manager");
   const managerName = profile.isAccessPreview ? profile.previewManagerName : profile.fullName;
   const firstName = managerName?.trim().split(/\s+/)[0] ?? "there";
   const siteContext = sites.length === 1 ? sites[0]?.name : sites.length > 1 ? `${sites.length} kitchens` : profile.previewSiteName ?? "your kitchens";
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
         <div>
           <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · weekly reporting` : "Group decision dashboard"}</p>
           <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "What should we do next?"}</h1>
-          <p className="page-header__copy">{isManagerHome ? `Upload the kitchen pack, review the data-led actions and complete your weekly 1-1. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} report exceptions need attention.`}</p>
+          <p className="page-header__copy">{isManagerHome ? `Upload the kitchen pack, review your actions and complete your weekly 1-1. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} report exceptions need attention.`}</p>
         </div>
         {canCreateReport ? <Link className="button button--primary" href="/reports/new">Upload weekly pack <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
@@ -78,7 +79,7 @@ export default async function DashboardPage() {
 
       <Suspense fallback={<WorkbenchSkeleton />}><DashboardWorkbench bundle={bundle} profile={profile} /></Suspense>
       <Suspense fallback={<MessageSkeleton />}><DashboardMessages profile={profile} /></Suspense>
-      <Suspense fallback={<section className="panel"><div className="panel__body">Analysing historical sales, product and labour patterns…</div></section>}><DashboardDecisions profile={profile} /></Suspense>
+      {canViewDecisionIntelligence ? <Suspense fallback={<section className="panel"><div className="panel__body">Analysing historical sales, product and labour patterns…</div></section>}><DashboardDecisions profile={profile} /></Suspense> : null}
 
       <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />
@@ -89,7 +90,7 @@ export default async function DashboardPage() {
         <MetricCard accent="#b93f35" label="Review queue" note="Approval blocks sharing" value={`${reviewFlags.length}`} />
       </section>
 
-      <div className="dashboard-grid"><div className="stack"><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Site performance</h2><p className="panel__subtitle">Weekly commercial performance by kitchen</p></div><CalendarDays aria-hidden="true" color="#5f6e68" size={19} /></div><SitePerformanceTable sites={sites} /></section><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Food cost / spend and labour</h2><p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p></div></div><div className="panel__body"><CostChart sites={sites} /></div></section></div><aside className="panel"><div className="panel__header"><div><h2 className="panel__title">Report exceptions</h2><p className="panel__subtitle">Resolve before a report can be shared</p></div></div><div className="panel__body"><div className="review-list">{reviewFlags.map((flag, index) => <Link className={`review-item review-item--${flag.severity}`} href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"} key={`${flag.code}-${index}`}><div className="review-item__site">{flag.siteName}</div><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></Link>)}{!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No report exceptions currently need management attention.</div> : null}</div></div></aside></div>
+      <div className="dashboard-grid"><div className="stack"><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Site performance</h2><p className="panel__subtitle">Weekly commercial performance by kitchen</p></div><CalendarDays aria-hidden="true" color="#5f6e68" size={19} /></div><SitePerformanceTable sites={sites} /></section><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Food cost / spend and labour</h2><p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p></div></div><div className="panel__body"><CostChart sites={sites} /></section></div><aside className="panel"><div className="panel__header"><div><h2 className="panel__title">Report exceptions</h2><p className="panel__subtitle">Resolve before a report can be shared</p></div></div><div className="panel__body"><div className="review-list">{reviewFlags.map((flag, index) => <Link className={`review-item review-item--${flag.severity}`} href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"} key={`${flag.code}-${index}`}><div className="review-item__site">{flag.siteName}</div><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></Link>)}{!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No report exceptions currently need management attention.</div> : null}</div></div></aside></div>
     </>
   );
 }
