@@ -32,7 +32,7 @@ const switchPersona = async (page, role) => {
 
 test("Admin lands in the group workspace", async ({ page }) => {
   await switchPersona(page, "admin");
-  await expect(page.getByRole("heading", { name: "The group at a glance." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What should we do next?" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Administration" })).toBeVisible();
   await expect(page.getByText("Dough Religion", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Kardia", { exact: true }).first()).toBeVisible();
@@ -42,8 +42,9 @@ test("Admin lands in the group workspace", async ({ page }) => {
 test("Kitchen Manager sees their kitchen, actions and nightly staffing check", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await expect(page.getByRole("heading", { name: "Hi, Scott." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Kitchen checks" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Product development" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Weekly reports" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "My 1-1s" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Action log" })).toBeVisible();
   await expect(page.getByText("Kardia", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Dough Religion", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
@@ -83,24 +84,15 @@ test("Kitchen Manager can start a site-scoped product and add an action", async 
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Kitchen Manager can see and unlock weekly submission before reaching the form footer", async ({ page }) => {
+test("Kitchen Manager sees the upload-first weekly reporting workflow", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await page.goto("/reports/new", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("heading", { name: "Build the week’s report." })).toBeVisible();
-  const submitButton = page.getByRole("button", { name: "Submit weekly report" }).first();
-  await expect(submitButton).toBeVisible();
-  await expect(submitButton).toBeDisabled();
-  await expect(page.getByText(/checks before submission/)).toBeVisible();
-
-  await page.getByLabel("Net sales excluding VAT and service charge").fill("12000");
-  await page.getByLabel(/confirm the net-sales total/).check();
-  await page.getByLabel(/confirm the food-spend and credit total/).check();
-  await page.getByLabel("Aggregate weekly wage cost").fill("3650");
-  await page.getByLabel(/confirm the aggregate labour total/).check();
-
-  await expect(submitButton).toBeEnabled();
-  await expect(page.getByRole("heading", { name: "Ready to submit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Upload the week once." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Drop the whole week in once." })).toBeVisible();
+  await expect(page.getByText("Drop all weekly reports here", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Upload & build draft/ })).toBeDisabled();
+  await expect(page.getByText("No exports available? Enter the week manually", { exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
