@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireSessionProfile } from "@/lib/auth/dal";
+import { parseGroupWeeklyPackFile } from "@/lib/reporting/group-pack-parser";
+import { reconcileGroupMasterBatch } from "@/lib/reporting/group-reconciliation";
 import { normaliseSiteName } from "@/lib/reporting/imports";
-import { classifyWeeklyPackFile, type ParsedPackFile } from "@/lib/reporting/pack-parser";
+import type { ParsedPackFile } from "@/lib/reporting/pack-parser";
 import { isSundayToSaturday } from "@/lib/reporting/periods";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -35,12 +37,24 @@ const numeric = (value: unknown) => {
 
 type SiteRow = { id: string; name: string; code: string };
 type MasterMetric = { siteId: string; metricKey: string; numericValue: number; sourceFileId: string };
-
+type ResolvedParse = { parsed: ParsedPackFile; site: SiteRow | null };
 type ParsedFileRow = {
   fileName: string;
   fileId: string;
-  parsed: ParsedPackFile;
-  site: SiteRow | null;
+  classification: ParsedPackFile["classification"];
+  status: ParsedPackFile["parseStatus"];
+  error: string;
+  summary: Record<string, unknown>;
+  sites: SiteRow[];
+};
+type HourlyMetric = {
+  siteId: string;
+  businessDate: string;
+  slotTime: string;
+  staffedHours: number;
+  staffCount: number;
+  hourlyCost: number;
+  sourceReference: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -87,6 +101,8 @@ export async function POST(request: NextRequest) {
   const expected = { start: weekStart, end: weekEnd };
   const parsedRows: ParsedFileRow[] = [];
   const metrics: MasterMetric[] = [];
+  const hourlyMetrics: HourlyMetric[] = [];
+  const rotaSitesSeen = new Set<string>();
 
   for (const file of files) {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -96,15 +112,46 @@ export async function POST(request: NextRequest) {
     const contentType = file.type || "application/octet-stream";
     const { error: storageError } = await admin.storage.from("weekly-report-packs").upload(storagePath, bytes, { contentType, upsert: false });
     if (storageError) {
-      await admin.from("weekly_upload_batches").update({ status: "error", updated_at: new Date().toISOString() }).eq("id", batch.id);
+      await markBatchError(admin, batch.id);
       return NextResponse.json({ error: `Could not retain ${file.name} privately.`, batchId: batch.id }, { status: 500 });
     }
 
-    const parsed = classifyWeeklyPackFile(file.name, decodeReportText(bytes), expected);
-    const site = resolveSite(parsed.siteHint, file.name, siteRows);
-    const effectiveParsed: ParsedPackFile = parsed.parseStatus === "parsed" && !site
-      ? { ...parsed, parseStatus: "error", error: parsed.siteHint ? `Could not match ${parsed.siteHint} to an active kitchen.` : "The kitchen could not be identified from this file." }
-      : parsed;
+    const parsedResults = parseGroupWeeklyPackFile(file.name, decodeReportText(bytes), expected);
+    const resolved: ResolvedParse[] = parsedResults.map((parsed) => {
+      const site = resolveSite(parsed.siteHint, parsedResults.length === 1 ? file.name : "", siteRows);
+      if (parsed.parseStatus === "parsed" && !site) {
+        return {
+          site: null,
+          parsed: {
+            ...parsed,
+            parseStatus: "error",
+            error: parsed.siteHint ? `Could not match ${parsed.siteHint} to an active kitchen.` : "The kitchen could not be identified from this file.",
+          },
+        };
+      }
+      return { parsed, site };
+    });
+
+    const successful = resolved.filter((row): row is ResolvedParse & { site: SiteRow } => row.parsed.parseStatus === "parsed" && Boolean(row.site));
+    const first = resolved[0]?.parsed;
+    const classification = first?.classification ?? "supporting";
+    const status: ParsedPackFile["parseStatus"] = successful.length
+      ? "parsed"
+      : resolved.some((row) => row.parsed.parseStatus === "error")
+        ? "error"
+        : first?.parseStatus ?? "unrecognised";
+    const errors = resolved
+      .filter((row) => row.parsed.error)
+      .map((row) => `${row.parsed.siteHint ? `${row.parsed.siteHint}: ` : ""}${row.parsed.error}`);
+    const summary = successful.length > 1 || parsedResults.length > 1
+      ? {
+        groupWideSource: true,
+        kitchenCount: successful.length,
+        kitchens: successful.map((row) => ({ site: row.site.name, summary: row.parsed.summary })),
+      }
+      : successful[0]?.parsed.summary ?? first?.summary ?? {};
+    const periods = successful.flatMap((row) => [row.parsed.periodStart, row.parsed.periodEnd].filter((value): value is string => Boolean(value))).sort();
+    const siteHint = successful.length === 1 ? successful[0].site.name : successful.length > 1 ? `${successful.length} kitchens` : first?.siteHint ?? null;
 
     const { error: fileError } = await admin.from("weekly_upload_files").insert({
       id: fileId,
@@ -114,23 +161,36 @@ export async function POST(request: NextRequest) {
       content_type: contentType,
       byte_size: file.size,
       sha256,
-      classification: effectiveParsed.classification,
-      parse_status: effectiveParsed.parseStatus,
-      site_hint: site?.name ?? effectiveParsed.siteHint,
-      period_start: effectiveParsed.periodStart,
-      period_end: effectiveParsed.periodEnd,
-      parsed_summary: effectiveParsed.summary,
-      parse_error: effectiveParsed.error,
+      classification,
+      parse_status: status,
+      site_hint: siteHint,
+      period_start: periods[0] ?? first?.periodStart ?? null,
+      period_end: periods.at(-1) ?? first?.periodEnd ?? null,
+      parsed_summary: summary,
+      parse_error: errors.join(" "),
     });
     if (fileError) {
-      await admin.from("weekly_upload_batches").update({ status: "error", updated_at: new Date().toISOString() }).eq("id", batch.id);
+      await markBatchError(admin, batch.id);
       return NextResponse.json({ error: `Could not register ${file.name} in the audit trail.`, batchId: batch.id }, { status: 500 });
     }
 
-    parsedRows.push({ fileName: file.name, fileId, parsed: effectiveParsed, site });
-    if (site && effectiveParsed.parseStatus === "parsed") {
-      metrics.push(...metricsForFile(site.id, fileId, effectiveParsed));
+    for (const row of successful) {
+      metrics.push(...metricsForFile(row.site.id, fileId, row.parsed));
+      if (row.parsed.classification === "rotacloud_labour") {
+        rotaSitesSeen.add(row.site.id);
+        hourlyMetrics.push(...hourlyMetricsForFile(row.site.id, file.name, sha256, row.parsed));
+      }
     }
+
+    parsedRows.push({
+      fileName: file.name,
+      fileId,
+      classification,
+      status,
+      error: errors.join(" "),
+      summary,
+      sites: successful.map((row) => row.site),
+    });
   }
 
   if (metrics.length) {
@@ -145,18 +205,37 @@ export async function POST(request: NextRequest) {
     }));
     const { error: metricError } = await admin.from("weekly_master_metrics").upsert(rows, { onConflict: "batch_id,site_id,metric_key" });
     if (metricError) {
-      await admin.from("weekly_upload_batches").update({ status: "error", updated_at: new Date().toISOString() }).eq("id", batch.id);
+      await markBatchError(admin, batch.id);
       return NextResponse.json({ error: "The master metrics could not be stored.", batchId: batch.id }, { status: 500 });
     }
   }
 
-  const reconciliation = await reconcileWeek({
+  const hourlyError = await replaceGroupHourlyLabour({
+    admin,
     organisationId: profile.organisationId,
     weekStart,
-    batchId: batch.id,
-    sites: siteRows,
-    admin,
+    weekEnd,
+    siteIds: [...rotaSitesSeen],
+    rows: hourlyMetrics,
   });
+  if (hourlyError) {
+    await markBatchError(admin, batch.id);
+    return NextResponse.json({ error: hourlyError, batchId: batch.id }, { status: 500 });
+  }
+
+  let reconciliation;
+  try {
+    reconciliation = await reconcileGroupMasterBatch({
+      organisationId: profile.organisationId,
+      weekStart,
+      batchId: batch.id,
+      sites: siteRows,
+      admin,
+    });
+  } catch (error) {
+    await markBatchError(admin, batch.id);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "The group reconciliation could not be refreshed.", batchId: batch.id }, { status: 500 });
+  }
 
   await admin.from("weekly_upload_batches").update({ status: "ready", updated_at: new Date().toISOString() }).eq("id", batch.id);
   await admin.from("audit_log").insert({
@@ -168,8 +247,10 @@ export async function POST(request: NextRequest) {
     detail: {
       week_start: weekStart,
       file_count: files.length,
-      parsed_count: parsedRows.filter((row) => row.parsed.parseStatus === "parsed").length,
+      parsed_file_count: parsedRows.filter((row) => row.status === "parsed").length,
+      recognised_kitchen_count: new Set(parsedRows.flatMap((row) => row.sites.map((site) => site.id))).size,
       metric_count: metrics.length,
+      hourly_labour_rows: hourlyMetrics.length,
       warning_count: reconciliation.filter((row) => row.status !== "match").length,
     },
   });
@@ -180,11 +261,12 @@ export async function POST(request: NextRequest) {
     weekStart,
     parsed: parsedRows.map((row) => ({
       name: row.fileName,
-      site: row.site?.name ?? row.parsed.siteHint,
-      classification: row.parsed.classification,
-      status: row.parsed.parseStatus,
-      error: row.parsed.error,
-      summary: row.parsed.summary,
+      site: row.sites.length === 1 ? row.sites[0].name : null,
+      sites: row.sites.map((site) => site.name),
+      classification: row.classification,
+      status: row.status,
+      error: row.error,
+      summary: row.summary,
     })),
     reconciliation,
   });
@@ -199,7 +281,7 @@ function resolveSite(siteHint: string | null, fileName: string, sites: SiteRow[]
     if (fuzzy) return fuzzy;
   }
   const name = normaliseSiteName(fileName.replace(/\.[^.]+$/, ""));
-  return sites.find((site) => name.includes(normaliseSiteName(site.name)) || name.includes(normaliseSiteName(site.code))) ?? null;
+  return name ? sites.find((site) => name.includes(normaliseSiteName(site.name)) || name.includes(normaliseSiteName(site.code))) ?? null : null;
 }
 
 function metricsForFile(siteId: string, sourceFileId: string, parsed: ParsedPackFile): MasterMetric[] {
@@ -227,82 +309,77 @@ function metricsForFile(siteId: string, sourceFileId: string, parsed: ParsedPack
   return rows;
 }
 
-async function reconcileWeek({ organisationId, weekStart, batchId, sites, admin }: {
-  organisationId: string;
-  weekStart: string;
-  batchId: string;
-  sites: SiteRow[];
-  admin: ReturnType<typeof createAdminClient>;
-}) {
-  const { data: period } = await admin.from("reporting_periods").select("id").eq("organisation_id", organisationId).eq("week_start", weekStart).eq("reporting_cycle", "sunday_saturday").maybeSingle();
-  const { data: masterRows = [] } = await admin.from("weekly_master_metrics").select("site_id, metric_key, numeric_value").eq("batch_id", batchId);
-  const masterBySite = new Map<string, Map<string, number>>();
-  for (const row of masterRows ?? []) {
-    const map = masterBySite.get(row.site_id) ?? new Map<string, number>();
-    map.set(row.metric_key, Number(row.numeric_value));
-    masterBySite.set(row.site_id, map);
-  }
-
-  const { data: reports = [] } = period?.id
-    ? await admin.from("weekly_reports").select("id, site_id").eq("period_id", period.id)
-    : { data: [] };
-  const reportIds = (reports ?? []).map((report) => report.id);
-  const reportBySite = new Map((reports ?? []).map((report) => [report.site_id, report.id]));
-  const { data: sourceRows = [] } = reportIds.length
-    ? await admin.from("report_source_values").select("report_id, net_sales, purchases, credits, staff_cost, paid_hours, pending_credits, awaiting_invoice").in("report_id", reportIds)
-    : { data: [] };
-  const sourceByReport = new Map((sourceRows ?? []).map((row) => [row.report_id, row]));
-
-  const keys = ["net_sales", "purchases", "credits", "staff_cost", "paid_hours", "pending_credits", "awaiting_invoice"] as const;
-  const reconciliationRows: Array<Record<string, unknown>> = [];
-  const response: Array<{ siteId: string; siteName: string; metricKey: string; siteValue: number | null; masterValue: number | null; variance: number | null; variancePct: number | null; status: "match" | "warning" | "missing_site" | "missing_master" }> = [];
-
-  for (const site of sites) {
-    const reportId = reportBySite.get(site.id) ?? null;
-    const source = reportId ? sourceByReport.get(reportId) : null;
-    const master = masterBySite.get(site.id) ?? new Map<string, number>();
-    for (const key of keys) {
-      const masterValue = master.has(key) ? master.get(key)! : null;
-      const rawSite = source ? source[key] : null;
-      const siteValue = rawSite == null ? null : Number(rawSite);
-      if (masterValue == null && siteValue == null) continue;
-      const variance = masterValue != null && siteValue != null ? masterValue - siteValue : null;
-      const variancePct = variance != null && siteValue != null && siteValue !== 0 ? variance / Math.abs(siteValue) * 100 : null;
-      const status = siteValue == null
-        ? "missing_site" as const
-        : masterValue == null
-          ? "missing_master" as const
-          : metricMatches(key, siteValue, masterValue)
-            ? "match" as const
-            : "warning" as const;
-      const row = { siteId: site.id, siteName: site.name, metricKey: key, siteValue, masterValue, variance, variancePct, status };
-      response.push(row);
-      reconciliationRows.push({
-        organisation_id: organisationId,
-        week_start: weekStart,
-        site_id: site.id,
-        report_id: reportId,
-        master_batch_id: batchId,
-        metric_key: key,
-        site_value: siteValue,
-        master_value: masterValue,
-        variance,
-        variance_pct: variancePct,
-        status,
-        checked_at: new Date().toISOString(),
-      });
-    }
-  }
-
-  if (reconciliationRows.length) {
-    await admin.from("weekly_reconciliations").upsert(reconciliationRows, { onConflict: "organisation_id,week_start,site_id,metric_key" });
-  }
-  return response;
+function hourlyMetricsForFile(siteId: string, fileName: string, sha256: string, parsed: ParsedPackFile): HourlyMetric[] {
+  const values = parsed.summary.hourlyLabour;
+  if (!Array.isArray(values)) return [];
+  const sourceReference = `${fileName}:${sha256.slice(0, 16)}`.slice(0, 250);
+  return values.flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const row = value as Record<string, unknown>;
+    const businessDate = typeof row.businessDate === "string" ? row.businessDate : "";
+    const slotTime = typeof row.slotTime === "string" ? row.slotTime : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate) || !/^\d{2}:\d{2}:\d{2}$/.test(slotTime)) return [];
+    return [{
+      siteId,
+      businessDate,
+      slotTime,
+      staffedHours: Math.max(numeric(row.staffedHours) ?? 0, 0),
+      staffCount: Math.max(numeric(row.staffCount) ?? 0, 0),
+      hourlyCost: Math.max(numeric(row.hourlyCost) ?? 0, 0),
+      sourceReference,
+    }];
+  });
 }
 
-function metricMatches(key: string, siteValue: number, masterValue: number) {
-  const absolute = Math.abs(masterValue - siteValue);
-  const pctVariance = siteValue !== 0 ? absolute / Math.abs(siteValue) * 100 : absolute === 0 ? 0 : 100;
-  if (key === "paid_hours") return absolute <= 0.25 || pctVariance <= 0.5;
-  return absolute <= 2 || pctVariance <= 0.25;
+async function replaceGroupHourlyLabour({
+  admin,
+  organisationId,
+  weekStart,
+  weekEnd,
+  siteIds,
+  rows,
+}: {
+  admin: ReturnType<typeof createAdminClient>;
+  organisationId: string;
+  weekStart: string;
+  weekEnd: string;
+  siteIds: string[];
+  rows: HourlyMetric[];
+}) {
+  for (const siteId of siteIds) {
+    const { error } = await admin
+      .from("hourly_labour_metrics")
+      .delete()
+      .eq("organisation_id", organisationId)
+      .eq("site_id", siteId)
+      .eq("source_system", "rotacloud_group_pack")
+      .gte("business_date", weekStart)
+      .lte("business_date", weekEnd);
+    if (error) return "The previous group RotaCloud hourly data could not be refreshed.";
+  }
+  if (!rows.length) return null;
+
+  const deduped = new Map<string, HourlyMetric>();
+  for (const row of rows) deduped.set(`${row.siteId}:${row.businessDate}:${row.slotTime}`, row);
+  const payload = [...deduped.values()].map((row) => ({
+    organisation_id: organisationId,
+    site_id: row.siteId,
+    business_date: row.businessDate,
+    slot_time: row.slotTime,
+    interval_minutes: 60,
+    staffed_hours: row.staffedHours,
+    staff_count: row.staffCount,
+    hourly_cost: row.hourlyCost,
+    source_system: "rotacloud_group_pack",
+    source_reference: row.sourceReference,
+    imported_at: new Date().toISOString(),
+  }));
+  const { error } = await admin.from("hourly_labour_metrics").upsert(payload, {
+    onConflict: "organisation_id,site_id,business_date,slot_time,interval_minutes,source_system",
+  });
+  return error ? "The detailed group RotaCloud labour data could not be stored." : null;
+}
+
+async function markBatchError(admin: ReturnType<typeof createAdminClient>, batchId: string) {
+  await admin.from("weekly_upload_batches").update({ status: "error", updated_at: new Date().toISOString() }).eq("id", batchId);
 }
