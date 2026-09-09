@@ -17,6 +17,9 @@ const siteHeaderCandidates = [
   "location",
   "site",
   "site name",
+  "purchaser site",
+  "purchaser unit",
+  "purchaser unit name",
   "kitchen",
   "outlet",
   "venue",
@@ -56,7 +59,7 @@ const toCsv = (headers: string[], rows: string[][]) => [headers, ...rows].map((r
 const meaningfulSite = (value: string) => {
   const clean = value.trim();
   if (!clean) return false;
-  return !/^(all|all locations?|total|grand total|group|house of social|hos)$/i.test(clean);
+  return !/^(all|all locations?|all sites?|total|grand total|group|house of social|hos)$/i.test(clean);
 };
 
 /**
@@ -68,7 +71,7 @@ export function parseGroupWeeklyPackFile(fileName: string, content: string, expe
   const headers = (rows[0] ?? []).map(cleanHeader);
 
   if (headers.length > 0) {
-    const goods = splitGoodsDelivered(headers, rows.slice(1), expected);
+    const goods = splitGoodsPurchased(headers, rows.slice(1), expected);
     if (goods) return goods;
 
     const credits = splitCreditsOverview(headers, rows.slice(1), expected);
@@ -84,9 +87,11 @@ export function parseGroupWeeklyPackFile(fileName: string, content: string, expe
   return [classifyWeeklyPackFile(fileName, content, expected)];
 }
 
-function splitGoodsDelivered(headers: string[], rows: string[][], expected: SourcePeriod): ParsedPackFile[] | null {
-  const siteHeader = findHeader(headers, ["Purchaser Unit Name"]);
-  if (!siteHeader || !hasHeaders(headers, ["Date Delivered", "Total Price Net"])) return null;
+function splitGoodsPurchased(headers: string[], rows: string[][], expected: SourcePeriod): ParsedPackFile[] | null {
+  const siteHeader = findHeader(headers, ["Purchaser Unit Name", "Purchaser site", "Purchaser Unit", "Site", "Location"]);
+  const dateHeader = findHeader(headers, ["Date Delivered", "Delivery Date", "Date of Delivery", "Requested Delivery", "Invoice Date", "Order Invoice Date"]);
+  const valueHeader = findHeader(headers, ["Total Price Net", "Line Net Value", "Goods Net Value", "Total Net", "Net Value", "PO Net Value", "Invoice Net Value"]);
+  if (!siteHeader || !dateHeader || !valueHeader) return null;
   const groups = groupRows(headers, rows, siteHeader);
   if (groups.size <= 1) return null;
 
@@ -109,8 +114,10 @@ function splitGoodsDelivered(headers: string[], rows: string[][], expected: Sour
 }
 
 function splitCreditsOverview(headers: string[], rows: string[][], expected: SourcePeriod): ParsedPackFile[] | null {
-  const siteHeader = findHeader(headers, ["Purchaser Unit"]);
-  if (!siteHeader || !hasHeaders(headers, ["Credit Request Date", "Order Status"])) return null;
+  const siteHeader = findHeader(headers, ["Purchaser site", "Purchaser Unit", "Purchaser Unit Name", "Site", "Location"]);
+  const noteValueHeader = findHeader(headers, ["Credit note total", "Credit Note Net Value", "Credit Note Total Value", "Credit Note Value"]);
+  const requestValueHeader = findHeader(headers, ["Credit request net value", "Credit Request Net Value", "Credit Request Total", "Credit Request Value"]);
+  if (!siteHeader || (!noteValueHeader && !requestValueHeader)) return null;
   const groups = groupRows(headers, rows, siteHeader);
   if (groups.size <= 1) return null;
 
@@ -139,8 +146,8 @@ function splitCreditsOverview(headers: string[], rows: string[][], expected: Sou
 }
 
 function splitRotaCloud(fileName: string, headers: string[], rows: string[][], expected: SourcePeriod): ParsedPackFile[] | null {
-  const looksLikeRota = /rotacloud|rota cloud/i.test(fileName)
-    || headers.some((header) => /wage cost|staff cost|labour cost|labor cost|paid hours|total cost/i.test(header));
+  const looksLikeRota = /rotacloud|rota cloud|daily[_ -]?totals/i.test(fileName)
+    || headers.some((header) => /wage cost|staff cost|labour cost|labor cost|paid hours|total hours|total cost|total shifts/i.test(header));
   if (!looksLikeRota) return null;
 
   const rowSiteHeader = findHeader(headers, siteHeaderCandidates);
@@ -153,12 +160,14 @@ function splitRotaCloud(fileName: string, headers: string[], rows: string[][], e
 
   const wideLocations = new Map<string, { hours?: number; cost?: number }>();
   headers.forEach((header, index) => {
-    const match = header.match(/^Location:\s*(.+?)\s*\((Hours|Cost)\)$/i);
+    const match = header.match(/^(?:Location:\s*)?(.+?)\s*(?:\(|-|:)?\s*(Hours|Cost)\s*\)?$/i);
     if (!match) return;
-    const current = wideLocations.get(match[1].trim()) ?? {};
+    const siteName = match[1].trim();
+    if (/^(total|paid|estimated|wage|staff|labour|labor|shift)$/i.test(siteName) || !meaningfulSite(siteName)) return;
+    const current = wideLocations.get(siteName) ?? {};
     if (/hours/i.test(match[2])) current.hours = index;
     if (/cost/i.test(match[2])) current.cost = index;
-    wideLocations.set(match[1].trim(), current);
+    wideLocations.set(siteName, current);
   });
   if (wideLocations.size <= 1) return null;
 
@@ -259,11 +268,6 @@ function groupRows(headers: string[], rows: string[][], siteHeader: string) {
     groups.set(key, current);
   }
   return groups;
-}
-
-function hasHeaders(headers: string[], required: string[]) {
-  const normalised = new Set(headers.map(normaliseHeader));
-  return required.every((header) => normalised.has(normaliseHeader(header)));
 }
 
 function parsedError(classification: ParsedPackFile["classification"], siteHint: string, error: unknown): ParsedPackFile {
