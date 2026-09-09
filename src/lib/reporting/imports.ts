@@ -290,7 +290,9 @@ export function parseRotaCloudLabour(input: string, expected: SourcePeriod): Lab
     && headers.some((header) => normaliseHeader(header) === "totalcost");
   const headerLocations = headers.flatMap((header) => {
     const match = header.match(/^(?:Location:\s*)?(.+?)\s*(?:\(|-|:)\s*(Hours|Cost)\s*\)?$/i);
-    return match ? [match[1].trim()] : [];
+    if (!match) return [];
+    const location = match[1].trim();
+    return /^(total|paid|estimated|wage|staff|labour|labor|shift)$/i.test(location) ? [] : [location];
   });
   const rowLocations = locationColumn
     ? records.map((record) => record[locationColumn]?.trim()).filter((value): value is string => Boolean(value))
