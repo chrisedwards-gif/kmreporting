@@ -1,0 +1,140 @@
+.source-guide {
+  background: #f7f3eb;
+  border: 1px solid #ddd8ce;
+  border-radius: 0.95rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.source-guide__header {
+  align-items: flex-start;
+  border-bottom: 1px solid #ddd8ce;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.source-guide__header-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.source-guide__header-copy strong {
+  font-size: 0.92rem;
+}
+
+.source-guide__header-copy span {
+  color: #5f6e68;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.source-guide__count {
+  background: #1e2e35;
+  border-radius: 999px;
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.45rem 0.65rem;
+  white-space: nowrap;
+}
+
+.source-guide__grid {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-guide__item {
+  background: #fffdf9;
+  border-bottom: 1px solid #e7e1d7;
+  display: grid;
+  gap: 0.45rem;
+  min-height: 9.5rem;
+  padding: 1rem;
+}
+
+.source-guide__item:nth-child(odd) {
+  border-right: 1px solid #e7e1d7;
+}
+
+.source-guide__item-top {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.source-guide__number {
+  align-items: center;
+  background: #e7f2ed;
+  border-radius: 999px;
+  color: #22664f;
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-weight: 900;
+  height: 1.7rem;
+  justify-content: center;
+  width: 1.7rem;
+}
+
+.source-guide__required {
+  color: #22664f;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.source-guide__item strong {
+  font-size: 0.84rem;
+}
+
+.source-guide__item span,
+.source-guide__item small {
+  color: #5f6e68;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.source-guide__item small {
+  margin-top: auto;
+}
+
+.source-guide__note {
+  background: #fffdf9;
+  color: #5f6e68;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 0.85rem 1rem;
+}
+
+.source-guide__note strong {
+  color: #17211e;
+}
+
+.source-guide__separate {
+  background: #edf4f1;
+  border: 1px solid #c9ded5;
+  border-radius: 0.8rem;
+  color: #285e4c;
+  font-size: 0.73rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .source-guide__header {
+    flex-direction: column;
+  }
+
+  .source-guide__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-guide__item:nth-child(odd) {
+    border-right: 0;
+  }
+}
