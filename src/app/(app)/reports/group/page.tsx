@@ -30,9 +30,10 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
   const [batchResult, reconciliationResult, siteResult] = supabase ? await Promise.all([
     supabase.from("weekly_upload_batches").select("id, status, created_at").eq("organisation_id", profile.organisationId).eq("week_start", weekStart).eq("batch_kind", "group").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("weekly_reconciliations").select("site_id, metric_key, site_value, master_value, variance, variance_pct, status").eq("organisation_id", profile.organisationId).eq("week_start", weekStart).order("site_id"),
-    supabase.from("sites").select("id, name").eq("organisation_id", profile.organisationId),
+    supabase.from("sites").select("id, name").eq("organisation_id", profile.organisationId).eq("active", true).order("name"),
   ]) : [{ data: null }, { data: [] }, { data: [] }];
   const sitesById = new Map((siteResult.data ?? []).map((site) => [site.id, site.name]));
+  const activeSiteNames = (siteResult.data ?? []).map((site) => site.name);
   const rows = reconciliationResult.data ?? [];
   const warnings = rows.filter((row) => row.status !== "match");
   const matches = rows.filter((row) => row.status === "match");
@@ -43,18 +44,18 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
         <div>
           <p className="page-header__eyebrow">Group Chef · independent source</p>
           <h1 className="page-header__title">Master weekly pack.</h1>
-          <p className="page-header__copy">Upload the HOS-wide exports after the kitchens submit. The platform keeps the group figures independent, cross-checks the two sources and feeds only reconciled data into decision intelligence.</p>
+          <p className="page-header__copy">Upload the independent group exports after the kitchens submit. The platform tells you exactly what it needs, cross-checks the KM figures and feeds only management-trusted data into Decision Desk.</p>
         </div>
         <div className="page-header__actions">
           <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> Weekly reports</Link>
-          <Link className="button button--secondary" href="/intelligence"><BrainCircuit aria-hidden="true" size={16} /> Decision desk</Link>
+          <Link className="button button--secondary" href="/intelligence"><BrainCircuit aria-hidden="true" size={16} /> Decision Desk</Link>
           <a className="button button--primary" href={`/api/intelligence/export?week=${weekStart}`}><Download aria-hidden="true" size={16} /> Download AI review pack</a>
         </div>
       </header>
 
       <div className="privacy-callout" style={{ marginBottom: "1rem" }}><ShieldCheck aria-hidden="true" className="privacy-callout__icon" size={16} />This workspace is group-management only. Master files never overwrite the figures entered by a kitchen.</div>
 
-      <GroupMasterUploader weekStart={weekStart} />
+      <GroupMasterUploader activeSites={activeSiteNames} weekStart={weekStart} />
 
       <section className="panel" style={{ marginTop: "1rem" }}>
         <div className="panel__header">
@@ -70,7 +71,7 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
                 return <tr key={`${row.site_id}-${row.metric_key}`}><td><strong>{sitesById.get(row.site_id) ?? "Kitchen"}</strong></td><td>{prettyMetric(row.metric_key)}</td><td>{format(row.site_value)}</td><td>{format(row.master_value)}</td><td>{format(row.variance)}</td><td><span className={`rag-chip rag-chip--${row.status === "match" ? "green" : "red"}`}>{row.status.replaceAll("_", " ")}</span></td></tr>;
               })}
             </tbody></table></div>
-          ) : <div className="empty-inline">Upload the group pack to create the first independent cross-check for this week.</div>}
+          ) : <div className="empty-inline">Upload the four core reports for each kitchen to create the first independent cross-check for this week.</div>}
         </div>
       </section>
     </>

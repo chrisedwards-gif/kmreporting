@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, FileSpreadsheet, FolderUp, LoaderCircle, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import styles from "./group-master-uploader.module.css";
 
 type ReconciliationRow = {
   siteId: string;
@@ -22,6 +23,35 @@ type UploadResult = {
   reconciliation?: ReconciliationRow[];
   error?: string;
 };
+
+type MasterSource = {
+  title: string;
+  exportRule: string;
+  unlocks: string;
+};
+
+const masterSources: MasterSource[] = [
+  {
+    title: "Access / StockLink — End Of Week Report",
+    exportRule: "HTML/HTM · exact Sunday–Saturday week · one export per kitchen",
+    unlocks: "Net sales, gross sales and the daily / item / category sales mix used by decision intelligence.",
+  },
+  {
+    title: "Procure Wizard — Goods Delivered",
+    exportRule: "CSV · Food category · exact reporting week · one kitchen per export",
+    unlocks: "Food purchases and Awaiting Invoice values for the independent food-cost cross-check.",
+  },
+  {
+    title: "Procure Wizard — Credits Overview",
+    exportRule: "CSV · one kitchen per export",
+    unlocks: "Confirmed credits and pending / investigation credits. Keep the kitchen name in the filename if the export is empty.",
+  },
+  {
+    title: "RotaCloud — Labour / Daily Totals",
+    exportRule: "CSV · one kitchen per export · include wage cost and paid hours",
+    unlocks: "Staff cost and paid hours. A detailed dated/shift export also unlocks exact hourly staffing analysis.",
+  },
+];
 
 const prettyClassification = (value: string) => ({
   sales_eow: "EPOS sales",
@@ -51,7 +81,7 @@ const formatValue = (key: string, value: number | null) => value == null
     ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 2 }).format(value)
     : value.toFixed(2);
 
-export function GroupMasterUploader({ weekStart }: { weekStart: string }) {
+export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart: string; activeSites?: string[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [start, setStart] = useState(weekStart);
   const [files, setFiles] = useState<File[]>([]);
@@ -59,6 +89,7 @@ export function GroupMasterUploader({ weekStart }: { weekStart: string }) {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const totalBytes = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
+  const expectedCoreFiles = activeSites.length ? activeSites.length * masterSources.length : null;
 
   const addFiles = (next: File[]) => {
     const byKey = new Map(files.map((file) => [`${file.name}:${file.size}:${file.lastModified}`, file]));
@@ -94,8 +125,8 @@ export function GroupMasterUploader({ weekStart }: { weekStart: string }) {
       <div className="panel__header weekly-pack__header">
         <div>
           <p className="page-header__eyebrow">Group source of truth</p>
-          <h2 className="panel__title">Drop every kitchen’s master reports in one go.</h2>
-          <p className="panel__subtitle">The app identifies the kitchen, extracts the recognised totals and checks them against the submitted site reports.</p>
+          <h2 className="panel__title">Upload the four core exports for every kitchen.</h2>
+          <p className="panel__subtitle">Drop them together. The app identifies each kitchen, extracts the recognised totals and checks them against the KM-submitted site reports.</p>
         </div>
         <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Group management only</span>
       </div>
@@ -106,6 +137,33 @@ export function GroupMasterUploader({ weekStart }: { weekStart: string }) {
             <input className="field__input" onChange={(event) => { setStart(event.target.value); setResult(null); }} type="date" value={start} />
           </label>
         </div>
+
+        <section aria-label="Required master reports" className={styles["source-guide"]}>
+          <div className={styles["source-guide__header"]}>
+            <div className={styles["source-guide__header-copy"]}>
+              <strong>What exactly do I need to export?</strong>
+              <span>These four reports are the weekly core pack. Each data export must cover one kitchen only so it can be reconciled safely.</span>
+              {activeSites.length ? <span><strong>Active kitchens:</strong> {activeSites.join(", ")}</span> : null}
+            </div>
+            <span className={styles["source-guide__count"]}>{expectedCoreFiles ? `${expectedCoreFiles} core files expected` : "4 files per kitchen"}</span>
+          </div>
+          <div className={styles["source-guide__grid"]}>
+            {masterSources.map((source, index) => (
+              <article className={styles["source-guide__item"]} key={source.title}>
+                <div className={styles["source-guide__item-top"]}>
+                  <span className={styles["source-guide__number"]}>{index + 1}</span>
+                  <span className={styles["source-guide__required"]}>Required weekly</span>
+                </div>
+                <strong>{source.title}</strong>
+                <span>{source.exportRule}</span>
+                <small><strong>Used for:</strong> {source.unlocks}</small>
+              </article>
+            ))}
+          </div>
+          <div className={styles["source-guide__note"]}><strong>Important:</strong> use the original HTML/CSV exports for the four core reports. XLS/XLSX/PDF/TXT files can be retained as supporting evidence, but they do not currently populate the reconciliation figures. Stocktake and waste files are optional supporting evidence.</div>
+        </section>
+
+        <div className={styles["source-guide__separate"]}><strong>Menu / recipe costs are separate:</strong> upload those on the Decision Desk when costs change — they are not part of the weekly master pack.</div>
 
         <button
           className={`weekly-pack__drop${dragging ? " weekly-pack__drop--active" : ""}`}
@@ -118,8 +176,8 @@ export function GroupMasterUploader({ weekStart }: { weekStart: string }) {
         >
           <FolderUp aria-hidden="true" size={34} />
           <strong>Drop the full HOS master pack here</strong>
-          <span>All kitchens can be uploaded together — up to 80 files.</span>
-          <small>EPOS · Procure Wizard · RotaCloud · stocktake/supporting evidence</small>
+          <span>{expectedCoreFiles ? `Aim for ${expectedCoreFiles} core data files for this week; optional evidence can be added too.` : "Upload all four core reports for every kitchen together."}</span>
+          <small>Access / StockLink · Procure Wizard Goods · Procure Wizard Credits · RotaCloud Labour</small>
         </button>
         <input accept=".csv,.xls,.xlsx,.html,.htm,.pdf,.txt" hidden multiple onChange={(event) => { addFiles([...(event.target.files ?? [])]); event.target.value = ""; }} ref={inputRef} type="file" />
 

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, MessageSquareText, Siren } from "lucide-react";
+import { AlertTriangle, ArrowRight, BrainCircuit, CalendarDays, FileUp, MessageSquareText, Siren } from "lucide-react";
 import { CostChart } from "@/components/dashboard/cost-chart";
 import { DecisionDesk } from "@/components/dashboard/decision-desk";
+import { GroupChefControlCentre } from "@/components/dashboard/group-chef-control-centre";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { Workbench } from "@/components/dashboard/workbench";
@@ -68,18 +69,20 @@ export default async function DashboardPage() {
     <>
       <header className="page-header page-header--personal">
         <div>
-          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · weekly reporting` : "Group decision dashboard"}</p>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · weekly reporting` : "Group Chef · weekly control"}</p>
           <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "What should we do next?"}</h1>
-          <p className="page-header__copy">{isManagerHome ? `Upload the kitchen pack, review your actions and complete your weekly 1-1. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} report exceptions need attention.`}</p>
+          <p className="page-header__copy">{isManagerHome ? `Upload the kitchen pack, review your actions and complete your weekly 1-1. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens currently have reporting data · ${reviewFlags.length} report exceptions need attention.`}</p>
         </div>
-        {canCreateReport ? <Link className="button button--primary" href="/reports/new">Upload weekly pack <ArrowRight aria-hidden="true" size={16} /></Link> : null}
+        {isManagerHome && canCreateReport ? <Link className="button button--primary" href="/reports/new">Upload weekly pack <ArrowRight aria-hidden="true" size={16} /></Link> : null}
+        {canViewDecisionIntelligence ? <div className="page-header__actions"><Link className="button button--secondary" href="/intelligence"><BrainCircuit aria-hidden="true" size={16} /> Decision Desk</Link><Link className="button button--primary" href={`/reports/group?week=${week.start}`}><FileUp aria-hidden="true" size={16} /> Upload master pack</Link></div> : null}
       </header>
 
       {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode is active. You are seeing only {profile.previewSiteName} records and the same navigation as {profile.previewManagerName ?? "the assigned manager"}; your Admin edit rights remain available.</div> : null}
 
+      {canViewDecisionIntelligence ? <GroupChefControlCentre bundle={bundle} profile={profile} /> : null}
+
       <Suspense fallback={<WorkbenchSkeleton />}><DashboardWorkbench bundle={bundle} profile={profile} /></Suspense>
       <Suspense fallback={<MessageSkeleton />}><DashboardMessages profile={profile} /></Suspense>
-      {canViewDecisionIntelligence ? <Suspense fallback={<section className="panel"><div className="panel__body">Analysing historical sales, product and labour patterns…</div></section>}><DashboardDecisions profile={profile} /></Suspense> : null}
 
       <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />
@@ -89,6 +92,8 @@ export default async function DashboardPage() {
         <MetricCard accent="#1e2e35" label="Prime cost" note={formatCurrency(totals.cogs + totals.staffCost)} value={formatPercentage(primeCostPct)} />
         <MetricCard accent="#b93f35" label="Review queue" note="Approval blocks sharing" value={`${reviewFlags.length}`} />
       </section>
+
+      {canViewDecisionIntelligence ? <Suspense fallback={<section className="panel"><div className="panel__body">Analysing historical sales, product and labour patterns…</div></section>}><DashboardDecisions profile={profile} /></Suspense> : null}
 
       <div className="dashboard-grid"><div className="stack"><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Site performance</h2><p className="panel__subtitle">Weekly commercial performance by kitchen</p></div><CalendarDays aria-hidden="true" color="#5f6e68" size={19} /></div><SitePerformanceTable sites={sites} /></section><section className="panel"><div className="panel__header"><div><h2 className="panel__title">Food cost / spend and labour</h2><p className="panel__subtitle">Percentage of net sales by kitchen; spend basis is shown until stocktakes begin</p></div></div><div className="panel__body"><CostChart sites={sites} /></div></section></div><aside className="panel"><div className="panel__header"><div><h2 className="panel__title">Report exceptions</h2><p className="panel__subtitle">Resolve before a report can be shared</p></div></div><div className="panel__body"><div className="review-list">{reviewFlags.map((flag, index) => <Link className={`review-item review-item--${flag.severity}`} href={flag.reportId ? `/reports/${flag.reportId}` : "/reports"} key={`${flag.code}-${index}`}><div className="review-item__site">{flag.siteName}</div><div className="review-item__label">{flag.label}</div><div className="review-item__detail">{flag.detail}</div></Link>)}{!reviewFlags.length ? <div className="empty-inline empty-inline--compact">No report exceptions currently need management attention.</div> : null}</div></div></aside></div>
     </>

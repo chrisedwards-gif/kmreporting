@@ -33,10 +33,27 @@ const switchPersona = async (page, role) => {
 test("Admin lands in the group workspace", async ({ page }) => {
   await switchPersona(page, "admin");
   await expect(page.getByRole("heading", { name: "What should we do next?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Weekly control centre." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Administration" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Upload master pack/ }).first()).toBeVisible();
   await expect(page.getByText("Dough Religion", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Kardia", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Decision intelligence", { exact: true })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page);
+});
+
+test("Admin master pack explains the exact weekly exports", async ({ page }) => {
+  await switchPersona(page, "admin");
+  await page.goto("/reports/group", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Master weekly pack." })).toBeVisible();
+  await expect(page.getByText("What exactly do I need to export?", { exact: true })).toBeVisible();
+  await expect(page.getByText("Access / StockLink — End Of Week Report", { exact: true })).toBeVisible();
+  await expect(page.getByText("Procure Wizard — Goods Delivered", { exact: true })).toBeVisible();
+  await expect(page.getByText("Procure Wizard — Credits Overview", { exact: true })).toBeVisible();
+  await expect(page.getByText("RotaCloud — Labour / Daily Totals", { exact: true })).toBeVisible();
+  await expect(page.getByText("Required weekly", { exact: true })).toHaveCount(4);
+  await expect(page.getByText(/Menu \/ recipe costs are separate/)).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 
@@ -52,6 +69,7 @@ test("Kitchen Manager sees their scoped kitchen and reporting actions", async ({
   await expect(page.getByRole("link", { name: "Management summary" })).toHaveCount(0);
   await expect(page.getByText("Decision intelligence", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Observed opportunity", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Weekly control centre." })).toHaveCount(0);
 
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("dialog", { name: "Workspace search" })).toBeVisible();
@@ -150,6 +168,7 @@ test("Viewer lands on reporting insight with no operational controls", async ({ 
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await expect(page.getByText("Decision intelligence", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Observed opportunity", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Weekly control centre." })).toHaveCount(0);
   await expect(page.getByText("No operational actions are assigned to this access role.")).toHaveCount(0);
   await expectNoSeriousAccessibilityViolations(page);
 });
