@@ -43,54 +43,55 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
 
   const masterReady = batchResult.data?.status === "ready";
   const reconciliationRows = reconciliationResult.data ?? [];
-  const reconciliationWarnings = reconciliationRows.filter((row) => row.status !== "match").length;
   const reconciliationMatches = reconciliationRows.filter((row) => row.status === "match").length;
+  const awaitingKmChecks = reconciliationRows.filter((row) => row.status === "missing_site").length;
+  const reviewIssues = reconciliationRows.filter((row) => row.status === "warning" || row.status === "missing_master").length;
   const allKitchensSubmitted = bundle.expectedSiteCount > 0 && submittedCount >= bundle.expectedSiteCount;
   const kitchensRemaining = Math.max(bundle.expectedSiteCount - submittedCount, 0);
 
-  const nextAction = !allKitchensSubmitted
-    ? `Wait for ${kitchensRemaining} kitchen${kitchensRemaining === 1 ? "" : "s"} to submit, then upload your independent master pack.`
-    : !masterReady
-      ? "Upload the Group Master Pack — four core exports per kitchen."
-      : reconciliationWarnings > 0
-        ? `Review ${reconciliationWarnings} reconciliation exception${reconciliationWarnings === 1 ? "" : "s"} before trusting the week.`
-        : "Open Decision Desk, review the ranked opportunities, then download the AI review pack for ChatGPT.";
+  const nextAction = !masterReady
+    ? "Upload your HOS-wide master exports once. They can contain all kitchens; KMs submit their own reports separately."
+    : !allKitchensSubmitted
+      ? `${kitchensRemaining} KM submission${kitchensRemaining === 1 ? " is" : "s are"} still outstanding. Your master data is already loaded and reconciliation will refresh as they submit.`
+      : reviewIssues > 0
+        ? `Review ${reviewIssues} genuine reconciliation issue${reviewIssues === 1 ? "" : "s"} before trusting the week.`
+        : "The week is reconciled. Open Decision Desk, review the ranked opportunities, then download the AI review pack.";
 
   const steps: ControlStep[] = [
     {
-      title: "KM submissions",
-      status: `${submittedCount}/${bundle.expectedSiteCount} submitted`,
-      copy: "Check every kitchen has completed its weekly report before you use the group cross-check.",
-      href: "/reports",
-      action: "Review reports",
-      tone: allKitchensSubmitted ? "ready" : "attention",
-      icon: FileCheck2,
-    },
-    {
-      title: "Master pack",
-      status: masterReady ? "Uploaded" : "Needed",
-      copy: "Upload Access/StockLink sales, Procure Wizard goods + credits and RotaCloud labour for every kitchen.",
+      title: "Your HOS master exports",
+      status: masterReady ? "Uploaded once" : "Upload once",
+      copy: "Drop the group-wide Access/StockLink, Procure Wizard and RotaCloud exports. One file can cover all kitchens.",
       href: `/reports/group?week=${bundle.week.start}`,
       action: masterReady ? "View master pack" : "Upload master pack",
       tone: masterReady ? "ready" : "attention",
       icon: FolderUp,
     },
     {
+      title: "KM submissions",
+      status: `${submittedCount}/${bundle.expectedSiteCount} submitted`,
+      copy: "KMs independently upload/review only their own kitchen and add the operational context you do not need to enter for them.",
+      href: "/reports",
+      action: "Review KM status",
+      tone: allKitchensSubmitted ? "ready" : "neutral",
+      icon: FileCheck2,
+    },
+    {
       title: "Reconciliation",
-      status: masterReady ? `${reconciliationMatches} match · ${reconciliationWarnings} exceptions` : "Waiting for master pack",
-      copy: "The platform compares KM-entered source totals with your independent management exports.",
+      status: !masterReady ? "Waiting for your master" : `${reconciliationMatches} match · ${awaitingKmChecks} awaiting KM · ${reviewIssues} review`,
+      copy: "As KM reports arrive, their figures are automatically checked against your independent HOS-wide source data.",
       href: `/reports/group?week=${bundle.week.start}`,
       action: "Check reconciliation",
-      tone: masterReady && reconciliationWarnings === 0 ? "ready" : masterReady ? "attention" : "neutral",
+      tone: !masterReady ? "neutral" : reviewIssues > 0 ? "attention" : allKitchensSubmitted ? "ready" : "neutral",
       icon: Gauge,
     },
     {
       title: "Decision Desk",
-      status: masterReady ? "Ready to review" : "Building evidence",
-      copy: "Rank sales, labour, menu, cost and data-quality opportunities using the reconciled history.",
+      status: masterReady && allKitchensSubmitted && reviewIssues === 0 ? "Ready to review" : "Building evidence",
+      copy: "Rank sales, labour, menu, cost and data-quality opportunities once the weekly evidence is complete enough to trust.",
       href: "/intelligence",
       action: "Open Decision Desk",
-      tone: masterReady ? "ready" : "neutral",
+      tone: masterReady && allKitchensSubmitted && reviewIssues === 0 ? "ready" : "neutral",
       icon: BrainCircuit,
     },
     {
@@ -99,10 +100,18 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       copy: "Download the rich Markdown export and upload it into ChatGPT while we refine the future in-app AI layer.",
       href: `/api/intelligence/export?week=${bundle.week.start}`,
       action: "Download AI review pack",
-      tone: masterReady ? "ready" : "neutral",
+      tone: masterReady && allKitchensSubmitted && reviewIssues === 0 ? "ready" : "neutral",
       icon: Download,
     },
   ];
+
+  const nextHref = !masterReady
+    ? `/reports/group?week=${bundle.week.start}`
+    : !allKitchensSubmitted
+      ? "/reports"
+      : reviewIssues > 0
+        ? `/reports/group?week=${bundle.week.start}`
+        : "/intelligence";
 
   return (
     <section aria-label="Group Chef weekly control centre" className={`panel ${styles["group-control"]}`}>
@@ -110,7 +119,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
         <div>
           <p className="page-header__eyebrow">Your weekly workflow</p>
           <h2 className="panel__title">Weekly control centre.</h2>
-          <p className="panel__subtitle">Week commencing {formatDate(bundle.week.start)} · one place to see what is done, what is missing and what you should do next.</p>
+          <p className="panel__subtitle">Week commencing {formatDate(bundle.week.start)} · your group exports and the KM submissions are two independent sides of the same weekly check.</p>
         </div>
         <span className="source-chip source-chip--safe"><CheckCircle2 aria-hidden="true" size={14} /> Group Chef workspace</span>
       </div>
@@ -119,9 +128,9 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
           <div className={styles["group-control__next-copy"]}>
             <span>Next action</span>
             <strong>{nextAction}</strong>
-            {missingSites.length ? <div className={styles["group-control__missing"]}>Missing: {missingSites.map((site) => site.name).join(", ")}</div> : null}
+            {missingSites.length ? <div className={styles["group-control__missing"]}>KM reports still missing: {missingSites.map((site) => site.name).join(", ")}</div> : null}
           </div>
-          <Link className="button button--primary" href={!allKitchensSubmitted ? "/reports" : !masterReady || reconciliationWarnings > 0 ? `/reports/group?week=${bundle.week.start}` : "/intelligence"}>
+          <Link className="button button--primary" href={nextHref}>
             Go to next step <ArrowRight aria-hidden="true" size={16} />
           </Link>
         </div>
@@ -143,7 +152,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
             );
           })}
         </div>
-        {reconciliationWarnings > 0 ? <div className="form-message form-message--error" style={{ marginTop: "1rem" }}><TriangleAlert aria-hidden="true" size={15} /> {reconciliationWarnings} independent source check{reconciliationWarnings === 1 ? "" : "s"} need review before using the numbers as trusted management data.</div> : null}
+        {reviewIssues > 0 ? <div className="form-message form-message--error" style={{ marginTop: "1rem" }}><TriangleAlert aria-hidden="true" size={15} /> {reviewIssues} independent source check{reviewIssues === 1 ? "" : "s"} genuinely disagree or are missing from your master data and need review.</div> : null}
       </div>
     </section>
   );
