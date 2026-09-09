@@ -143,25 +143,19 @@ export function parseStockLinkEndOfWeek(input: string, expected: SourcePeriod): 
   const rows = [...input.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
   for (const row of rows) {
     const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => decodeHtml(cell[1]));
-    const label = cells[0] ?? "";
-    const sectionLabel = label.replace(/:$/, "").trim();
-    if (/^Gross Sales After Adjustments?$/i.test(sectionLabel)) {
-      section = "gross sales after adjustment";
+    const label = (cells[0] ?? "").trim();
+    const rowHasNumbers = cells.slice(1).some((cell) => /\d/.test(cell));
+    if (label && !rowHasNumbers) {
+      section = normaliseHeader(label.replace(/:$/, ""));
       continue;
     }
-    if (/^VAT$/i.test(sectionLabel)) {
-      section = "vat";
-      continue;
-    }
-    if (/^Adjustments?$/i.test(sectionLabel)) {
-      section = "adjustments";
-      continue;
-    }
+
     const numericValues = cells.slice(1).map(parseMoney).filter((value, index) => value !== 0 || /(?:^|\D)0(?:\.0+)?(?:\D|$)/.test(cells[index + 1] ?? ""));
     const total = numericValues.at(-1) ?? 0;
-    if (section === "gross sales after adjustment" && /^Total$/i.test(label)) grossAfterAdjustments = total;
-    if (section === "vat" && /^Total$/i.test(label)) vat = total;
-    if (section === "adjustments" && /^Service Charge$/i.test(label)) serviceCharge = total;
+    const normalisedLabel = normaliseHeader(label);
+    if (section === "grosssalesafteradjustment" && normalisedLabel === "total") grossAfterAdjustments = total;
+    if (section === "vat" && normalisedLabel === "total") vat = total;
+    if (section === "adjustments" && normalisedLabel === "servicecharge") serviceCharge = total;
   }
   if (grossAfterAdjustments <= 0 || vat < 0) throw new Error("The StockLink sales and VAT totals could not be read.");
   const netSales = roundMoney(grossAfterAdjustments - vat - Math.max(serviceCharge, 0));
@@ -289,10 +283,8 @@ export function parseRotaCloudLabour(input: string, expected: SourcePeriod): Lab
   const isDailyTotals = headers.some((header) => normaliseHeader(header) === "totalshifts")
     && headers.some((header) => normaliseHeader(header) === "totalcost");
   const headerLocations = headers.flatMap((header) => {
-    const match = header.match(/^(?:Location:\s*)?(.+?)\s*(?:\(|-|:)\s*(Hours|Cost)\s*\)?$/i);
-    if (!match) return [];
-    const location = match[1].trim();
-    return /^(total|paid|estimated|wage|staff|labour|labor|shift)$/i.test(location) ? [] : [location];
+    const match = header.match(/^Location:\s*(.+?)\s*\((?:Hours|Cost)\)$/i);
+    return match ? [match[1].trim()] : [];
   });
   const rowLocations = locationColumn
     ? records.map((record) => record[locationColumn]?.trim()).filter((value): value is string => Boolean(value))
