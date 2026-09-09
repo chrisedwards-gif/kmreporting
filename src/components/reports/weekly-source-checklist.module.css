@@ -1,0 +1,213 @@
+.source-checklist {
+  background: #f7f3eb;
+  border: 1px solid #ddd8ce;
+  border-radius: 1rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.source-checklist__header {
+  align-items: flex-start;
+  border-bottom: 1px solid #ddd8ce;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.source-checklist__header h3 {
+  font-size: 1rem;
+  margin: 0.2rem 0 0.35rem;
+}
+
+.source-checklist__header p {
+  color: #5f6e68;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 62rem;
+}
+
+.source-checklist__eyebrow {
+  align-items: center;
+  color: #22664f !important;
+  display: flex;
+  font-size: 0.66rem !important;
+  font-weight: 900;
+  gap: 0.35rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.source-checklist__required-count {
+  background: #1e2e35;
+  border-radius: 999px;
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 0.45rem 0.7rem;
+}
+
+.source-checklist__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.source-checklist__item {
+  background: #fffdf9;
+  border-bottom: 1px solid #e7e1d7;
+  display: grid;
+  gap: 0.6rem;
+  min-height: 13rem;
+  padding: 1rem;
+}
+
+.source-checklist__item:nth-child(odd) {
+  border-right: 1px solid #e7e1d7;
+}
+
+.source-checklist__item-top {
+  align-items: flex-start;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto 1fr auto;
+}
+
+.source-checklist__item-top > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.source-checklist__item-top strong {
+  font-size: 0.9rem;
+}
+
+.source-checklist__number {
+  align-items: center;
+  background: #e7f2ed;
+  border-radius: 999px;
+  color: #22664f;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 900;
+  height: 1.8rem;
+  justify-content: center;
+  width: 1.8rem;
+}
+
+.source-checklist__system {
+  color: #5f6e68;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.source-checklist__format {
+  background: #eef2ef;
+  border-radius: 999px;
+  color: #36594c;
+  font-size: 0.61rem;
+  font-weight: 900;
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
+.source-checklist__path,
+.source-checklist__filters {
+  align-items: flex-start;
+  border-radius: 0.65rem;
+  display: flex;
+  font-size: 0.73rem;
+  gap: 0.45rem;
+  line-height: 1.5;
+  padding: 0.65rem 0.7rem;
+}
+
+.source-checklist__path {
+  background: #f3f5f4;
+  color: #33453f;
+}
+
+.source-checklist__filters {
+  background: #edf6f2;
+  color: #285e4c;
+}
+
+.source-checklist__path svg,
+.source-checklist__filters svg {
+  flex: 0 0 auto;
+  margin-top: 0.12rem;
+}
+
+.source-checklist__item small {
+  color: #5f6e68;
+  font-size: 0.69rem;
+  line-height: 1.45;
+  margin-top: auto;
+}
+
+.source-checklist__warning,
+.source-checklist__optional {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+}
+
+.source-checklist__warning {
+  background: #fff2ed;
+  border-bottom: 1px solid #ecd4ca;
+  color: #814632;
+}
+
+.source-checklist__optional {
+  background: #fffdf9;
+  color: #53615c;
+}
+
+.source-checklist__warning svg,
+.source-checklist__optional svg {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+}
+
+.source-checklist__warning > div,
+.source-checklist__optional > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.source-checklist__warning strong,
+.source-checklist__optional strong {
+  font-size: 0.75rem;
+}
+
+.source-checklist__warning span,
+.source-checklist__optional span {
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .source-checklist__header {
+    flex-direction: column;
+  }
+
+  .source-checklist__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-checklist__item:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .source-checklist__item-top {
+    grid-template-columns: auto 1fr;
+  }
+
+  .source-checklist__format {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
