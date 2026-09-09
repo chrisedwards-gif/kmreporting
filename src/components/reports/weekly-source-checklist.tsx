@@ -20,7 +20,7 @@ const requiredSources: SourceInstruction[] = [
     path: "Sales Reports → End Of Week Report",
     format: "HTML / HTM",
     kitchenFilters: "Select this kitchen and the exact Sunday–Saturday reporting week.",
-    groupFilters: "Download one End Of Week Report per kitchen. If you already have a safe HOS-wide sales CSV containing Site/Location + Net Sales, you can upload that instead.",
+    groupFilters: "Download one End Of Week Report per active kitchen. You can also include non-HOS / inactive-brand reports: those are retained as competitor benchmarks rather than treated as errors.",
     purpose: "Net sales, gross sales, VAT/service charge and richer daily / item / category sales detail.",
   },
   {
@@ -29,7 +29,7 @@ const requiredSources: SourceInstruction[] = [
     path: "Reporting → Goods Purchased",
     format: "CSV",
     kitchenFilters: "Date Type = Date Delivered · Category = Food · Site = this kitchen · exact reporting week.",
-    groupFilters: "Date Type = Date Delivered · Category = Food · Site = All Sites · exact reporting week.",
+    groupFilters: "Date Type = Date Delivered · Category = Food · Site = All Sites · exact reporting week. Kitchens that do not use PW are excluded automatically.",
     purpose: "Food purchases and Awaiting Invoice value.",
   },
   {
@@ -38,7 +38,7 @@ const requiredSources: SourceInstruction[] = [
     path: "Reporting → Credits Overview",
     format: "CSV",
     kitchenFilters: "Site = this kitchen · exact reporting week · include all credit statuses.",
-    groupFilters: "Site = All Sites · exact reporting week · include all credit statuses.",
+    groupFilters: "Site = All Sites · exact reporting week · include all credit statuses. A kitchen with no credit rows is treated as £0, not missing data, when PW applies to that kitchen.",
     purpose: "Confirmed credits plus pending / investigation credits.",
   },
   {
@@ -47,7 +47,7 @@ const requiredSources: SourceInstruction[] = [
     path: "Reports → Hours & Costs → Daily Totals",
     format: "CSV",
     kitchenFilters: "Location = this kitchen · exact reporting week · keep hours and costs visible.",
-    groupFilters: "Location = All Locations · exact reporting week · keep hours and costs visible.",
+    groupFilters: "Use All Locations only when the CSV retains a separate hours/cost breakdown per location. Otherwise export each RotaCloud kitchen separately. Kitchens that do not use RotaCloud are excluded automatically.",
     purpose: "Weekly wage cost and paid hours by kitchen.",
   },
 ];
@@ -62,10 +62,10 @@ export function WeeklySourceChecklist({ audience }: { audience: Audience }) {
           <p className={styles["source-checklist__eyebrow"]}><Download aria-hidden="true" size={14} /> Download these reports first</p>
           <h3>{group ? "Group Chef weekly downloads" : "Kitchen Manager weekly downloads"}</h3>
           <p>{group
-            ? "Use All Sites / All Locations wherever the system allows it. Upload the resulting HOS-wide files once; the app splits them by kitchen automatically."
+            ? "These are the four source types the workflow understands. Each kitchen only needs the sources that actually apply to it; configured exceptions are not flagged as missing."
             : "Use only your kitchen and the exact Sunday–Saturday week. Download these four reports, then drop them into the uploader together."}</p>
         </div>
-        <span className={styles["source-checklist__required-count"]}>4 required</span>
+        <span className={styles["source-checklist__required-count"]}>{group ? "4 source types" : "4 required"}</span>
       </div>
 
       <div className={styles["source-checklist__grid"]}>
@@ -93,7 +93,7 @@ export function WeeklySourceChecklist({ audience }: { audience: Audience }) {
 
       <div className={styles["source-checklist__optional"]}>
         <Info aria-hidden="true" size={15} />
-        <div><strong>Optional supporting files</strong><span>Stocktake, waste and detailed RotaCloud shift exports can be added when available. They are useful evidence, but they do not replace the four required reports above.</span></div>
+        <div><strong>Optional supporting files</strong><span>Stocktake, waste and detailed RotaCloud shift exports can be added when available. They are useful evidence, but they do not replace an applicable core source above.</span></div>
       </div>
     </section>
   );
