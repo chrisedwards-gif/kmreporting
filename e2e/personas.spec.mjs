@@ -42,18 +42,21 @@ test("Admin lands in the group workspace", async ({ page }) => {
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Admin master pack explains the exact weekly exports", async ({ page }) => {
+test("Admin upload route defaults to one HOS-wide Group Chef master pack", async ({ page }) => {
   await switchPersona(page, "admin");
-  await page.goto("/reports/group", { waitUntil: "domcontentloaded" });
+  await page.goto("/reports/new", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/reports\/group$/);
 
   await expect(page.getByRole("heading", { name: "Master weekly pack." })).toBeVisible();
-  await expect(page.getByText("What exactly do I need to export?", { exact: true })).toBeVisible();
-  await expect(page.getByText("Access / StockLink — End Of Week Report", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Upload your HOS-wide exports once." })).toBeVisible();
+  await expect(page.getByText("What do I upload as Group Chef?", { exact: true })).toBeVisible();
+  await expect(page.getByText("Access / StockLink — sales", { exact: true })).toBeVisible();
   await expect(page.getByText("Procure Wizard — Goods Delivered", { exact: true })).toBeVisible();
   await expect(page.getByText("Procure Wizard — Credits Overview", { exact: true })).toBeVisible();
-  await expect(page.getByText("RotaCloud — Labour / Daily Totals", { exact: true })).toBeVisible();
-  await expect(page.getByText("Required weekly", { exact: true })).toHaveCount(4);
-  await expect(page.getByText(/Menu \/ recipe costs are separate/)).toBeVisible();
+  await expect(page.getByText("RotaCloud — labour", { exact: true })).toBeVisible();
+  await expect(page.getByText("Group export", { exact: true })).toHaveCount(4);
+  await expect(page.getByText("Usually 3–4 HOS-wide files", { exact: true })).toBeVisible();
+  await expect(page.getByText("One file can cover all five kitchens — no kitchen selector needed.", { exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 });
 

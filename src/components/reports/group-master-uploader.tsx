@@ -15,11 +15,21 @@ type ReconciliationRow = {
   status: "match" | "warning" | "missing_site" | "missing_master";
 };
 
+type ParsedUpload = {
+  name: string;
+  site: string | null;
+  sites?: string[];
+  classification: string;
+  status: string;
+  error: string;
+  summary: Record<string, unknown>;
+};
+
 type UploadResult = {
   ok?: boolean;
   batchId?: string;
   weekStart?: string;
-  parsed?: Array<{ name: string; site: string | null; classification: string; status: string; error: string; summary: Record<string, unknown> }>;
+  parsed?: ParsedUpload[];
   reconciliation?: ReconciliationRow[];
   error?: string;
 };
@@ -32,24 +42,24 @@ type MasterSource = {
 
 const masterSources: MasterSource[] = [
   {
-    title: "Access / StockLink — End Of Week Report",
-    exportRule: "HTML/HTM · exact Sunday–Saturday week · one export per kitchen",
-    unlocks: "Net sales, gross sales and the daily / item / category sales mix used by decision intelligence.",
+    title: "Access / StockLink — sales",
+    exportRule: "Prefer one HOS-wide CSV with Site/Location + Net Sales. Per-kitchen End Of Week HTML files still work too.",
+    unlocks: "Independent net/gross sales cross-check. Per-kitchen End Of Week files can also carry the richer daily / item / category sales detail.",
   },
   {
     title: "Procure Wizard — Goods Delivered",
-    exportRule: "CSV · Food category · exact reporting week · one kitchen per export",
-    unlocks: "Food purchases and Awaiting Invoice values for the independent food-cost cross-check.",
+    exportRule: "One HOS-wide CSV is preferred. Keep Purchaser Unit Name, Date Delivered, Category, Order Status and Total Price Net.",
+    unlocks: "The app splits every kitchen automatically, then calculates Food purchases and Awaiting Invoice values.",
   },
   {
     title: "Procure Wizard — Credits Overview",
-    exportRule: "CSV · one kitchen per export",
-    unlocks: "Confirmed credits and pending / investigation credits. Keep the kitchen name in the filename if the export is empty.",
+    exportRule: "One HOS-wide CSV is preferred. Keep Purchaser Unit and the credit request / credit note / status / value columns.",
+    unlocks: "Confirmed credits and pending / investigation credits are split automatically by kitchen.",
   },
   {
-    title: "RotaCloud — Labour / Daily Totals",
-    exportRule: "CSV · one kitchen per export · include wage cost and paid hours",
-    unlocks: "Staff cost and paid hours. A detailed dated/shift export also unlocks exact hourly staffing analysis.",
+    title: "RotaCloud — labour",
+    exportRule: "One HOS-wide CSV is preferred. Include Location, wage/total cost and paid hours. Detailed dated shifts are even better.",
+    unlocks: "Staff cost and paid hours by kitchen; detailed shift rows also feed exact hourly staffing analysis.",
   },
 ];
 
@@ -89,7 +99,6 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const totalBytes = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
-  const expectedCoreFiles = activeSites.length ? activeSites.length * masterSources.length : null;
 
   const addFiles = (next: File[]) => {
     const byKey = new Map(files.map((file) => [`${file.name}:${file.size}:${file.lastModified}`, file]));
@@ -118,15 +127,15 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
 
   const warnings = result?.reconciliation?.filter((row) => row.status !== "match") ?? [];
   const matches = result?.reconciliation?.filter((row) => row.status === "match") ?? [];
-  const matchedSites = [...new Set((result?.parsed ?? []).filter((row) => row.status === "parsed" && row.site).map((row) => row.site!))];
+  const matchedSites = [...new Set((result?.parsed ?? []).flatMap((row) => row.sites?.length ? row.sites : row.site ? [row.site] : []))];
 
   return (
     <section className="panel weekly-pack group-master-pack">
       <div className="panel__header weekly-pack__header">
         <div>
-          <p className="page-header__eyebrow">Group source of truth</p>
-          <h2 className="panel__title">Upload the four core exports for every kitchen.</h2>
-          <p className="panel__subtitle">Drop them together. The app identifies each kitchen, extracts the recognised totals and checks them against the KM-submitted site reports.</p>
+          <p className="page-header__eyebrow">Group Chef source of truth</p>
+          <h2 className="panel__title">Upload your HOS-wide exports once.</h2>
+          <p className="panel__subtitle">You do not need to choose a kitchen here. If a source file contains all five kitchens, the app splits it automatically and holds those figures independently from the KM submissions.</p>
         </div>
         <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Group management only</span>
       </div>
@@ -138,21 +147,21 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
           </label>
         </div>
 
-        <section aria-label="Required master reports" className={styles["source-guide"]}>
+        <section aria-label="Group Chef master reports" className={styles["source-guide"]}>
           <div className={styles["source-guide__header"]}>
             <div className={styles["source-guide__header-copy"]}>
-              <strong>What exactly do I need to export?</strong>
-              <span>These four reports are the weekly core pack. Each data export must cover one kitchen only so it can be reconciled safely.</span>
-              {activeSites.length ? <span><strong>Active kitchens:</strong> {activeSites.join(", ")}</span> : null}
+              <strong>What do I upload as Group Chef?</strong>
+              <span>Use the group-wide reports you already pull. One physical file can contain every kitchen; we split it by the kitchen/location column before reconciliation.</span>
+              {activeSites.length ? <span><strong>We are looking for:</strong> {activeSites.join(", ")}</span> : null}
             </div>
-            <span className={styles["source-guide__count"]}>{expectedCoreFiles ? `${expectedCoreFiles} core files expected` : "4 files per kitchen"}</span>
+            <span className={styles["source-guide__count"]}>Usually 3–4 HOS-wide files</span>
           </div>
           <div className={styles["source-guide__grid"]}>
             {masterSources.map((source, index) => (
               <article className={styles["source-guide__item"]} key={source.title}>
                 <div className={styles["source-guide__item-top"]}>
                   <span className={styles["source-guide__number"]}>{index + 1}</span>
-                  <span className={styles["source-guide__required"]}>Required weekly</span>
+                  <span className={styles["source-guide__required"]}>Group export</span>
                 </div>
                 <strong>{source.title}</strong>
                 <span>{source.exportRule}</span>
@@ -160,10 +169,10 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
               </article>
             ))}
           </div>
-          <div className={styles["source-guide__note"]}><strong>Important:</strong> use the original HTML/CSV exports for the four core reports. XLS/XLSX/PDF/TXT files can be retained as supporting evidence, but they do not currently populate the reconciliation figures. Stocktake and waste files are optional supporting evidence.</div>
+          <div className={styles["source-guide__note"]}><strong>How the two sides work:</strong> you upload the independent HOS-wide source here once. KMs separately upload/review only their own kitchen report. Reconciliation refreshes as each KM submits, so your master pack can be loaded before or after them.</div>
         </section>
 
-        <div className={styles["source-guide__separate"]}><strong>Menu / recipe costs are separate:</strong> upload those on the Decision Desk when costs change — they are not part of the weekly master pack.</div>
+        <div className={styles["source-guide__separate"]}><strong>Fallbacks are fine:</strong> if a system only gives you one file per kitchen, drop those here too. CSV/HTML files populate the recognised figures; XLS/XLSX/PDF/TXT are retained as evidence until a parser is added for that exact format.</div>
 
         <button
           className={`weekly-pack__drop${dragging ? " weekly-pack__drop--active" : ""}`}
@@ -175,15 +184,15 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
           type="button"
         >
           <FolderUp aria-hidden="true" size={34} />
-          <strong>Drop the full HOS master pack here</strong>
-          <span>{expectedCoreFiles ? `Aim for ${expectedCoreFiles} core data files for this week; optional evidence can be added too.` : "Upload all four core reports for every kitchen together."}</span>
+          <strong>Drop your HOS-wide weekly exports here</strong>
+          <span>One file can cover all five kitchens — no kitchen selector needed.</span>
           <small>Access / StockLink · Procure Wizard Goods · Procure Wizard Credits · RotaCloud Labour</small>
         </button>
         <input accept=".csv,.xls,.xlsx,.html,.htm,.pdf,.txt" hidden multiple onChange={(event) => { addFiles([...(event.target.files ?? [])]); event.target.value = ""; }} ref={inputRef} type="file" />
 
         {files.length ? (
           <div className="weekly-pack__queue">
-            <div className="weekly-pack__queue-head"><strong>{files.length} master file{files.length === 1 ? "" : "s"}</strong><span>{(totalBytes / 1024 / 1024).toFixed(1)} MB</span></div>
+            <div className="weekly-pack__queue-head"><strong>{files.length} group source file{files.length === 1 ? "" : "s"}</strong><span>{(totalBytes / 1024 / 1024).toFixed(1)} MB</span></div>
             {files.map((file, index) => (
               <div className="weekly-pack__file" key={`${file.name}-${file.size}-${index}`}>
                 <span className="weekly-pack__file-type">{file.name.split(".").pop()?.toUpperCase() || "FILE"}</span>
@@ -197,37 +206,37 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
         {result?.error ? <div className="form-message form-message--error" role="alert">{result.error}</div> : null}
         {result?.ok ? (
           <div className="group-master-result" role="status">
-            <div className="weekly-pack__result-title"><CheckCircle2 aria-hidden="true" size={18} /><strong>Master pack processed</strong></div>
-            <p>{matchedSites.length} kitchen{matchedSites.length === 1 ? "" : "s"} recognised · {matches.length} metric checks matched · {warnings.length} need review.</p>
+            <div className="weekly-pack__result-title"><CheckCircle2 aria-hidden="true" size={18} /><strong>Group master pack processed</strong></div>
+            <p>{matchedSites.length} kitchen{matchedSites.length === 1 ? "" : "s"} recognised · {matches.length} metric checks matched · {warnings.length} currently need review / a KM submission.</p>
             <div className="group-master-result__sites">{matchedSites.map((site) => <span className="source-chip source-chip--safe" key={site}>{site}</span>)}</div>
-            {result.parsed?.filter((item) => item.status !== "parsed").map((item) => (
-              <div className="weekly-pack__parsed weekly-pack__parsed--error" key={item.name}>
+            {result.parsed?.map((item) => (
+              <div className={`weekly-pack__parsed${item.status !== "parsed" || item.error ? " weekly-pack__parsed--error" : ""}`} key={item.name}>
                 <FileSpreadsheet aria-hidden="true" size={15} />
                 <span><strong>{prettyClassification(item.classification)}</strong> · {item.name}</span>
-                <small>{item.error || "Stored but not used for reconciliation"}</small>
+                <small>{item.sites?.length ? `${item.sites.length} kitchens: ${item.sites.join(", ")}${item.error ? ` · ${item.error}` : ""}` : item.error || "Stored as supporting evidence"}</small>
               </div>
             ))}
             {warnings.length ? (
               <div className="reconciliation-warnings">
-                <h3><TriangleAlert aria-hidden="true" size={17} /> Reconciliation exceptions</h3>
+                <h3><TriangleAlert aria-hidden="true" size={17} /> Reconciliation still in progress / needs review</h3>
                 {warnings.slice(0, 20).map((row) => (
                   <div className="reconciliation-row" key={`${row.siteId}-${row.metricKey}`}>
                     <div><strong>{row.siteName}</strong><span>{prettyMetric(row.metricKey)}</span></div>
-                    <span>Site {formatValue(row.metricKey, row.siteValue)}</span>
+                    <span>KM {formatValue(row.metricKey, row.siteValue)}</span>
                     <span>Master {formatValue(row.metricKey, row.masterValue)}</span>
                     <span className="reconciliation-row__status">{row.status === "warning" ? `Δ ${formatValue(row.metricKey, row.variance)}` : row.status.replaceAll("_", " ")}</span>
                   </div>
                 ))}
               </div>
-            ) : <p className="weekly-pack__missing weekly-pack__missing--ready">All comparable submitted values agree with the master pack.</p>}
+            ) : <p className="weekly-pack__missing weekly-pack__missing--ready">All comparable KM values agree with your independent master pack.</p>}
           </div>
         ) : null}
 
         <div className="weekly-pack__actions">
           <button className="button button--primary" disabled={!files.length || !start || uploading} onClick={() => void upload()} type="button">
-            {uploading ? <><LoaderCircle aria-hidden="true" className="spin" size={17} /> Cross-checking every kitchen…</> : <><FolderUp aria-hidden="true" size={17} /> Upload & reconcile group pack</>}
+            {uploading ? <><LoaderCircle aria-hidden="true" className="spin" size={17} /> Splitting & cross-checking every kitchen…</> : <><FolderUp aria-hidden="true" size={17} /> Upload HOS-wide master pack</>}
           </button>
-          <span>This does not overwrite a manager’s report; it creates an independent management source for comparison.</span>
+          <span>Your files never overwrite a KM report. They stay as the independent Group Chef source used to check it.</span>
         </div>
       </div>
     </section>
