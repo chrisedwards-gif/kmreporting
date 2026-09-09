@@ -35,43 +35,46 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
   const sitesById = new Map((siteResult.data ?? []).map((site) => [site.id, site.name]));
   const activeSiteNames = (siteResult.data ?? []).map((site) => site.name);
   const rows = reconciliationResult.data ?? [];
-  const warnings = rows.filter((row) => row.status !== "match");
   const matches = rows.filter((row) => row.status === "match");
+  const awaitingKm = rows.filter((row) => row.status === "missing_site");
+  const reviewIssues = rows.filter((row) => row.status === "warning" || row.status === "missing_master");
 
   return (
     <>
       <header className="page-header">
         <div>
-          <p className="page-header__eyebrow">Group Chef · independent source</p>
+          <p className="page-header__eyebrow">Group Chef · independent HOS source</p>
           <h1 className="page-header__title">Master weekly pack.</h1>
-          <p className="page-header__copy">Upload the independent group exports after the kitchens submit. The platform tells you exactly what it needs, cross-checks the KM figures and feeds only management-trusted data into Decision Desk.</p>
+          <p className="page-header__copy">Upload the HOS-wide reports you already have once — they can contain all kitchens. KMs separately complete their own kitchen report, and the platform automatically reconciles the two sides as submissions arrive.</p>
         </div>
         <div className="page-header__actions">
-          <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> Weekly reports</Link>
+          <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> KM report status</Link>
+          <Link className="button button--secondary" href="/reports/new?mode=site">Single-kitchen override</Link>
           <Link className="button button--secondary" href="/intelligence"><BrainCircuit aria-hidden="true" size={16} /> Decision Desk</Link>
           <a className="button button--primary" href={`/api/intelligence/export?week=${weekStart}`}><Download aria-hidden="true" size={16} /> Download AI review pack</a>
         </div>
       </header>
 
-      <div className="privacy-callout" style={{ marginBottom: "1rem" }}><ShieldCheck aria-hidden="true" className="privacy-callout__icon" size={16} />This workspace is group-management only. Master files never overwrite the figures entered by a kitchen.</div>
+      <div className="privacy-callout" style={{ marginBottom: "1rem" }}><ShieldCheck aria-hidden="true" className="privacy-callout__icon" size={16} />This is your Group Chef source, not a KM report. Uploading here never overwrites a kitchen submission; it gives you an independent dataset to check it against.</div>
 
       <GroupMasterUploader activeSites={activeSiteNames} weekStart={weekStart} />
 
       <section className="panel" style={{ marginTop: "1rem" }}>
         <div className="panel__header">
-          <div><h2 className="panel__title">Latest reconciliation</h2><p className="panel__subtitle">Week commencing {formatDate(weekStart)} · {batchResult.data ? `master batch ${batchResult.data.status}` : "no group batch yet"}</p></div>
-          <div className="source-chip source-chip--safe">{matches.length} matched · {warnings.length} exceptions</div>
+          <div><h2 className="panel__title">Live reconciliation</h2><p className="panel__subtitle">Week commencing {formatDate(weekStart)} · {batchResult.data ? `master batch ${batchResult.data.status}` : "no Group Chef master pack yet"}</p></div>
+          <div className="source-chip source-chip--safe">{matches.length} matched · {awaitingKm.length} awaiting KM · {reviewIssues.length} review</div>
         </div>
         <div className="panel__body">
           {rows.length ? (
-            <div className="table-scroll"><table className="data-table"><thead><tr><th>Kitchen</th><th>Metric</th><th>Site submission</th><th>Master source</th><th>Variance</th><th>Status</th></tr></thead><tbody>
+            <div className="table-scroll"><table className="data-table"><thead><tr><th>Kitchen</th><th>Metric</th><th>KM submission</th><th>Your master source</th><th>Variance</th><th>Status</th></tr></thead><tbody>
               {rows.map((row) => {
                 const money = row.metric_key !== "paid_hours";
                 const format = (value: number | string | null) => value == null ? "—" : money ? formatCurrency(Number(value)) : Number(value).toFixed(2);
-                return <tr key={`${row.site_id}-${row.metric_key}`}><td><strong>{sitesById.get(row.site_id) ?? "Kitchen"}</strong></td><td>{prettyMetric(row.metric_key)}</td><td>{format(row.site_value)}</td><td>{format(row.master_value)}</td><td>{format(row.variance)}</td><td><span className={`rag-chip rag-chip--${row.status === "match" ? "green" : "red"}`}>{row.status.replaceAll("_", " ")}</span></td></tr>;
+                const statusLabel = row.status === "missing_site" ? "awaiting KM" : row.status === "missing_master" ? "missing master" : row.status;
+                return <tr key={`${row.site_id}-${row.metric_key}`}><td><strong>{sitesById.get(row.site_id) ?? "Kitchen"}</strong></td><td>{prettyMetric(row.metric_key)}</td><td>{format(row.site_value)}</td><td>{format(row.master_value)}</td><td>{format(row.variance)}</td><td>{row.status === "match" ? <span className="rag-chip rag-chip--green">match</span> : row.status === "missing_site" ? <span className="source-chip">{statusLabel}</span> : <span className="rag-chip rag-chip--red">{statusLabel}</span>}</td></tr>;
               })}
             </tbody></table></div>
-          ) : <div className="empty-inline">Upload the four core reports for each kitchen to create the first independent cross-check for this week.</div>}
+          ) : <div className="empty-inline">Upload your HOS-wide group exports once. Reconciliation rows will appear immediately, then fill in the KM side automatically as each kitchen submits.</div>}
         </div>
       </section>
     </>
