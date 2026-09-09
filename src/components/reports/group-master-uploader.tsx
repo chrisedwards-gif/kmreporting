@@ -78,6 +78,20 @@ const sourceExceptionLabel = (exception: SourceException) => {
   return `${exception.siteName}: ${missing.join(" + ")} not expected in the Group Chef master; the KM submission is the source for those metrics.`;
 };
 
+const dedupeFilesByContent = async (input: File[]) => {
+  if (!globalThis.crypto?.subtle) return input;
+  const seen = new Set<string>();
+  const unique: File[] = [];
+  for (const file of input) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+    const hash = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+    if (seen.has(hash)) continue;
+    seen.add(hash);
+    unique.push(file);
+  }
+  return unique;
+};
+
 export function GroupMasterUploader({
   weekStart,
   activeSites = [],
@@ -107,9 +121,11 @@ export function GroupMasterUploader({
     setUploading(true);
     setResult(null);
     try {
+      const uniqueFiles = await dedupeFilesByContent(files);
+      if (uniqueFiles.length !== files.length) setFiles(uniqueFiles);
       const body = new FormData();
       body.set("weekStart", start);
-      files.forEach((file) => body.append("files", file));
+      uniqueFiles.forEach((file) => body.append("files", file));
       const response = await fetch("/api/group-weekly-pack", { method: "POST", body });
       const payload = await response.json().catch(() => ({ error: "The server did not return a readable response." })) as UploadResult;
       setResult(payload);
@@ -196,7 +212,7 @@ export function GroupMasterUploader({
             {result.parsed?.map((item) => {
               const competitors = item.externalBrands ?? [];
               return (
-                <div className={`weekly-pack__parsed${item.status !== "parsed" || item.error ? " weekly-pack__parsed--error" : ""}`} key={item.name}>
+                <div className={`weekly-pack__parsed${item.status === "error" || item.error ? " weekly-pack__parsed--error" : ""}`} key={item.name}>
                   <FileSpreadsheet aria-hidden="true" size={15} />
                   <span><strong>{prettyClassification(item.classification)}</strong> · {item.name}</span>
                   <small>{competitors.length
