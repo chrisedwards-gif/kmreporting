@@ -27,13 +27,22 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
   const fallback = getLatestCompletedReportingWeek();
   const weekStart = /^\d{4}-\d{2}-\d{2}$/.test(params.week ?? "") ? params.week! : fallback.start;
   const supabase = await createServerSupabaseClient();
-  const [batchResult, reconciliationResult, siteResult] = supabase ? await Promise.all([
+  const [batchResult, reconciliationResult, siteResult, externalResult] = supabase ? await Promise.all([
     supabase.from("weekly_upload_batches").select("id, status, created_at").eq("organisation_id", profile.organisationId).eq("week_start", weekStart).eq("batch_kind", "group").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("weekly_reconciliations").select("site_id, metric_key, site_value, master_value, variance, variance_pct, status").eq("organisation_id", profile.organisationId).eq("week_start", weekStart).order("site_id"),
-    supabase.from("sites").select("id, name").eq("organisation_id", profile.organisationId).eq("active", true).order("name"),
-  ]) : [{ data: null }, { data: [] }, { data: [] }];
+    supabase.from("sites").select("id, name, master_sales_expected, master_purchasing_expected, master_labour_expected").eq("organisation_id", profile.organisationId).eq("active", true).order("name"),
+    supabase.from("external_brand_weekly_sales").select("brand_name, gross_sales, net_sales, captured_at").eq("organisation_id", profile.organisationId).eq("week_start", weekStart).order("net_sales", { ascending: false }),
+  ]) : [{ data: null }, { data: [] }, { data: [] }, { data: [] }];
   const sitesById = new Map((siteResult.data ?? []).map((site) => [site.id, site.name]));
   const activeSiteNames = (siteResult.data ?? []).map((site) => site.name);
+  const sourceExceptions = (siteResult.data ?? [])
+    .filter((site) => !site.master_purchasing_expected || !site.master_labour_expected)
+    .map((site) => ({
+      siteName: site.name,
+      purchasingMasterExpected: site.master_purchasing_expected,
+      labourMasterExpected: site.master_labour_expected,
+    }));
+  const competitorRows = externalResult.data ?? [];
   const rows = reconciliationResult.data ?? [];
   const matches = rows.filter((row) => row.status === "match");
   const awaitingKm = rows.filter((row) => row.status === "missing_site");
@@ -45,7 +54,7 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
         <div>
           <p className="page-header__eyebrow">Group Chef · independent HOS source</p>
           <h1 className="page-header__title">Master weekly pack.</h1>
-          <p className="page-header__copy">Upload the HOS-wide reports you already have once — they can contain all kitchens. KMs separately complete their own kitchen report, and the platform automatically reconciles the two sides as submissions arrive.</p>
+          <p className="page-header__copy">Upload the HOS-wide reports you already have once. Active kitchens are reconciled against KM submissions, while valid StockLink reports for non-HOS brands are retained as competitor benchmarks instead of being rejected.</p>
         </div>
         <div className="page-header__actions">
           <Link className="button button--secondary" href="/reports"><ArrowLeft aria-hidden="true" size={16} /> KM report status</Link>
@@ -57,7 +66,21 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
 
       <div className="privacy-callout" style={{ marginBottom: "1rem" }}><ShieldCheck aria-hidden="true" className="privacy-callout__icon" size={16} />This is your Group Chef source, not a KM report. Uploading here never overwrites a kitchen submission; it gives you an independent dataset to check it against.</div>
 
-      <GroupMasterUploader activeSites={activeSiteNames} weekStart={weekStart} />
+      <GroupMasterUploader activeSites={activeSiteNames} sourceExceptions={sourceExceptions} weekStart={weekStart} />
+
+      {competitorRows.length ? (
+        <section className="panel" style={{ marginTop: "1rem" }}>
+          <div className="panel__header">
+            <div><h2 className="panel__title">Competitor benchmarks captured</h2><p className="panel__subtitle">Valid Access / StockLink reports for brands outside the active HOS kitchen list · week commencing {formatDate(weekStart)}</p></div>
+            <div className="source-chip">{competitorRows.length} tracked</div>
+          </div>
+          <div className="panel__body">
+            <div className="table-scroll"><table className="data-table"><thead><tr><th>Brand</th><th>Net sales</th><th>Gross sales</th><th>Captured</th></tr></thead><tbody>
+              {competitorRows.map((row) => <tr key={row.brand_name}><td><strong>{row.brand_name}</strong></td><td>{formatCurrency(Number(row.net_sales))}</td><td>{row.gross_sales == null ? "—" : formatCurrency(Number(row.gross_sales))}</td><td>{new Date(row.captured_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</td></tr>)}
+            </tbody></table></div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel" style={{ marginTop: "1rem" }}>
         <div className="panel__header">
@@ -74,7 +97,7 @@ export default async function GroupReportingPage({ searchParams }: { searchParam
                 return <tr key={`${row.site_id}-${row.metric_key}`}><td><strong>{sitesById.get(row.site_id) ?? "Kitchen"}</strong></td><td>{prettyMetric(row.metric_key)}</td><td>{format(row.site_value)}</td><td>{format(row.master_value)}</td><td>{format(row.variance)}</td><td>{row.status === "match" ? <span className="rag-chip rag-chip--green">match</span> : row.status === "missing_site" ? <span className="source-chip">{statusLabel}</span> : <span className="rag-chip rag-chip--red">{statusLabel}</span>}</td></tr>;
               })}
             </tbody></table></div>
-          ) : <div className="empty-inline">Upload your HOS-wide group exports once. Reconciliation rows will appear immediately, then fill in the KM side automatically as each kitchen submits.</div>}
+          ) : <div className="empty-inline">Upload your HOS-wide group exports once. Only metrics with an applicable independent master source are reconciled; source-exception metrics remain owned by the KM submission.</div>}
         </div>
       </section>
     </>

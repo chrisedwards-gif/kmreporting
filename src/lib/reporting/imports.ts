@@ -58,7 +58,7 @@ const parseMoney = (value: unknown) => {
 };
 
 const toIsoDate = (value: string) => {
-  const uk = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const uk = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (uk) return `${uk[3]}-${uk[2].padStart(2, "0")}-${uk[1].padStart(2, "0")}`;
   const iso = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
   return iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : undefined;
@@ -71,6 +71,12 @@ const assertExpectedPeriod = (actual: SourcePeriod, expected: SourcePeriod, sour
 };
 
 const normaliseHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const findHeader = (headers: string[], candidates: string[]) => {
+  const normalisedCandidates = candidates.map(normaliseHeader);
+  return headers.find((header) => normalisedCandidates.includes(normaliseHeader(header)))
+    ?? headers.find((header) => normalisedCandidates.some((candidate) => candidate.length >= 5 && normaliseHeader(header).includes(candidate)));
+};
 
 export function parseCsv(input: string) {
   const rows: string[][] = [];
@@ -120,11 +126,6 @@ const rowsAsRecords = (input: string) => {
   };
 };
 
-const getValue = (record: Record<string, string>, header: string) => {
-  const match = Object.keys(record).find((key) => normaliseHeader(key) === normaliseHeader(header));
-  return match ? record[match] : "";
-};
-
 export function parseStockLinkEndOfWeek(input: string, expected: SourcePeriod): SalesImportResult {
   if (!/<html[\s>]/i.test(input) || !/End Of Week Report/i.test(input)) {
     throw new Error("This is not a recognised StockLink End of Week export.");
@@ -141,17 +142,20 @@ export function parseStockLinkEndOfWeek(input: string, expected: SourcePeriod): 
   let serviceCharge = 0;
   const rows = [...input.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
   for (const row of rows) {
-    const cells = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((cell) => decodeHtml(cell[1]));
-    const label = cells[0] ?? "";
-    if (/colspan\s*=\s*['"]?3/i.test(row[1]) || /^(Gross Sales After Adjustment|Vat|Adjustments)$/i.test(label)) {
-      section = label.toLowerCase();
+    const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => decodeHtml(cell[1]));
+    const label = (cells[0] ?? "").trim();
+    const rowHasNumbers = cells.slice(1).some((cell) => /\d/.test(cell));
+    if (label && !rowHasNumbers) {
+      section = normaliseHeader(label.replace(/:$/, ""));
       continue;
     }
+
     const numericValues = cells.slice(1).map(parseMoney).filter((value, index) => value !== 0 || /(?:^|\D)0(?:\.0+)?(?:\D|$)/.test(cells[index + 1] ?? ""));
     const total = numericValues.at(-1) ?? 0;
-    if (section === "gross sales after adjustment" && /^Total$/i.test(label)) grossAfterAdjustments = total;
-    if (section === "vat" && /^Total$/i.test(label)) vat = total;
-    if (section === "adjustments" && /^Service Charge$/i.test(label)) serviceCharge = total;
+    const normalisedLabel = normaliseHeader(label);
+    if (section === "grosssalesafteradjustment" && normalisedLabel === "total") grossAfterAdjustments = total;
+    if (section === "vat" && normalisedLabel === "total") vat = total;
+    if (section === "adjustments" && normalisedLabel === "servicecharge") serviceCharge = total;
   }
   if (grossAfterAdjustments <= 0 || vat < 0) throw new Error("The StockLink sales and VAT totals could not be read.");
   const netSales = roundMoney(grossAfterAdjustments - vat - Math.max(serviceCharge, 0));
@@ -168,35 +172,47 @@ export function parseStockLinkEndOfWeek(input: string, expected: SourcePeriod): 
 
 export function parseGoodsDelivered(input: string, expected: SourcePeriod): PurchasingImportResult {
   const { headers, records } = rowsAsRecords(input);
-  const required = ["Purchaser Unit Name", "Date Delivered", "Category", "Order Status", "Total Price Net"];
-  if (!required.every((header) => headers.some((value) => normaliseHeader(value) === normaliseHeader(header)))) {
-    throw new Error("This is not a recognised Procure Wizard Goods Delivered export.");
+  const siteColumn = findHeader(headers, ["Purchaser Unit Name", "Purchaser site", "Purchaser Unit", "Site", "Location"]);
+  const dateColumn = findHeader(headers, ["Date Delivered", "Delivery Date", "Date of Delivery", "Requested Delivery", "Invoice Date", "Order Invoice Date"]);
+  const valueColumn = findHeader(headers, ["Total Price Net", "Line Net Value", "Goods Net Value", "Total Net", "Net Value", "PO Net Value", "Invoice Net Value"]);
+  const categoryColumn = findHeader(headers, ["Category", "Product Category", "Mini Market"]);
+  const statusColumn = findHeader(headers, ["Order Status", "Status", "Invoice Status"]);
+
+  if (!siteColumn || !dateColumn || !valueColumn) {
+    const missing = [!siteColumn ? "site" : "", !dateColumn ? "delivery date" : "", !valueColumn ? "net value" : ""].filter(Boolean).join(", ");
+    throw new Error(`This Goods Purchased export is missing a recognised ${missing} column.`);
   }
+
   const sites = new Set<string>();
   const deliveredDates: string[] = [];
   let purchases = 0;
   let awaitingInvoice = 0;
   let rowCount = 0;
+
   for (const record of records) {
-    const category = getValue(record, "Category").trim().toLowerCase();
-    if (category !== "food") continue;
-    const date = toIsoDate(getValue(record, "Date Delivered"));
+    const site = (record[siteColumn] ?? "").trim();
+    if (site) sites.add(site);
+    if (categoryColumn) {
+      const category = (record[categoryColumn] ?? "").trim();
+      if (category && !/^food(?:\b|$)/i.test(category)) continue;
+    }
+    const date = toIsoDate(record[dateColumn] ?? "");
     if (!date) continue;
     deliveredDates.push(date);
-    sites.add(getValue(record, "Purchaser Unit Name").trim());
     if (date < expected.start || date > expected.end) continue;
-    const status = getValue(record, "Order Status");
+    const status = statusColumn ? record[statusColumn] ?? "" : "";
     if (/cancelled|canceled|rejected/i.test(status)) continue;
-    const value = parseMoney(getValue(record, "Total Price Net"));
+    const value = parseMoney(record[valueColumn]);
     purchases += value;
-    if (/awaiting invoice/i.test(status)) awaitingInvoice += value;
+    if (/awaiting invoice|invoice outstanding/i.test(status)) awaitingInvoice += value;
     rowCount += 1;
   }
-  if (sites.size !== 1) throw new Error("The Goods Delivered export must contain exactly one kitchen.");
-  if (!deliveredDates.length || !rowCount) throw new Error("No delivered Food rows were found for this reporting week.");
+
+  if (sites.size !== 1) throw new Error("The Goods Purchased export must contain exactly one kitchen.");
+  if (!deliveredDates.length || !rowCount) throw new Error("No purchased Food rows were found for this reporting week.");
   const actual = { start: [...deliveredDates].sort()[0], end: [...deliveredDates].sort().at(-1)! };
   if (actual.start < expected.start || actual.end > expected.end) {
-    throw new Error(`The Goods Delivered export includes dates outside ${expected.start} to ${expected.end}.`);
+    throw new Error(`The Goods Purchased export includes dates outside ${expected.start} to ${expected.end}.`);
   }
   return {
     siteName: [...sites][0],
@@ -207,33 +223,43 @@ export function parseGoodsDelivered(input: string, expected: SourcePeriod): Purc
   };
 }
 
-export function parseCreditsOverview(input: string, expected: SourcePeriod): CreditsImportResult {
+export function parseCreditsOverview(input: string, _expected: SourcePeriod): CreditsImportResult {
   const { headers, records } = rowsAsRecords(input);
-  const required = ["Credit Request Date", "Credit Note Date", "Order Status", "Purchaser Unit", "Credit Note Net Value"];
-  if (!required.every((header) => headers.some((value) => normaliseHeader(value) === normaliseHeader(header)))) {
+  const siteColumn = findHeader(headers, ["Purchaser site", "Purchaser Unit", "Purchaser Unit Name", "Site", "Location"]);
+  const creditStatusColumn = findHeader(headers, ["Credit note status", "Credit Status", "Credit Note Status", "Order Status", "Status"]);
+  const noteValueColumn = findHeader(headers, ["Credit note total", "Credit Note Net Value", "Credit Note Total Value", "Credit Note Value"]);
+  const requestValueColumn = findHeader(headers, ["Credit request net value", "Credit Request Net Value", "Credit Request Total", "Credit Request Value"]);
+
+  if (!siteColumn || (!noteValueColumn && !requestValueColumn)) {
     throw new Error("This is not a recognised Procure Wizard Credits Overview export.");
   }
+
   const sites = new Set<string>();
   let confirmedCredits = 0;
   let pendingCredits = 0;
   let confirmedCount = 0;
   let pendingCount = 0;
+
   for (const record of records) {
-    const site = getValue(record, "Purchaser Unit").trim();
+    const site = (record[siteColumn] ?? "").trim();
     if (site) sites.add(site);
-    const status = getValue(record, "Order Status");
-    const noteDate = toIsoDate(getValue(record, "Credit Note Date"));
-    const requestDate = toIsoDate(getValue(record, "Credit Request Date"));
-    const noteValue = Math.abs(parseMoney(getValue(record, "Credit Note Net Value")));
-    const requestValue = Math.abs(parseMoney(getValue(record, "Credit Request Net Value")) || noteValue);
-    if (noteDate && noteDate >= expected.start && noteDate <= expected.end && !/cancelled|canceled|rejected|pending|investigation/i.test(status)) {
-      confirmedCredits += noteValue;
-      confirmedCount += 1;
-    } else if (requestDate && requestDate >= expected.start && requestDate <= expected.end && /pending|investigation|requested|query/i.test(status)) {
-      pendingCredits += requestValue;
+    const status = creditStatusColumn ? record[creditStatusColumn] ?? "" : "";
+    if (/rejected|cancelled|canceled/i.test(status)) continue;
+
+    const noteValue = noteValueColumn ? Math.abs(parseMoney(record[noteValueColumn])) : 0;
+    const requestValue = requestValueColumn ? Math.abs(parseMoney(record[requestValueColumn])) : noteValue;
+    const pending = /awaiting acknowledgement|pending investigation|does not balance|pending|investigation|requested|query/i.test(status);
+    const confirmed = /checked\s*&?\s*balances|completed|complete|credited|approved/i.test(status);
+
+    if (pending) {
+      pendingCredits += requestValue || noteValue;
       pendingCount += 1;
+    } else if (confirmed || noteValue > 0) {
+      confirmedCredits += noteValue || requestValue;
+      confirmedCount += 1;
     }
   }
+
   if (sites.size > 1) throw new Error("The Credits Overview export must contain one kitchen only.");
   return {
     siteName: [...sites][0] ?? "",
@@ -244,12 +270,6 @@ export function parseCreditsOverview(input: string, expected: SourcePeriod): Cre
   };
 }
 
-const findHeader = (headers: string[], candidates: string[]) => {
-  const normalisedCandidates = candidates.map(normaliseHeader);
-  return headers.find((header) => normalisedCandidates.includes(normaliseHeader(header)))
-    ?? headers.find((header) => normalisedCandidates.some((candidate) => normaliseHeader(header).includes(candidate)));
-};
-
 export function parseRotaCloudLabour(input: string, expected: SourcePeriod): LabourImportResult {
   const { headers, records } = rowsAsRecords(input);
   const costColumn = findHeader(headers, [
@@ -257,12 +277,15 @@ export function parseRotaCloudLabour(input: string, expected: SourcePeriod): Lab
   ]);
   if (!costColumn) throw new Error("No recognised wage-cost column was found. Enter the aggregate RotaCloud total manually and keep the file as supporting evidence.");
   const hoursColumn = findHeader(headers, ["total paid hours", "paid hours", "total hours", "hours"]);
-  const dateColumn = findHeader(headers, ["shift date", "work date", "date"]);
+  const dateColumn = findHeader(headers, ["shift date", "work date", "business date", "date", "day"]);
   const employeeColumn = headers.find((header) => normaliseHeader(header) === "employee");
-  const locationColumn = headers.find((header) => normaliseHeader(header) === "location");
+  const locationColumn = headers.find((header) => ["location", "site", "kitchen"].includes(normaliseHeader(header)));
   const isDailyTotals = headers.some((header) => normaliseHeader(header) === "totalshifts")
     && headers.some((header) => normaliseHeader(header) === "totalcost");
-  const headerLocations = headers.flatMap((header) => header.match(/^Location:\s*(.+?)\s*\((?:Hours|Cost)\)$/i)?.[1]?.trim() ?? []);
+  const headerLocations = headers.flatMap((header) => {
+    const match = header.match(/^Location:\s*(.+?)\s*\((?:Hours|Cost)\)$/i);
+    return match ? [match[1].trim()] : [];
+  });
   const rowLocations = locationColumn
     ? records.map((record) => record[locationColumn]?.trim()).filter((value): value is string => Boolean(value))
     : [];
@@ -276,6 +299,7 @@ export function parseRotaCloudLabour(input: string, expected: SourcePeriod): Lab
   const staffCost = roundMoney(rowsToUse.reduce((sum, record) => sum + parseMoney(record[costColumn]), 0));
   const paidHours = hoursColumn ? roundMoney(rowsToUse.reduce((sum, record) => sum + parseMoney(record[hoursColumn]), 0)) : 0;
   if (staffCost <= 0) throw new Error("The RotaCloud export did not contain a positive aggregate wage cost.");
+
   let period: SourcePeriod | undefined;
   if (dateColumn) {
     const dates = records.map((record) => toIsoDate(record[dateColumn])).filter((value): value is string => Boolean(value)).sort();

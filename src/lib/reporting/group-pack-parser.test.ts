@@ -6,7 +6,7 @@ const week = { start: "2026-08-30", end: "2026-09-05" };
 const bySite = (rows: ReturnType<typeof parseGroupWeeklyPackFile>) => new Map(rows.map((row) => [row.siteHint, row]));
 
 describe("parseGroupWeeklyPackFile", () => {
-  it("splits one Procure Wizard Goods Delivered export across kitchens", () => {
+  it("splits one legacy Procure Wizard Goods Delivered export across kitchens", () => {
     const csv = [
       "Purchaser Unit Name,Date Delivered,Category,Order Status,Total Price Net",
       "Kardia,30/08/2026,Food,Invoiced,100.00",
@@ -21,7 +21,20 @@ describe("parseGroupWeeklyPackFile", () => {
     expect(parsed.get("Dough Religion")?.summary).toMatchObject({ purchases: 200, awaitingInvoice: 0, groupWideSource: true });
   });
 
-  it("splits one Procure Wizard Credits Overview export across kitchens", () => {
+  it("splits the current Goods Purchased column names across kitchens", () => {
+    const csv = [
+      "Purchaser site,Requested Delivery,Product Category,Order Status,Invoice Net Value",
+      "Kardia,30/08/2026,Food,Completed Invoices,100.00",
+      "Kardia,31/08/2026,Food,Awaiting Invoice,50.00",
+      "Dough Religion,30/08/2026,Food,Completed Invoices,200.00",
+    ].join("\n");
+
+    const parsed = bySite(parseGroupWeeklyPackFile("GoodsPurchased_123.csv", csv, week));
+    expect(parsed.get("Kardia")?.summary).toMatchObject({ purchases: 150, awaitingInvoice: 50, groupWideSource: true });
+    expect(parsed.get("Dough Religion")?.summary).toMatchObject({ purchases: 200, awaitingInvoice: 0, groupWideSource: true });
+  });
+
+  it("splits one legacy Procure Wizard Credits Overview export across kitchens", () => {
     const csv = [
       "Purchaser Unit,Credit Request Date,Credit Note Date,Order Status,Credit Note Net Value,Credit Request Net Value",
       "Kardia,01/09/2026,02/09/2026,Credited,25.00,25.00",
@@ -29,6 +42,18 @@ describe("parseGroupWeeklyPackFile", () => {
     ].join("\n");
 
     const parsed = bySite(parseGroupWeeklyPackFile("credits.csv", csv, week));
+    expect(parsed.get("Kardia")?.summary).toMatchObject({ confirmedCredits: 25, pendingCredits: 0 });
+    expect(parsed.get("Dough Religion")?.summary).toMatchObject({ confirmedCredits: 0, pendingCredits: 18 });
+  });
+
+  it("splits the current Credits Overview column names and statuses", () => {
+    const csv = [
+      "Purchaser site,Credit note status,Credit request net value,Credit note total",
+      "Kardia,Completed Credit,25.00,25.00",
+      "Dough Religion,Pending Investigation,18.00,0.00",
+    ].join("\n");
+
+    const parsed = bySite(parseGroupWeeklyPackFile("CreditsOverview_123.csv", csv, week));
     expect(parsed.get("Kardia")?.summary).toMatchObject({ confirmedCredits: 25, pendingCredits: 0 });
     expect(parsed.get("Dough Religion")?.summary).toMatchObject({ confirmedCredits: 0, pendingCredits: 18 });
   });
@@ -45,6 +70,23 @@ describe("parseGroupWeeklyPackFile", () => {
     const parsed = bySite(parseGroupWeeklyPackFile("rotacloud-labour.csv", csv, week));
     expect(parsed.get("Kardia")?.summary).toMatchObject({ staffCost: 216, paidHours: 18, groupWideSource: true });
     expect(parsed.get("Dough Religion")?.summary).toMatchObject({ staffCost: 262.5, paidHours: 21, groupWideSource: true });
+  });
+
+  it("splits RotaCloud Daily Totals wide location columns", () => {
+    const csv = [
+      "Date,Total Shifts,Total Hours,Total Cost,Kardia Hours,Kardia Cost,Dough Religion Hours,Dough Religion Cost",
+      "2026-08-30,4,26,340,10,120,16,220",
+      "2026-08-31,4,24,312,8,96,16,216",
+      "2026-09-01,0,0,0,0,0,0,0",
+      "2026-09-02,0,0,0,0,0,0,0",
+      "2026-09-03,0,0,0,0,0,0,0",
+      "2026-09-04,0,0,0,0,0,0,0",
+      "2026-09-05,0,0,0,0,0,0,0",
+    ].join("\n");
+
+    const parsed = bySite(parseGroupWeeklyPackFile("daily_totals_2026-08-30_to_2026-09-05.csv", csv, week));
+    expect(parsed.get("Kardia")?.summary).toMatchObject({ staffCost: 216, paidHours: 18, groupWideSource: true });
+    expect(parsed.get("Dough Religion")?.summary).toMatchObject({ staffCost: 436, paidHours: 32, groupWideSource: true });
   });
 
   it("accepts a safe multi-kitchen sales CSV when it has business dates", () => {

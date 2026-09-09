@@ -30,7 +30,7 @@ export type ParsedPackFile = {
   salesInsights?: SalesInsightsInput;
 };
 
-const hasAll = (content: string, tokens: string[]) => tokens.every((token) => content.toLowerCase().includes(token.toLowerCase()));
+const hasAny = (content: string, tokens: string[]) => tokens.some((token) => content.toLowerCase().includes(token.toLowerCase()));
 
 export function classifyWeeklyPackFile(fileName: string, content: string, expected: SourcePeriod): ParsedPackFile {
   const lowerName = fileName.toLowerCase();
@@ -68,11 +68,17 @@ export function classifyWeeklyPackFile(fileName: string, content: string, expect
         salesInsights,
       };
     } catch (error) {
-      return recognisedError("sales_eow", error);
+      return recognisedError("sales_eow", error, stockLinkSiteHint(content));
     }
   }
 
-  if (hasAll(content, ["Purchaser Unit Name", "Date Delivered", "Total Price Net"])) {
+  const looksLikeGoodsPurchased = /goods\s*purchased/i.test(lowerName)
+    || (
+      hasAny(content.slice(0, 5000), ["Purchaser Unit Name", "Purchaser site", "Purchaser Unit"])
+      && hasAny(content.slice(0, 5000), ["Date Delivered", "Delivery Date", "Requested Delivery", "Order Invoice Date"])
+      && hasAny(content.slice(0, 5000), ["Total Price Net", "Line Net Value", "Goods Net Value", "Total Net", "PO Net Value", "Invoice Net Value"])
+    );
+  if (looksLikeGoodsPurchased) {
     try {
       const result = parseGoodsDelivered(content, expected);
       return {
@@ -89,7 +95,12 @@ export function classifyWeeklyPackFile(fileName: string, content: string, expect
     }
   }
 
-  if (hasAll(content, ["Credit Request Date", "Order Status", "Purchaser Unit"])) {
+  const looksLikeCredits = /credits?\s*overview/i.test(lowerName)
+    || (
+      hasAny(content.slice(0, 5000), ["Purchaser site", "Purchaser Unit", "Purchaser Unit Name"])
+      && hasAny(content.slice(0, 5000), ["Credit note status", "Credit Status", "Credit note total", "Credit Request Net Value"])
+    );
+  if (looksLikeCredits) {
     try {
       const result = parseCreditsOverview(content, expected);
       return {
@@ -111,8 +122,9 @@ export function classifyWeeklyPackFile(fileName: string, content: string, expect
     }
   }
 
-  const looksLikeRotaCloud = /rotacloud|rota cloud/i.test(lowerName)
-    || /total wage cost|estimated wage cost|paid hours|labour cost|labor cost/i.test(content.slice(0, 8000));
+  const rotaHeader = content.slice(0, 8000);
+  const looksLikeRotaCloud = /rotacloud|rota cloud|daily[_ -]?totals/i.test(lowerName)
+    || /total wage cost|estimated wage cost|paid hours|total hours|labour cost|labor cost|total shifts|total cost/i.test(rotaHeader);
   if (looksLikeRotaCloud) {
     try {
       const result = parseRotaCloudLabour(content, expected);
@@ -145,11 +157,16 @@ export function packSiteMatches(siteHint: string | null, selectedSiteName: strin
   return normaliseSiteName(siteHint) === normaliseSiteName(selectedSiteName);
 }
 
-function recognisedError(classification: PackClassification, error: unknown): ParsedPackFile {
+function stockLinkSiteHint(content: string) {
+  const flattened = content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+  return flattened.match(/End Of Week Report For (.+?) From \d{1,2}\/\d{1,2}\/\d{4}/i)?.[1]?.trim() ?? null;
+}
+
+function recognisedError(classification: PackClassification, error: unknown, siteHint: string | null = null): ParsedPackFile {
   return {
     classification,
     parseStatus: "error",
-    siteHint: null,
+    siteHint,
     periodStart: null,
     periodEnd: null,
     summary: {},
