@@ -3,14 +3,14 @@ import type { DecisionIntelligence } from "@/lib/data/decision-intelligence";
 import type { DecisionSignal } from "@/lib/reporting/decision-engine";
 import { formatCurrency } from "@/lib/utils";
 
-const categoryIcon = (category: DecisionSignal["category"]) => {
-  if (category === "labour") return Clock3;
-  if (category === "menu") return UtensilsCrossed;
-  if (category === "pricing") return BadgePoundSterling;
-  if (category === "food_cost" || category === "procurement" || category === "waste") return ShoppingBasket;
-  if (category === "reconciliation" || category === "data_quality") return AlertTriangle;
-  return TrendingUp;
-};
+function CategoryIcon({ category }: { category: DecisionSignal["category"] }) {
+  if (category === "labour") return <Clock3 aria-hidden="true" size={16} />;
+  if (category === "menu") return <UtensilsCrossed aria-hidden="true" size={16} />;
+  if (category === "pricing") return <BadgePoundSterling aria-hidden="true" size={16} />;
+  if (category === "food_cost" || category === "procurement" || category === "waste") return <ShoppingBasket aria-hidden="true" size={16} />;
+  if (category === "reconciliation" || category === "data_quality") return <AlertTriangle aria-hidden="true" size={16} />;
+  return <TrendingUp aria-hidden="true" size={16} />;
+}
 
 export function DecisionDesk({ intelligence, groupView }: { intelligence: DecisionIntelligence; groupView: boolean }) {
   const signals = intelligence.signals.slice(0, groupView ? 8 : 6);
@@ -56,12 +56,11 @@ export function DecisionDesk({ intelligence, groupView }: { intelligence: Decisi
 }
 
 function DecisionCard({ signal, groupView }: { signal: DecisionSignal; groupView: boolean }) {
-  const Icon = categoryIcon(signal.category);
   const confidenceTone = signal.confidence >= 80 ? "high" : signal.confidence >= 65 ? "medium" : "developing";
   return (
     <article className={`decision-card decision-card--${signal.severity}`}>
       <div className="decision-card__top">
-        <span className="decision-card__icon"><Icon aria-hidden="true" size={16} /></span>
+        <span className="decision-card__icon"><CategoryIcon category={signal.category} /></span>
         <div className="decision-card__labels">
           {groupView ? <span>{signal.siteName}</span> : null}
           <span>{signal.category.replaceAll("_", " ")}</span>
