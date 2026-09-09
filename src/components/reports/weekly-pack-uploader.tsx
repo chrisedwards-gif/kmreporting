@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, FileSpreadsheet, FolderUp, LoaderCircle, ShieldCheck, X } from "lucide-react";
+import { WeeklySourceChecklist } from "@/components/reports/weekly-source-checklist";
 
 type UploadResult = {
   ok?: boolean;
@@ -19,10 +20,10 @@ const shortType = (name: string) => {
 };
 
 const prettyClassification = (value: string) => ({
-  sales_eow: "EPOS sales",
-  procure_goods: "Goods Delivered",
+  sales_eow: "End Of Week Report",
+  procure_goods: "Goods Purchased",
   procure_credits: "Credits Overview",
-  rotacloud_labour: "Labour",
+  rotacloud_labour: "RotaCloud Daily Totals",
   stocktake_support: "Stocktake support",
   waste_support: "Waste support",
   supporting: "Supporting file",
@@ -77,9 +78,9 @@ export function WeeklyPackUploader({ sites, weekStart }: {
     <section className="panel weekly-pack">
       <div className="panel__header weekly-pack__header">
         <div>
-          <p className="page-header__eyebrow">Fast weekly upload</p>
-          <h2 className="panel__title">Drop the whole week in once.</h2>
-          <p className="panel__subtitle">EPOS, Goods Delivered, Credits, labour, stocktake and supporting files can all be selected together.</p>
+          <p className="page-header__eyebrow">Kitchen Manager weekly upload</p>
+          <h2 className="panel__title">Download four reports, then upload them together.</h2>
+          <p className="panel__subtitle">The exact report names and filters are below. Use your kitchen only and the Sunday–Saturday reporting week.</p>
         </div>
         <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Raw files retained privately</span>
       </div>
@@ -97,6 +98,8 @@ export function WeeklyPackUploader({ sites, weekStart }: {
           </label>
         </div>
 
+        <WeeklySourceChecklist audience="kitchen" />
+
         <button
           className={`weekly-pack__drop${dragging ? " weekly-pack__drop--active" : ""}`}
           onClick={() => inputRef.current?.click()}
@@ -107,9 +110,9 @@ export function WeeklyPackUploader({ sites, weekStart }: {
           type="button"
         >
           <FolderUp aria-hidden="true" size={32} />
-          <strong>Drop all weekly reports here</strong>
-          <span>or click to select up to 20 files</span>
-          <small>CSV · XLS/XLSX · HTML · PDF · TXT · 25 MB per file</small>
+          <strong>Drop the four required reports here</strong>
+          <span>End Of Week Report · Goods Purchased · Credits Overview · RotaCloud Daily Totals</span>
+          <small>HTML/HTM + CSV · optional supporting files can be added too</small>
         </button>
         <input
           accept=".csv,.xls,.xlsx,.html,.htm,.pdf,.txt"
@@ -144,7 +147,7 @@ export function WeeklyPackUploader({ sites, weekStart }: {
                 <small>{item.error || (item.status === "parsed" ? "Recognised" : "Stored as supporting evidence")}</small>
               </div>
             ))}
-            {result.missing?.length ? <p className="weekly-pack__missing">Still needed before submission: <strong>{result.missing.join(", ")}</strong>.</p> : <p className="weekly-pack__missing weekly-pack__missing--ready">Core source pack recognised. Opening the short review now.</p>}
+            {result.missing?.length ? <p className="weekly-pack__missing">Still needed before submission: <strong>{result.missing.join(", ")}</strong>.</p> : <p className="weekly-pack__missing weekly-pack__missing--ready">All four core sources are recognised. Opening the short review now.</p>}
           </div>
         ) : null}
 
