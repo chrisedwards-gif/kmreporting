@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AlertTriangle, ArrowRight, CalendarDays, MessageSquareText, Siren } from "lucide-react";
 import { CostChart } from "@/components/dashboard/cost-chart";
+import { DecisionDesk } from "@/components/dashboard/decision-desk";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SitePerformanceTable } from "@/components/dashboard/site-performance-table";
 import { Workbench } from "@/components/dashboard/workbench";
 import { requireSessionProfile, type SessionProfile } from "@/lib/auth/dal";
+import { getDecisionIntelligence } from "@/lib/data/decision-intelligence";
 import { getVisibleManagerMessages } from "@/lib/data/manager-home";
 import { getScopedReportingBundle } from "@/lib/data/scoped-reporting";
 import type { ReportingBundle } from "@/lib/data/reporting";
@@ -13,7 +15,7 @@ import { getWorkbench } from "@/lib/data/workbench";
 import { MessageSkeleton, WorkbenchSkeleton } from "@/components/ui/page-skeleton";
 import { formatCurrency, formatDate, formatPercentage } from "@/lib/utils";
 
-export const metadata = { title: "Group overview" };
+export const metadata = { title: "Decision dashboard" };
 
 async function DashboardWorkbench({ profile, bundle }: { profile: SessionProfile; bundle: ReportingBundle }) {
   const workbench = await getWorkbench(profile.navigationRole, bundle, { siteIds: profile.siteScopeIds, managerId: profile.scopeManagerId });
@@ -32,6 +34,11 @@ async function DashboardMessages({ profile }: { profile: SessionProfile }) {
     const PriorityIcon = message.priority === "urgent" ? Siren : message.priority === "important" ? AlertTriangle : MessageSquareText;
     return <article className={`manager-home-message manager-home-message--${message.priority}`} key={message.id}><div className="manager-home-message__icon"><PriorityIcon aria-hidden="true" size={20} /></div><div className="manager-home-message__content"><div className="manager-home-message__top"><div className="manager-home-message__meta">{message.siteName}{message.recipientProfileId ? ` · for ${message.recipientName}` : ""}</div><span className={`manager-home-message__priority manager-home-message__priority--${message.priority}`}>{message.priority}</span></div><h2>{message.title}</h2><p>{message.body}</p></div></article>;
   })}</section>;
+}
+
+async function DashboardDecisions({ profile }: { profile: SessionProfile }) {
+  const intelligence = await getDecisionIntelligence(profile);
+  return <DecisionDesk groupView={profile.siteScopeIds === null} intelligence={intelligence} />;
 }
 
 export default async function DashboardPage() {
@@ -60,17 +67,18 @@ export default async function DashboardPage() {
     <>
       <header className="page-header page-header--personal">
         <div>
-          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · weekly reporting` : "Weekly management summary"}</p>
-          <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "The group at a glance."}</h1>
-          <p className="page-header__copy">{isManagerHome ? `Complete the kitchen report, review actions and keep your weekly 1-1 up to date. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} report exceptions need attention.`}</p>
+          <p className="page-header__eyebrow">{profile.isAccessPreview ? `Admin site mode · ${profile.previewSiteName}` : isManagerHome ? `${siteContext} · weekly reporting` : "Group decision dashboard"}</p>
+          <h1 className="page-header__title">{isManagerHome ? `Hi, ${firstName}.` : "What should we do next?"}</h1>
+          <p className="page-header__copy">{isManagerHome ? `Upload the kitchen pack, review the data-led actions and complete your weekly 1-1. Week ending ${formatDate(week.end)}.` : `Week ending ${formatDate(week.end)} · ${sites.length} of ${expectedSiteCount} active kitchens reported · ${reviewFlags.length} report exceptions need attention.`}</p>
         </div>
-        {canCreateReport ? <Link className="button button--primary" href="/reports/new">Start a report <ArrowRight aria-hidden="true" size={16} /></Link> : null}
+        {canCreateReport ? <Link className="button button--primary" href="/reports/new">Upload weekly pack <ArrowRight aria-hidden="true" size={16} /></Link> : null}
       </header>
 
       {profile.isAccessPreview ? <div className="privacy-callout" style={{ marginBottom: "1rem" }}>Admin site mode is active. You are seeing only {profile.previewSiteName} records and the same navigation as {profile.previewManagerName ?? "the assigned manager"}; your Admin edit rights remain available.</div> : null}
 
       <Suspense fallback={<WorkbenchSkeleton />}><DashboardWorkbench bundle={bundle} profile={profile} /></Suspense>
       <Suspense fallback={<MessageSkeleton />}><DashboardMessages profile={profile} /></Suspense>
+      <Suspense fallback={<section className="panel"><div className="panel__body">Analysing historical sales, product and labour patterns…</div></section>}><DashboardDecisions profile={profile} /></Suspense>
 
       <section aria-label={isManagerHome ? `${siteContext} metrics` : "Group metrics"} className="metric-grid">
         <MetricCard accent="#2d7a62" label="Net sales" note={`Across ${sites.length} kitchen${sites.length === 1 ? "" : "s"}`} trend="up" value={formatCurrency(totals.netSales)} />
