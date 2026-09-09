@@ -35,9 +35,16 @@ const numeric = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-type SiteRow = { id: string; name: string; code: string };
+type SiteRow = {
+  id: string;
+  name: string;
+  code: string;
+  master_sales_expected: boolean;
+  master_purchasing_expected: boolean;
+  master_labour_expected: boolean;
+};
 type MasterMetric = { siteId: string; metricKey: string; numericValue: number; sourceFileId: string };
-type ResolvedParse = { parsed: ParsedPackFile; site: SiteRow | null };
+type ResolvedParse = { parsed: ParsedPackFile; site: SiteRow | null; externalBrand?: string };
 type ParsedFileRow = {
   fileName: string;
   fileId: string;
@@ -46,6 +53,7 @@ type ParsedFileRow = {
   error: string;
   summary: Record<string, unknown>;
   sites: SiteRow[];
+  externalBrands: string[];
 };
 type HourlyMetric = {
   siteId: string;
@@ -55,6 +63,16 @@ type HourlyMetric = {
   staffCount: number;
   hourlyCost: number;
   sourceReference: string;
+};
+type ExternalBrandSales = {
+  sourceFileId: string;
+  brandKey: string;
+  brandName: string;
+  grossSales: number | null;
+  vat: number | null;
+  serviceCharge: number | null;
+  netSales: number;
+  salesInsights: ParsedPackFile["salesInsights"];
 };
 
 export async function POST(request: NextRequest) {
@@ -80,7 +98,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { data: sites = [], error: sitesError } = await admin
     .from("sites")
-    .select("id, name, code")
+    .select("id, name, code, master_sales_expected, master_purchasing_expected, master_labour_expected")
     .eq("organisation_id", profile.organisationId)
     .eq("active", true)
     .order("name");
@@ -102,6 +120,7 @@ export async function POST(request: NextRequest) {
   const parsedRows: ParsedFileRow[] = [];
   const metrics: MasterMetric[] = [];
   const hourlyMetrics: HourlyMetric[] = [];
+  const externalBrandSales: ExternalBrandSales[] = [];
   const rotaSitesSeen = new Set<string>();
 
   for (const file of files) {
@@ -116,10 +135,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Could not retain ${file.name} privately.`, batchId: batch.id }, { status: 500 });
     }
 
-    const parsedResults = parseGroupWeeklyPackFile(file.name, decodeReportText(bytes), expected);
+    const sourceResults = parseGroupWeeklyPackFile(file.name, decodeReportText(bytes), expected);
+    const parsedResults = ensureGroupCreditCoverage(sourceResults, siteRows, expected);
     const resolved: ResolvedParse[] = parsedResults.map((parsed) => {
       const site = resolveSite(parsed.siteHint, parsedResults.length === 1 ? file.name : "", siteRows);
       if (parsed.parseStatus === "parsed" && !site) {
+        const benchmark = externalSalesFromParsed(parsed, fileId);
+        if (benchmark) {
+          externalBrandSales.push(benchmark);
+          return {
+            site: null,
+            externalBrand: benchmark.brandName,
+            parsed: {
+              ...parsed,
+              summary: { ...parsed.summary, externalBenchmark: true, externalBrand: benchmark.brandName },
+            },
+          };
+        }
         return {
           site: null,
           parsed: {
@@ -133,9 +165,10 @@ export async function POST(request: NextRequest) {
     });
 
     const successful = resolved.filter((row): row is ResolvedParse & { site: SiteRow } => row.parsed.parseStatus === "parsed" && Boolean(row.site));
+    const external = resolved.filter((row): row is ResolvedParse & { externalBrand: string } => row.parsed.parseStatus === "parsed" && Boolean(row.externalBrand));
     const first = resolved[0]?.parsed;
     const classification = first?.classification ?? "supporting";
-    const status: ParsedPackFile["parseStatus"] = successful.length
+    const status: ParsedPackFile["parseStatus"] = successful.length || external.length
       ? "parsed"
       : resolved.some((row) => row.parsed.parseStatus === "error")
         ? "error"
@@ -143,15 +176,27 @@ export async function POST(request: NextRequest) {
     const errors = resolved
       .filter((row) => row.parsed.error)
       .map((row) => `${row.parsed.siteHint ? `${row.parsed.siteHint}: ` : ""}${row.parsed.error}`);
+    const externalBrands = [...new Set(external.map((row) => row.externalBrand))];
     const summary = successful.length > 1 || parsedResults.length > 1
       ? {
         groupWideSource: true,
         kitchenCount: successful.length,
         kitchens: successful.map((row) => ({ site: row.site.name, summary: row.parsed.summary })),
+        externalBrandCount: externalBrands.length,
+        externalBrands: external.map((row) => ({ brand: row.externalBrand, summary: row.parsed.summary })),
       }
-      : successful[0]?.parsed.summary ?? first?.summary ?? {};
-    const periods = successful.flatMap((row) => [row.parsed.periodStart, row.parsed.periodEnd].filter((value): value is string => Boolean(value))).sort();
-    const siteHint = successful.length === 1 ? successful[0].site.name : successful.length > 1 ? `${successful.length} kitchens` : first?.siteHint ?? null;
+      : successful[0]?.parsed.summary ?? external[0]?.parsed.summary ?? first?.summary ?? {};
+    const accepted = [...successful, ...external];
+    const periods = accepted.flatMap((row) => [row.parsed.periodStart, row.parsed.periodEnd].filter((value): value is string => Boolean(value))).sort();
+    const siteHint = successful.length === 1
+      ? successful[0].site.name
+      : successful.length > 1
+        ? `${successful.length} kitchens`
+        : externalBrands.length === 1
+          ? externalBrands[0]
+          : externalBrands.length > 1
+            ? `${externalBrands.length} external brands`
+            : first?.siteHint ?? null;
 
     const { error: fileError } = await admin.from("weekly_upload_files").insert({
       id: fileId,
@@ -190,6 +235,7 @@ export async function POST(request: NextRequest) {
       error: errors.join(" "),
       summary,
       sites: successful.map((row) => row.site),
+      externalBrands,
     });
   }
 
@@ -207,6 +253,32 @@ export async function POST(request: NextRequest) {
     if (metricError) {
       await markBatchError(admin, batch.id);
       return NextResponse.json({ error: "The master metrics could not be stored.", batchId: batch.id }, { status: 500 });
+    }
+  }
+
+  if (externalBrandSales.length) {
+    const deduped = new Map<string, ExternalBrandSales>();
+    for (const row of externalBrandSales) deduped.set(row.brandKey, row);
+    const { error: externalError } = await admin.from("external_brand_weekly_sales").upsert(
+      [...deduped.values()].map((row) => ({
+        organisation_id: profile.organisationId,
+        week_start: weekStart,
+        week_end: weekEnd,
+        brand_key: row.brandKey,
+        brand_name: row.brandName,
+        source_file_id: row.sourceFileId,
+        gross_sales: row.grossSales,
+        vat: row.vat,
+        service_charge: row.serviceCharge,
+        net_sales: row.netSales,
+        sales_insights: row.salesInsights ?? {},
+        captured_at: new Date().toISOString(),
+      })),
+      { onConflict: "organisation_id,week_start,brand_key" },
+    );
+    if (externalError) {
+      await markBatchError(admin, batch.id);
+      return NextResponse.json({ error: "The competitor benchmark sales could not be stored.", batchId: batch.id }, { status: 500 });
     }
   }
 
@@ -249,6 +321,7 @@ export async function POST(request: NextRequest) {
       file_count: files.length,
       parsed_file_count: parsedRows.filter((row) => row.status === "parsed").length,
       recognised_kitchen_count: new Set(parsedRows.flatMap((row) => row.sites.map((site) => site.id))).size,
+      external_brand_count: new Set(externalBrandSales.map((row) => row.brandKey)).size,
       metric_count: metrics.length,
       hourly_labour_rows: hourlyMetrics.length,
       warning_count: reconciliation.filter((row) => row.status !== "match").length,
@@ -263,6 +336,7 @@ export async function POST(request: NextRequest) {
       name: row.fileName,
       site: row.sites.length === 1 ? row.sites[0].name : null,
       sites: row.sites.map((site) => site.name),
+      externalBrands: row.externalBrands,
       classification: row.classification,
       status: row.status,
       error: row.error,
@@ -270,6 +344,46 @@ export async function POST(request: NextRequest) {
     })),
     reconciliation,
   });
+}
+
+function ensureGroupCreditCoverage(results: ParsedPackFile[], sites: SiteRow[], expected: { start: string; end: string }) {
+  if (!results.length || !results.every((row) => row.classification === "procure_credits")) return results;
+  const present = new Set(results.map((row) => row.siteHint ? normaliseSiteName(row.siteHint) : "").filter(Boolean));
+  const additions = sites
+    .filter((site) => site.master_purchasing_expected && !present.has(normaliseSiteName(site.name)) && !present.has(normaliseSiteName(site.code)))
+    .map<ParsedPackFile>((site) => ({
+      classification: "procure_credits",
+      parseStatus: "parsed",
+      siteHint: site.name,
+      periodStart: expected.start,
+      periodEnd: expected.end,
+      summary: {
+        confirmedCredits: 0,
+        pendingCredits: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        groupWideSource: true,
+        zeroEvidence: true,
+      },
+      error: "",
+    }));
+  return [...results.filter((row) => row.siteHint || row.parseStatus === "error"), ...additions];
+}
+
+function externalSalesFromParsed(parsed: ParsedPackFile, sourceFileId: string): ExternalBrandSales | null {
+  if (parsed.classification !== "sales_eow" || parsed.parseStatus !== "parsed" || !parsed.siteHint) return null;
+  const netSales = numeric(parsed.summary.netSales);
+  if (netSales == null || netSales <= 0) return null;
+  return {
+    sourceFileId,
+    brandKey: normaliseSiteName(parsed.siteHint),
+    brandName: parsed.siteHint.trim(),
+    grossSales: numeric(parsed.summary.grossSales),
+    vat: numeric(parsed.summary.vat),
+    serviceCharge: numeric(parsed.summary.serviceCharge),
+    netSales,
+    salesInsights: parsed.salesInsights,
+  };
 }
 
 function resolveSite(siteHint: string | null, fileName: string, sites: SiteRow[]) {
