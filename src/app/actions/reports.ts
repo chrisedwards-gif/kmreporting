@@ -5,6 +5,7 @@ import { z } from "zod";
 import { environment } from "@/lib/env";
 import { requireSessionProfile } from "@/lib/auth/dal";
 import { reportSaveErrorMessage } from "@/lib/reporting/errors";
+import { reconcileLatestGroupMaster } from "@/lib/reporting/group-reconciliation";
 import { isSundayToSaturday } from "@/lib/reporting/periods";
 import { optionalNumericInput } from "@/lib/reporting/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -94,6 +95,19 @@ export async function saveWeeklyReport(_previousState: ReportActionState, formDa
     console.error("save_weekly_report failed", { code: error.code, message: error.message, details: error.details, hint: error.hint, siteId: parsed.data.siteId, userId: profile.id });
     return { status: "error", message: reportSaveErrorMessage(error, environment.isPreview) };
   }
-  for (const path of ["/dashboard", "/reports", `/reports/${reportId}`, "/approvals", "/summary", "/costs"]) revalidatePath(path);
+
+  if (parsed.data.intent === "submit") {
+    try {
+      await reconcileLatestGroupMaster({ organisationId: profile.organisationId, weekStart: parsed.data.weekStart });
+    } catch (reconciliationError) {
+      console.error("group reconciliation refresh failed after KM submission", {
+        siteId: parsed.data.siteId,
+        weekStart: parsed.data.weekStart,
+        error: reconciliationError instanceof Error ? reconciliationError.message : reconciliationError,
+      });
+    }
+  }
+
+  for (const path of ["/dashboard", "/reports", `/reports/${reportId}`, "/reports/group", "/intelligence", "/approvals", "/summary", "/costs"]) revalidatePath(path);
   return { status: "success", message: parsed.data.intent === "submit" ? "Report submitted for review." : "Draft saved.", intent: parsed.data.intent, reportId: typeof reportId === "string" ? reportId : undefined };
 }
