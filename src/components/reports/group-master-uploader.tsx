@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, FileSpreadsheet, FolderUp, LoaderCircle, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { WeeklySourceChecklist } from "@/components/reports/weekly-source-checklist";
 import styles from "./group-master-uploader.module.css";
 
 type ReconciliationRow = {
@@ -34,40 +35,11 @@ type UploadResult = {
   error?: string;
 };
 
-type MasterSource = {
-  title: string;
-  exportRule: string;
-  unlocks: string;
-};
-
-const masterSources: MasterSource[] = [
-  {
-    title: "Access / StockLink — sales",
-    exportRule: "Prefer one HOS-wide CSV with Site/Location + Net Sales. Per-kitchen End Of Week HTML files still work too.",
-    unlocks: "Independent net/gross sales cross-check. Per-kitchen End Of Week files can also carry the richer daily / item / category sales detail.",
-  },
-  {
-    title: "Procure Wizard — Goods Delivered",
-    exportRule: "One HOS-wide CSV is preferred. Keep Purchaser Unit Name, Date Delivered, Category, Order Status and Total Price Net.",
-    unlocks: "The app splits every kitchen automatically, then calculates Food purchases and Awaiting Invoice values.",
-  },
-  {
-    title: "Procure Wizard — Credits Overview",
-    exportRule: "One HOS-wide CSV is preferred. Keep Purchaser Unit and the credit request / credit note / status / value columns.",
-    unlocks: "Confirmed credits and pending / investigation credits are split automatically by kitchen.",
-  },
-  {
-    title: "RotaCloud — labour",
-    exportRule: "One HOS-wide CSV is preferred. Include Location, wage/total cost and paid hours. Detailed dated shifts are even better.",
-    unlocks: "Staff cost and paid hours by kitchen; detailed shift rows also feed exact hourly staffing analysis.",
-  },
-];
-
 const prettyClassification = (value: string) => ({
-  sales_eow: "EPOS sales",
-  procure_goods: "Goods Delivered",
+  sales_eow: "End Of Week Report",
+  procure_goods: "Goods Purchased",
   procure_credits: "Credits Overview",
-  rotacloud_labour: "Labour",
+  rotacloud_labour: "RotaCloud Daily Totals",
   stocktake_support: "Stocktake support",
   waste_support: "Waste support",
   supporting: "Supporting file",
@@ -134,8 +106,8 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
       <div className="panel__header weekly-pack__header">
         <div>
           <p className="page-header__eyebrow">Group Chef source of truth</p>
-          <h2 className="panel__title">Upload your HOS-wide exports once.</h2>
-          <p className="panel__subtitle">You do not need to choose a kitchen here. If a source file contains all five kitchens, the app splits it automatically and holds those figures independently from the KM submissions.</p>
+          <h2 className="panel__title">Download the reports below, then upload them once.</h2>
+          <p className="panel__subtitle">Choose All Sites / All Locations wherever possible. The app splits multi-kitchen files automatically and keeps them independent from KM submissions.</p>
         </div>
         <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Group management only</span>
       </div>
@@ -147,32 +119,11 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
           </label>
         </div>
 
-        <section aria-label="Group Chef master reports" className={styles["source-guide"]}>
-          <div className={styles["source-guide__header"]}>
-            <div className={styles["source-guide__header-copy"]}>
-              <strong>What do I upload as Group Chef?</strong>
-              <span>Use the group-wide reports you already pull. One physical file can contain every kitchen; we split it by the kitchen/location column before reconciliation.</span>
-              {activeSites.length ? <span><strong>We are looking for:</strong> {activeSites.join(", ")}</span> : null}
-            </div>
-            <span className={styles["source-guide__count"]}>Usually 3–4 HOS-wide files</span>
-          </div>
-          <div className={styles["source-guide__grid"]}>
-            {masterSources.map((source, index) => (
-              <article className={styles["source-guide__item"]} key={source.title}>
-                <div className={styles["source-guide__item-top"]}>
-                  <span className={styles["source-guide__number"]}>{index + 1}</span>
-                  <span className={styles["source-guide__required"]}>Group export</span>
-                </div>
-                <strong>{source.title}</strong>
-                <span>{source.exportRule}</span>
-                <small><strong>Used for:</strong> {source.unlocks}</small>
-              </article>
-            ))}
-          </div>
-          <div className={styles["source-guide__note"]}><strong>How the two sides work:</strong> you upload the independent HOS-wide source here once. KMs separately upload/review only their own kitchen report. Reconciliation refreshes as each KM submits, so your master pack can be loaded before or after them.</div>
-        </section>
+        <WeeklySourceChecklist audience="group" />
 
-        <div className={styles["source-guide__separate"]}><strong>Fallbacks are fine:</strong> if a system only gives you one file per kitchen, drop those here too. CSV/HTML files populate the recognised figures; XLS/XLSX/PDF/TXT are retained as evidence until a parser is added for that exact format.</div>
+        {activeSites.length ? <div className={styles["source-guide__separate"]}><strong>Active kitchens expected in the group files:</strong> {activeSites.join(", ")}.</div> : null}
+
+        <div className={styles["source-guide__separate"]}><strong>Group shortcut:</strong> Procure Wizard and RotaCloud should normally be exported as All Sites / All Locations. Access End Of Week Report is commonly one file per kitchen, but a HOS-wide sales CSV with Site/Location + Net Sales is also accepted.</div>
 
         <button
           className={`weekly-pack__drop${dragging ? " weekly-pack__drop--active" : ""}`}
@@ -184,9 +135,9 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
           type="button"
         >
           <FolderUp aria-hidden="true" size={34} />
-          <strong>Drop your HOS-wide weekly exports here</strong>
-          <span>One file can cover all five kitchens — no kitchen selector needed.</span>
-          <small>Access / StockLink · Procure Wizard Goods · Procure Wizard Credits · RotaCloud Labour</small>
+          <strong>Drop the required Group Chef exports here</strong>
+          <span>Use HOS-wide files wherever possible — no kitchen selector needed.</span>
+          <small>End Of Week Report · Goods Purchased · Credits Overview · RotaCloud Daily Totals</small>
         </button>
         <input accept=".csv,.xls,.xlsx,.html,.htm,.pdf,.txt" hidden multiple onChange={(event) => { addFiles([...(event.target.files ?? [])]); event.target.value = ""; }} ref={inputRef} type="file" />
 
