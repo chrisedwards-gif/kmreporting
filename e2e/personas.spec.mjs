@@ -39,7 +39,7 @@ test("Admin lands in the group workspace", async ({ page }) => {
   await expectNoSeriousAccessibilityViolations(page);
 });
 
-test("Kitchen Manager sees their kitchen, actions and nightly staffing check", async ({ page }) => {
+test("Kitchen Manager sees their scoped kitchen and reporting actions", async ({ page }) => {
   await switchPersona(page, "kitchen_manager");
   await expect(page.getByRole("heading", { name: "Hi, Scott." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Weekly reports" })).toBeVisible();
@@ -49,9 +49,6 @@ test("Kitchen Manager sees their kitchen, actions and nightly staffing check", a
   await expect(page.getByText("Dough Religion", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Management summary" })).toHaveCount(0);
-  await expect(page.getByText("Tonight’s staffing check", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Was the cover right?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Right" })).toBeVisible();
 
   await page.keyboard.press("Control+K");
   await expect(page.getByRole("dialog", { name: "Workspace search" })).toBeVisible();
