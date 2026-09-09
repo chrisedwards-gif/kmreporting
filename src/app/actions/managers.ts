@@ -134,7 +134,7 @@ export async function createManager(
 
     let profileId = existing?.id;
     let invited = false;
-    if (profileId) {
+    if (existing && profileId) {
       const { data: authRecord, error: authError } = await admin.auth.admin.getUserById(profileId);
       const authEmail = authRecord.user?.email?.toLowerCase() ?? "";
       if (authError || !authRecord.user || authEmail !== parsed.data.email) {

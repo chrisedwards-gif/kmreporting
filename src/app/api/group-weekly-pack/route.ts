@@ -267,7 +267,7 @@ async function reconcileWeek({ organisationId, weekStart, batchId, sites, admin 
       const siteValue = rawSite == null ? null : Number(rawSite);
       if (masterValue == null && siteValue == null) continue;
       const variance = masterValue != null && siteValue != null ? masterValue - siteValue : null;
-      const variancePct = variance != null && siteValue !== 0 ? variance / Math.abs(siteValue) * 100 : null;
+      const variancePct = variance != null && siteValue != null && siteValue !== 0 ? variance / Math.abs(siteValue) * 100 : null;
       const status = siteValue == null
         ? "missing_site" as const
         : masterValue == null

@@ -45,7 +45,7 @@ describe("buildDecisionSignals", () => {
     const weekStarts = ["2026-08-16", "2026-08-23", "2026-08-30", "2026-09-06"];
     const products = weekStarts.flatMap((weekStart) => [
       { siteId, siteName, weekStart, itemName: "Hero Gyros", category: "Flatbreads", quantity: 100, netSales: 1200 },
-      { siteId, siteName, weekStart, itemName: "Slow Dish", category: "Small Plates", quantity: 2, netSales: 20 },
+      { siteId, siteName, weekStart, itemName: "Slow Dish", category: "Small Plates", quantity: 2, netSales: 8 },
     ]);
     const signals = buildDecisionSignals({ ...base, products });
     const menu = signals.find((signal) => signal.title.includes("Slow Dish"));
