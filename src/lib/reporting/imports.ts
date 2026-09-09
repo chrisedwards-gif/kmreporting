@@ -285,7 +285,7 @@ export function parseRotaCloudLabour(input: string, expected: SourcePeriod): Lab
   const hoursColumn = findHeader(headers, ["total paid hours", "paid hours", "total hours", "hours"]);
   const dateColumn = findHeader(headers, ["shift date", "work date", "business date", "date", "day"]);
   const employeeColumn = headers.find((header) => normaliseHeader(header) === "employee");
-  const locationColumn = findHeader(headers, ["location", "site", "kitchen"]);
+  const locationColumn = headers.find((header) => ["location", "site", "kitchen"].includes(normaliseHeader(header)));
   const isDailyTotals = headers.some((header) => normaliseHeader(header) === "totalshifts")
     && headers.some((header) => normaliseHeader(header) === "totalcost");
   const headerLocations = headers.flatMap((header) => {
