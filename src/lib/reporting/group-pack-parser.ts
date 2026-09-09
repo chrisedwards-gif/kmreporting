@@ -62,6 +62,16 @@ const meaningfulSite = (value: string) => {
   return !/^(all|all locations?|all sites?|total|grand total|group|house of social|hos)$/i.test(clean);
 };
 
+const rotaLocationHeader = (header: string) => {
+  const explicit = header.match(/^Location:\s*(.+?)\s*\((Hours|Cost)\)$/i);
+  if (explicit) return { siteName: explicit[1].trim(), kind: explicit[2].toLowerCase() as "hours" | "cost" };
+
+  if (/^(Role|Department|Area|Position|Job):/i.test(header)) return null;
+  const loose = header.match(/^(.+?)\s+(Hours|Cost)$/i) ?? header.match(/^(.+?)\s*\((Hours|Cost)\)$/i);
+  if (!loose) return null;
+  return { siteName: loose[1].trim(), kind: loose[2].toLowerCase() as "hours" | "cost" };
+};
+
 /**
  * Expands one physical Group Chef source file into one parsed result per kitchen.
  * Single-kitchen files remain supported through the existing parser.
@@ -160,13 +170,13 @@ function splitRotaCloud(fileName: string, headers: string[], rows: string[][], e
 
   const wideLocations = new Map<string, { hours?: number; cost?: number }>();
   headers.forEach((header, index) => {
-    const match = header.match(/^(?:Location:\s*)?(.+?)\s*(?:\(|-|:)?\s*(Hours|Cost)\s*\)?$/i);
-    if (!match) return;
-    const siteName = match[1].trim();
+    const parsedHeader = rotaLocationHeader(header);
+    if (!parsedHeader) return;
+    const { siteName, kind } = parsedHeader;
     if (/^(total|paid|estimated|wage|staff|labour|labor|shift)$/i.test(siteName) || !meaningfulSite(siteName)) return;
     const current = wideLocations.get(siteName) ?? {};
-    if (/hours/i.test(match[2])) current.hours = index;
-    if (/cost/i.test(match[2])) current.cost = index;
+    if (kind === "hours") current.hours = index;
+    if (kind === "cost") current.cost = index;
     wideLocations.set(siteName, current);
   });
   if (wideLocations.size <= 1) return null;
