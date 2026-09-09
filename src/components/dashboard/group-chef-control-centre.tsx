@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BrainCircuit, CheckCircle2, Download, FileCheck2, FolderUp, Gauge, TriangleAlert } from "lucide-react";
+import { ArrowRight, BrainCircuit, CheckCircle2, Download, FileCheck2, FolderUp, Gauge, TriangleAlert, type LucideIcon } from "lucide-react";
 import type { SessionProfile } from "@/lib/auth/dal";
 import type { ReportingBundle } from "@/lib/data/reporting";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -13,6 +13,7 @@ type ControlStep = {
   href: string;
   action: string;
   tone: "ready" | "attention" | "neutral";
+  icon: LucideIcon;
 };
 
 export async function GroupChefControlCentre({ profile, bundle }: { profile: SessionProfile; bundle: ReportingBundle }) {
@@ -45,9 +46,10 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
   const reconciliationWarnings = reconciliationRows.filter((row) => row.status !== "match").length;
   const reconciliationMatches = reconciliationRows.filter((row) => row.status === "match").length;
   const allKitchensSubmitted = bundle.expectedSiteCount > 0 && submittedCount >= bundle.expectedSiteCount;
+  const kitchensRemaining = Math.max(bundle.expectedSiteCount - submittedCount, 0);
 
   const nextAction = !allKitchensSubmitted
-    ? `Wait for ${Math.max(bundle.expectedSiteCount - submittedCount, 0)} kitchen${bundle.expectedSiteCount - submittedCount === 1 ? "" : "s"} to submit, then upload your independent master pack.`
+    ? `Wait for ${kitchensRemaining} kitchen${kitchensRemaining === 1 ? "" : "s"} to submit, then upload your independent master pack.`
     : !masterReady
       ? "Upload the Group Master Pack — four core exports per kitchen."
       : reconciliationWarnings > 0
@@ -62,6 +64,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       href: "/reports",
       action: "Review reports",
       tone: allKitchensSubmitted ? "ready" : "attention",
+      icon: FileCheck2,
     },
     {
       title: "Master pack",
@@ -70,6 +73,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       href: `/reports/group?week=${bundle.week.start}`,
       action: masterReady ? "View master pack" : "Upload master pack",
       tone: masterReady ? "ready" : "attention",
+      icon: FolderUp,
     },
     {
       title: "Reconciliation",
@@ -78,6 +82,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       href: `/reports/group?week=${bundle.week.start}`,
       action: "Check reconciliation",
       tone: masterReady && reconciliationWarnings === 0 ? "ready" : masterReady ? "attention" : "neutral",
+      icon: Gauge,
     },
     {
       title: "Decision Desk",
@@ -86,6 +91,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       href: "/intelligence",
       action: "Open Decision Desk",
       tone: masterReady ? "ready" : "neutral",
+      icon: BrainCircuit,
     },
     {
       title: "AI review pack",
@@ -94,10 +100,9 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
       href: `/api/intelligence/export?week=${bundle.week.start}`,
       action: "Download AI review pack",
       tone: masterReady ? "ready" : "neutral",
+      icon: Download,
     },
   ];
-
-  const icons = [FileCheck2, FolderUp, Gauge, BrainCircuit, Download];
 
   return (
     <section aria-label="Group Chef weekly control centre" className={`panel ${styles["group-control"]}`}>
@@ -123,7 +128,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
 
         <div className={styles["group-control__steps"]}>
           {steps.map((step, index) => {
-            const Icon = icons[index];
+            const Icon = step.icon;
             return (
               <Link className={`${styles["group-control__step"]} ${styles[`group-control__step--${step.tone}`] ?? ""}`} href={step.href} key={step.title}>
                 <div className={styles["group-control__step-top"]}>
