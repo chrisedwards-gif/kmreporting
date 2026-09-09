@@ -20,6 +20,7 @@ type ParsedUpload = {
   name: string;
   site: string | null;
   sites?: string[];
+  externalBrands?: string[];
   classification: string;
   status: string;
   error: string;
@@ -33,6 +34,12 @@ type UploadResult = {
   parsed?: ParsedUpload[];
   reconciliation?: ReconciliationRow[];
   error?: string;
+};
+
+type SourceException = {
+  siteName: string;
+  purchasingMasterExpected: boolean;
+  labourMasterExpected: boolean;
 };
 
 const prettyClassification = (value: string) => ({
@@ -63,7 +70,23 @@ const formatValue = (key: string, value: number | null) => value == null
     ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 2 }).format(value)
     : value.toFixed(2);
 
-export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart: string; activeSites?: string[] }) {
+const sourceExceptionLabel = (exception: SourceException) => {
+  const missing = [
+    !exception.purchasingMasterExpected ? "Procure Wizard" : null,
+    !exception.labourMasterExpected ? "RotaCloud" : null,
+  ].filter(Boolean);
+  return `${exception.siteName}: ${missing.join(" + ")} not expected in the Group Chef master; the KM submission is the source for those metrics.`;
+};
+
+export function GroupMasterUploader({
+  weekStart,
+  activeSites = [],
+  sourceExceptions = [],
+}: {
+  weekStart: string;
+  activeSites?: string[];
+  sourceExceptions?: SourceException[];
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [start, setStart] = useState(weekStart);
   const [files, setFiles] = useState<File[]>([]);
@@ -100,6 +123,7 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
   const warnings = result?.reconciliation?.filter((row) => row.status !== "match") ?? [];
   const matches = result?.reconciliation?.filter((row) => row.status === "match") ?? [];
   const matchedSites = [...new Set((result?.parsed ?? []).flatMap((row) => row.sites?.length ? row.sites : row.site ? [row.site] : []))];
+  const externalBrands = [...new Set((result?.parsed ?? []).flatMap((row) => row.externalBrands ?? []))];
 
   return (
     <section className="panel weekly-pack group-master-pack">
@@ -107,7 +131,7 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
         <div>
           <p className="page-header__eyebrow">Group Chef source of truth</p>
           <h2 className="panel__title">Download the reports below, then upload them once.</h2>
-          <p className="panel__subtitle">Choose All Sites / All Locations wherever possible. The app splits multi-kitchen files automatically and keeps them independent from KM submissions.</p>
+          <p className="panel__subtitle">Choose All Sites / All Locations where that source applies. Competitor StockLink reports are retained as benchmarks; kitchen-specific source exceptions are not treated as missing data.</p>
         </div>
         <span className="source-chip source-chip--safe"><ShieldCheck aria-hidden="true" size={14} /> Group management only</span>
       </div>
@@ -121,9 +145,15 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
 
         <WeeklySourceChecklist audience="group" />
 
-        {activeSites.length ? <div className={styles["source-guide__separate"]}><strong>Active kitchens expected in the group files:</strong> {activeSites.join(", ")}.</div> : null}
+        {activeSites.length ? <div className={styles["source-guide__separate"]}><strong>Active kitchens expected for applicable sources:</strong> {activeSites.join(", ")}.</div> : null}
 
-        <div className={styles["source-guide__separate"]}><strong>Group shortcut:</strong> Procure Wizard and RotaCloud should normally be exported as All Sites / All Locations. Access End Of Week Report is commonly one file per kitchen, but a HOS-wide sales CSV with Site/Location + Net Sales is also accepted.</div>
+        {sourceExceptions.map((exception) => (
+          <div className={styles["source-guide__separate"]} key={exception.siteName}>
+            <strong>Source exception:</strong> {sourceExceptionLabel(exception)}
+          </div>
+        ))}
+
+        <div className={styles["source-guide__separate"]}><strong>Group shortcut:</strong> Procure Wizard can be exported as All Sites for kitchens that use PW. RotaCloud can be All Locations when the CSV contains per-location hours/cost columns; otherwise export the applicable kitchens separately. Access End Of Week Report remains one file per kitchen/brand and unmatched brands are kept as competitor benchmarks.</div>
 
         <button
           className={`weekly-pack__drop${dragging ? " weekly-pack__drop--active" : ""}`}
@@ -158,15 +188,25 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
         {result?.ok ? (
           <div className="group-master-result" role="status">
             <div className="weekly-pack__result-title"><CheckCircle2 aria-hidden="true" size={18} /><strong>Group master pack processed</strong></div>
-            <p>{matchedSites.length} kitchen{matchedSites.length === 1 ? "" : "s"} recognised · {matches.length} metric checks matched · {warnings.length} currently need review / a KM submission.</p>
-            <div className="group-master-result__sites">{matchedSites.map((site) => <span className="source-chip source-chip--safe" key={site}>{site}</span>)}</div>
-            {result.parsed?.map((item) => (
-              <div className={`weekly-pack__parsed${item.status !== "parsed" || item.error ? " weekly-pack__parsed--error" : ""}`} key={item.name}>
-                <FileSpreadsheet aria-hidden="true" size={15} />
-                <span><strong>{prettyClassification(item.classification)}</strong> · {item.name}</span>
-                <small>{item.sites?.length ? `${item.sites.length} kitchens: ${item.sites.join(", ")}${item.error ? ` · ${item.error}` : ""}` : item.error || "Stored as supporting evidence"}</small>
-              </div>
-            ))}
+            <p>{matchedSites.length} active kitchen{matchedSites.length === 1 ? "" : "s"} recognised · {externalBrands.length} competitor benchmark{externalBrands.length === 1 ? "" : "s"} captured · {matches.length} metric checks matched · {warnings.length} currently need review / a KM submission.</p>
+            <div className="group-master-result__sites">
+              {matchedSites.map((site) => <span className="source-chip source-chip--safe" key={site}>{site}</span>)}
+              {externalBrands.map((brand) => <span className="source-chip" key={brand}>{brand} · competitor</span>)}
+            </div>
+            {result.parsed?.map((item) => {
+              const competitors = item.externalBrands ?? [];
+              return (
+                <div className={`weekly-pack__parsed${item.status !== "parsed" || item.error ? " weekly-pack__parsed--error" : ""}`} key={item.name}>
+                  <FileSpreadsheet aria-hidden="true" size={15} />
+                  <span><strong>{prettyClassification(item.classification)}</strong> · {item.name}</span>
+                  <small>{competitors.length
+                    ? `Competitor benchmark captured: ${competitors.join(", ")}`
+                    : item.sites?.length
+                      ? `${item.sites.length} kitchens: ${item.sites.join(", ")}${item.error ? ` · ${item.error}` : ""}`
+                      : item.error || "Stored as supporting evidence"}</small>
+                </div>
+              );
+            })}
             {warnings.length ? (
               <div className="reconciliation-warnings">
                 <h3><TriangleAlert aria-hidden="true" size={17} /> Reconciliation still in progress / needs review</h3>
@@ -179,7 +219,7 @@ export function GroupMasterUploader({ weekStart, activeSites = [] }: { weekStart
                   </div>
                 ))}
               </div>
-            ) : <p className="weekly-pack__missing weekly-pack__missing--ready">All comparable KM values agree with your independent master pack.</p>}
+            ) : <p className="weekly-pack__missing weekly-pack__missing--ready">All comparable KM values agree with your independent master pack. Source-exception metrics remain owned by the KM submission.</p>}
           </div>
         ) : null}
 
