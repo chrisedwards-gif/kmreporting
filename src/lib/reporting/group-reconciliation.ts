@@ -13,7 +13,14 @@ export type GroupReconciliationRow = {
   status: "match" | "warning" | "missing_site" | "missing_master";
 };
 
-type SiteRow = { id: string; name: string; code?: string };
+type SiteRow = {
+  id: string;
+  name: string;
+  code?: string;
+  master_sales_expected?: boolean;
+  master_purchasing_expected?: boolean;
+  master_labour_expected?: boolean;
+};
 type AdminClient = ReturnType<typeof createAdminClient>;
 
 export async function reconcileLatestGroupMaster({ organisationId, weekStart }: { organisationId: string; weekStart: string }) {
@@ -29,7 +36,12 @@ export async function reconcileLatestGroupMaster({ organisationId, weekStart }: 
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    admin.from("sites").select("id, name, code").eq("organisation_id", organisationId).eq("active", true).order("name"),
+    admin
+      .from("sites")
+      .select("id, name, code, master_sales_expected, master_purchasing_expected, master_labour_expected")
+      .eq("organisation_id", organisationId)
+      .eq("active", true)
+      .order("name"),
   ]);
   if (!batch || !sites?.length) return [];
   return reconcileGroupMasterBatch({ organisationId, weekStart, batchId: batch.id, sites: sites as SiteRow[], admin });
@@ -89,6 +101,8 @@ export async function reconcileGroupMasterBatch({
     const source = reportId ? sourceByReport.get(reportId) : null;
     const master = masterBySite.get(site.id) ?? new Map<string, number>();
     for (const key of keys) {
+      if (!masterSourceExpected(site, key)) continue;
+
       const masterValue = master.has(key) ? master.get(key)! : null;
       const rawSite = source ? source[key] : null;
       const siteValue = rawSite == null ? null : Number(rawSite);
@@ -126,6 +140,13 @@ export async function reconcileGroupMasterBatch({
     if (error) throw new Error(`Could not refresh group reconciliation: ${error.message}`);
   }
   return response;
+}
+
+function masterSourceExpected(site: SiteRow, key: string) {
+  if (key === "net_sales") return site.master_sales_expected ?? true;
+  if (["purchases", "credits", "pending_credits", "awaiting_invoice"].includes(key)) return site.master_purchasing_expected ?? true;
+  if (["staff_cost", "paid_hours"].includes(key)) return site.master_labour_expected ?? true;
+  return true;
 }
 
 function metricMatches(key: string, siteValue: number, masterValue: number) {
