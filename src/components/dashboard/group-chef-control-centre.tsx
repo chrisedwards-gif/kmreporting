@@ -50,7 +50,7 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
   const kitchensRemaining = Math.max(bundle.expectedSiteCount - submittedCount, 0);
 
   const nextAction = !masterReady
-    ? "Upload your HOS-wide master exports once. They can contain all kitchens; KMs submit their own reports separately."
+    ? "Download the four named source reports, then upload your HOS-wide master exports once. KMs submit their own reports separately."
     : !allKitchensSubmitted
       ? `${kitchensRemaining} KM submission${kitchensRemaining === 1 ? " is" : "s are"} still outstanding. Your master data is already loaded and reconciliation will refresh as they submit.`
       : reviewIssues > 0
@@ -61,16 +61,16 @@ export async function GroupChefControlCentre({ profile, bundle }: { profile: Ses
     {
       title: "Your HOS master exports",
       status: masterReady ? "Uploaded once" : "Upload once",
-      copy: "Drop the group-wide Access/StockLink, Procure Wizard and RotaCloud exports. One file can cover all kitchens.",
+      copy: "Download: StockLink End Of Week Report, Procure Wizard Goods Purchased, Procure Wizard Credits Overview and RotaCloud Daily Totals. Use All Sites / All Locations where available.",
       href: `/reports/group?week=${bundle.week.start}`,
-      action: masterReady ? "View master pack" : "Upload master pack",
+      action: masterReady ? "View master pack" : "See download checklist",
       tone: masterReady ? "ready" : "attention",
       icon: FolderUp,
     },
     {
       title: "KM submissions",
       status: `${submittedCount}/${bundle.expectedSiteCount} submitted`,
-      copy: "KMs independently upload/review only their own kitchen and add the operational context you do not need to enter for them.",
+      copy: "KMs independently download the same four named source reports for their kitchen, upload them, then add the operational context you do not need to enter for them.",
       href: "/reports",
       action: "Review KM status",
       tone: allKitchensSubmitted ? "ready" : "neutral",
