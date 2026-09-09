@@ -6,6 +6,7 @@ import {
   parseStockLinkEndOfWeek,
   type SourcePeriod,
 } from "@/lib/reporting/imports";
+import { parseRotaCloudHourlyCoverage } from "@/lib/reporting/rotacloud-hourly";
 import { parseStockLinkSalesInsights } from "@/lib/reporting/sales-imports";
 import type { SalesInsightsInput } from "@/lib/types";
 
@@ -115,13 +116,14 @@ export function classifyWeeklyPackFile(fileName: string, content: string, expect
   if (looksLikeRotaCloud) {
     try {
       const result = parseRotaCloudLabour(content, expected);
+      const hourlyLabour = parseRotaCloudHourlyCoverage(content, expected);
       return {
         classification: "rotacloud_labour",
         parseStatus: "parsed",
         siteHint: result.siteName ?? null,
         periodStart: result.period?.start ?? expected.start,
         periodEnd: result.period?.end ?? expected.end,
-        summary: { staffCost: result.staffCost, paidHours: result.paidHours },
+        summary: { staffCost: result.staffCost, paidHours: result.paidHours, hourlyRows: hourlyLabour.length, hourlyLabour },
         error: "",
       };
     } catch (error) {
